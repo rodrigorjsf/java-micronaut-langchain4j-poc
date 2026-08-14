@@ -330,6 +330,42 @@ agentic:
         base-url: https://timeapi.io/api
         max-response-bytes: 4096
 
+      # --- Health and food ---------------------------------------------------
+      openfoodfacts:
+        # 10 req/min per IP, so a transport retry would walk straight into the
+        # throttle. The tool asks for a fields= whitelist, which is why 8 KB is
+        # generous for a route whose unprojected body measured 31 377 B.
+        base-url: https://world.openfoodfacts.org/api/v2
+        max-retries: 0
+        max-response-bytes: 8192
+      openfoodfacts-search:
+        # The v2 search host. Measured 2026-08-14: 3/3 200s at 1 201 B for
+        # ?q=nutella&page_size=5 with the fields whitelist. An earlier probe of
+        # this host WITHOUT fields= answered 503, which is why the tool always
+        # sends one.
+        base-url: https://search.openfoodfacts.org
+        max-retries: 0
+        max-response-bytes: 8192
+      themealdb:
+        # Sized to let a dish through and to stop an ingredient. Measured
+        # 2026-08-14: arrabiata 2 025 B, lasagne 2 987 B, pizza 6 234 B, random
+        # 1 650 B — but "chicken" is 59 786 B. Hitting the ceiling there is the
+        # intended outcome: search_recipe checks truncated() itself and tells the
+        # model the word was an ingredient, because this route has no result limit
+        # to narrow with.
+        base-url: https://www.themealdb.com/api/json/v1/1
+        max-response-bytes: 12288
+      thecocktaildb:
+        # 24 KB, not the 16 KB the response sizes first suggested. Measured
+        # 2026-08-14: caipirinha 8 288 B, margarita 17 762 B. "Margarita" is not a
+        # pathological query the way "chicken" is — it is the most common cocktail
+        # lookup there is — so the ceiling has to clear it.
+        base-url: https://www.thecocktaildb.com/api/json/v1/1
+        max-response-bytes: 24576
+      openbrewerydb:
+        base-url: https://api.openbrewerydb.org/v1
+        max-response-bytes: 8192
+
   agent:
     # 40 messages is ~3 turns worst case with 6 tool round trips, and ~10 turns of
     # chatty traffic. A message window rather than a token window: the prompt cost is
