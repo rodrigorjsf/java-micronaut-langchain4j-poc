@@ -3,6 +3,7 @@ package io.github.rodrigorjsf.agenticchat.conversation;
 import dev.langchain4j.guardrail.GuardrailException;
 import io.github.rodrigorjsf.agenticchat.agent.ChatAssistant;
 import io.github.rodrigorjsf.agenticchat.memory.ConversationId;
+import io.github.rodrigorjsf.agenticchat.skills.SkillCatalog;
 import io.github.rodrigorjsf.agenticchat.triage.TriageService;
 import io.github.rodrigorjsf.agenticchat.triage.TriageVerdict;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -34,18 +35,26 @@ public class ChatTurnService {
 
     private final TriageService triage;
     private final ChatAssistant assistant;
+    private final SkillCatalog skills;
     private final MeterRegistry meters;
 
-    public ChatTurnService(TriageService triage, ChatAssistant assistant, MeterRegistry meters) {
+    public ChatTurnService(TriageService triage,
+                           ChatAssistant assistant,
+                           SkillCatalog skills,
+                           MeterRegistry meters) {
         this.triage = triage;
         this.assistant = assistant;
+        this.skills = skills;
         this.meters = meters;
     }
 
     public ChatTurn handle(ConversationId conversationId, String message) {
         var sample = Timer.start(meters);
 
-        TriageVerdict verdict = triage.triage(message);
+        // The verdict is model output. Its skill hint reaches the agent's prompt, so
+        // it is checked against the published catalogue before it gets there — the
+        // guardrail chain reads the user's message, not this object.
+        TriageVerdict verdict = triage.triage(message).withSkillHintIn(skills.names());
         if (!verdict.inScope()) {
             sample.stop(meters.timer("agentic.turn.latency", "path", "refused"));
             LOG.info("Turn refused as out of scope: conversation={} intent={}",
@@ -65,10 +74,5 @@ public class ChatTurnService {
             meters.counter("agentic.turn.guardrail_blocks").increment();
             return ChatTurn.blocked(verdict, GUARDRAIL_REFUSAL);
         }
-    }
-
-    /** Exposed for the eval suite, which needs the verdict without paying for an agent turn. */
-    public TriageVerdict triageOnly(String message) {
-        return triage.triage(message);
     }
 }

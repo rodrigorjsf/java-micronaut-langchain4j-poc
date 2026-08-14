@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import dev.langchain4j.model.output.structured.Description;
 
 import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * What the triage judge decides about one user turn.
@@ -69,12 +70,47 @@ public record TriageVerdict(
         OUT_OF_SCOPE
     }
 
+    /** BCP-47 shape: two or three letters, optionally a script and a region. */
+    private static final Pattern LANGUAGE_TAG = Pattern.compile("[a-zA-Z]{2,3}(-[a-zA-Z]{2,8}){0,2}");
+    private static final Pattern INTENT_LABEL = Pattern.compile("[a-z][a-z0-9_]{0,39}");
+    private static final String DEFAULT_LANGUAGE = "pt-BR";
+
+    /**
+     * Every field here comes out of an LLM and two of them are interpolated into the
+     * next prompt, so they are constrained rather than trusted.
+     *
+     * <p>{@code language} and {@code intent} reach the agent's turn context and the
+     * metric tags respectively. The guardrail chain inspects the user's message, not
+     * this object, so an unvalidated field would be a way to get attacker-chosen text
+     * into the agent's prompt without passing a single guardrail — and an unbounded
+     * {@code intent} would additionally blow up metric cardinality. Anything not
+     * matching the expected shape is replaced, never sanitised in place.
+     */
     public TriageVerdict {
-        riskFlags = riskFlags == null ? List.of() : List.copyOf(riskFlags);
-        intent = intent == null ? "unknown" : intent;
-        language = language == null || language.isBlank() ? "pt-BR" : language;
+        riskFlags = riskFlags == null ? List.of() : riskFlags.stream()
+                .filter(flag -> flag != null && INTENT_LABEL.matcher(flag).matches())
+                .distinct()
+                .limit(8)
+                .toList();
+        intent = intent != null && INTENT_LABEL.matcher(intent).matches() ? intent : "unknown";
+        language = language != null && LANGUAGE_TAG.matcher(language).matches()
+                ? language
+                : DEFAULT_LANGUAGE;
         skillHint = skillHint == null ? "" : skillHint;
         outOfScopeReply = outOfScopeReply == null ? "" : outOfScopeReply;
+    }
+
+    /**
+     * A copy whose skill hint is guaranteed to name a real skill.
+     *
+     * <p>Checked against the catalogue rather than a pattern: the hint is
+     * interpolated into the agent's prompt, and the only safe values are ones the
+     * application already publishes.
+     */
+    public TriageVerdict withSkillHintIn(java.util.Collection<String> knownSkills) {
+        return knownSkills.contains(skillHint)
+                ? this
+                : new TriageVerdict(decision, confidence, intent, language, "", riskFlags, outOfScopeReply);
     }
 
     public boolean inScope() {
