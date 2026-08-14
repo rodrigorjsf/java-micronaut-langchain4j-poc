@@ -10,6 +10,7 @@ import io.github.rodrigorjsf.agenticchat.guardrail.input.NormalizingInputGuardra
 import io.github.rodrigorjsf.agenticchat.guardrail.output.ExfiltrationGuardrail;
 import io.github.rodrigorjsf.agenticchat.guardrail.output.SystemPromptLeakageGuardrail;
 import io.github.rodrigorjsf.agenticchat.llm.ChatModelRegistry;
+import io.github.rodrigorjsf.agenticchat.memory.SummarizerPrompt;
 import io.github.rodrigorjsf.agenticchat.skills.SkillCatalog;
 import io.github.rodrigorjsf.agenticchat.triage.TriageJudge;
 import io.micronaut.context.annotation.Factory;
@@ -42,6 +43,18 @@ public class AiServiceFactory {
                 .build();
     }
 
+    /**
+     * Compaction runs on the judge model, not the agent model. Compressing an old
+     * transcript is not reasoning, and the judge model measured a 0.91 s median
+     * against 5.93 s on this machine.
+     */
+    @Singleton
+    SummarizerPrompt summarizerPrompt(ChatModelRegistry models) {
+        return AiServices.builder(SummarizerPrompt.class)
+                .chatModel(models.forRole("judge"))
+                .build();
+    }
+
     @Singleton
     ChatAssistant chatAssistant(ChatModelRegistry models,
                                SystemPromptBuilder systemPrompt,
@@ -68,6 +81,9 @@ public class AiServiceFactory {
                 .chatMemoryProvider(conversationId -> MessageWindowChatMemory.builder()
                         .id(conversationId)
                         .maxMessages(memoryWindow)
+                        // The primacy anchor for lost-in-the-middle, set explicitly
+                        // rather than relying on the eviction loop's default.
+                        .alwaysKeepSystemMessageFirst(true)
                         .chatMemoryStore(memoryStore)
                         .build())
 

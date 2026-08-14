@@ -167,13 +167,21 @@ agentic:
         - ibge.gov.br
 
   agent:
-    # 20 messages is ~10 exchanges. A message window rather than a token window: the
-    # prompt cost is slightly less tight but the number of retained turns is the same
-    # in a test and in production, which a token window cannot promise.
-    memory-window-messages: 20
+    # 40 messages is ~3 turns worst case with 6 tool round trips, and ~10 turns of
+    # chatty traffic. A message window rather than a token window: the prompt cost is
+    # slightly less tight but the number of retained turns is the same in a test and
+    # in production, which a token window cannot promise. Tokens are counted for the
+    # COMPACTION trigger instead, where the imprecision does not matter.
+    memory-window-messages: 40
     # activate_skill plus a couple of chained lookups fits in six. Beyond that the
     # model is looping, and every loop pays for the whole prompt again.
     max-tool-round-trips: 6
+    # Compaction trigger, in estimated prompt tokens. 14400 is 60% of a self-imposed
+    # 24000-token working budget — deliberately far below the model's real window,
+    # because a bigger window is more RAM on a machine with a memory leak. Recall
+    # degrades with input length on every model tested, so the budget is chosen to
+    # keep a normal turn inside the range where that degradation is small.
+    compaction-trigger-tokens: 14400
 
   rag:
     # minScore is a relevance score in [0,1], not raw cosine similarity. 0.6 lets

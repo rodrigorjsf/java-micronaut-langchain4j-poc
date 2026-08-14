@@ -4,6 +4,7 @@ import dev.langchain4j.guardrail.GuardrailException;
 import dev.langchain4j.invocation.InvocationParameters;
 import io.github.rodrigorjsf.agenticchat.rag.SkillAwareQueryRouter;
 import io.github.rodrigorjsf.agenticchat.agent.ChatAssistant;
+import io.github.rodrigorjsf.agenticchat.memory.ConversationCompactor;
 import io.github.rodrigorjsf.agenticchat.memory.ConversationId;
 import io.github.rodrigorjsf.agenticchat.skills.SkillCatalog;
 import io.github.rodrigorjsf.agenticchat.triage.TriageService;
@@ -38,15 +39,18 @@ public class ChatTurnService {
     private final TriageService triage;
     private final ChatAssistant assistant;
     private final SkillCatalog skills;
+    private final ConversationCompactor compactor;
     private final MeterRegistry meters;
 
     public ChatTurnService(TriageService triage,
                            ChatAssistant assistant,
                            SkillCatalog skills,
+                           ConversationCompactor compactor,
                            MeterRegistry meters) {
         this.triage = triage;
         this.assistant = assistant;
         this.skills = skills;
+        this.compactor = compactor;
         this.meters = meters;
     }
 
@@ -72,6 +76,9 @@ public class ChatTurnService {
             var result = assistant.chat(
                     conversationId.value(), message, verdict.language(), verdict.skillHint(), parameters);
             sample.stop(meters.timer("agentic.turn.latency", "path", "answered"));
+            // At the END of the turn, so the user never waits for it, and only when
+            // the conversation is actually over budget.
+            compactor.compactIfNeeded(conversationId);
             return ChatTurn.answered(verdict, result);
         } catch (GuardrailException e) {
             // The guardrail already logged what it found. What reaches the user must

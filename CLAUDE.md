@@ -85,6 +85,7 @@ When something fails repeatedly, when User has to re-explain, or when a workarou
 - `@EachProperty` + `@Parameter` needs a class, not an interface.
 - Micronaut `@Cacheable` is proxy-based: self-invocation never caches.
 - `@EachProperty` entries in application.yml merge into every test context.
+- Reordering `@Factory` methods leaves stale `Bean1`/`Bean2` definitions; run `mvnw clean`.
 
 
 
