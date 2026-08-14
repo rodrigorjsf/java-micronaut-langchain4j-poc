@@ -156,17 +156,22 @@ swapping a model a deployment decision.
 | `api` | HTTP surface, DTOs, error shaping | `conversation`, `skills` |
 | `conversation` | the turn lifecycle | `triage`, `agent`, `skills`, `memory` |
 | `triage` | scope decisions | `llm`, `skills`, `guardrail.input` (normalizer only) |
-| `agent` | assistant assembly and the system prompt | `llm`, `skills`, `memory`, `guardrail` |
+| `agent` | assistant assembly, the system prompt, sub-agent workflows | `llm`, `skills`, `memory`, `guardrail`, `rag`, `tools.*` |
 | `guardrail` | input and output checks | `llm` |
 | `skills` | catalogue, `SKILL.md` loading, tool binding | — |
-| `tools.*` | tool implementations | `tools.http`, `skills` |
+| `tools.*` | tool implementations over external data sources | `tools.http`, `skills` |
+| `rag` | corpus ingestion, retrieval, routing | `skills` |
 | `memory` | chat memory stores | `infra` |
 | `llm` | model construction by role | `infra.config` |
 | `infra` | AWS and Valkey clients, configuration, clock | — |
 
 Two rules, enforced by ArchUnit rather than by convention:
 
-1. **No cycles** between these packages.
+1. **No cycles** between these packages. This is not decorative: it already caught
+   one. A sub-agent workflow needs tool beans, and exposing that workflow as a tool
+   made `agent` and `tools` mutually dependent. The fix was to recognise that the
+   trip-briefing tool is the *workflow's adapter*, not a data source, and move it
+   beside the workflow — which is why a tool lives under `agent.workflow`.
 2. **`infra` and `skills` depend on nothing above them.** They are the bottom of
    the graph.
 

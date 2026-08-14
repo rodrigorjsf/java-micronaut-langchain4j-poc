@@ -31,6 +31,7 @@ public class ScriptedChatModel implements ChatModel {
     private final List<ChatRequest> requests = new ArrayList<>();
     private AiMessage fallback = AiMessage.from("ok");
     private List<ChatModelListener> listeners = List.of();
+    private Function<ChatRequest, AiMessage> router;
 
     /**
      * Real provider models notify listeners around every call, so this double does
@@ -58,6 +59,19 @@ public class ScriptedChatModel implements ChatModel {
         return this;
     }
 
+    /**
+     * Answers by inspecting the request instead of by position.
+     *
+     * <p>Needed wherever calls are concurrent: a queue assumes an order, and a
+     * parallel workflow stage does not have one. Routing on the system message is
+     * both deterministic and closer to what the test is actually asserting — that
+     * each sub-agent was asked the right thing.
+     */
+    public ScriptedChatModel routeBy(Function<ChatRequest, AiMessage> router) {
+        this.router = router;
+        return this;
+    }
+
     public List<ChatRequest> requests() {
         return List.copyOf(requests);
     }
@@ -77,8 +91,13 @@ public class ScriptedChatModel implements ChatModel {
         listeners.forEach(listener -> listener.onRequest(
                 new ChatModelRequestContext(chatRequest, null, attributes)));
 
-        var responder = script.poll();
-        var message = responder == null ? fallback : responder.apply(chatRequest);
+        AiMessage message;
+        if (router != null) {
+            message = router.apply(chatRequest);
+        } else {
+            var responder = script.poll();
+            message = responder == null ? fallback : responder.apply(chatRequest);
+        }
         var response = ChatResponse.builder()
                 .aiMessage(message)
                 .tokenUsage(new TokenUsage(100, 20))
