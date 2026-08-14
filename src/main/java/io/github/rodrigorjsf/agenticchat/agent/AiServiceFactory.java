@@ -8,7 +8,10 @@ import dev.langchain4j.store.memory.chat.ChatMemoryStore;
 import io.github.rodrigorjsf.agenticchat.guardrail.input.InjectionTriageGuardrail;
 import io.github.rodrigorjsf.agenticchat.guardrail.input.NormalizingInputGuardrail;
 import io.github.rodrigorjsf.agenticchat.guardrail.output.ExfiltrationGuardrail;
+import io.github.rodrigorjsf.agenticchat.guardrail.input.InjectionHeuristics;
 import io.github.rodrigorjsf.agenticchat.guardrail.output.SystemPromptLeakageGuardrail;
+import io.github.rodrigorjsf.agenticchat.guardrail.tool.ToolResultScreeningProvider;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.github.rodrigorjsf.agenticchat.llm.ChatModelRegistry;
 import io.github.rodrigorjsf.agenticchat.memory.SummarizerPrompt;
 import io.github.rodrigorjsf.agenticchat.skills.SkillCatalog;
@@ -65,6 +68,8 @@ public class AiServiceFactory {
                                InjectionTriageGuardrail injectionTriage,
                                SystemPromptLeakageGuardrail leakage,
                                ExfiltrationGuardrail exfiltration,
+                               InjectionHeuristics heuristics,
+                               MeterRegistry meters,
                                @Value("${agentic.agent.memory-window-messages:20}") int memoryWindow,
                                @Value("${agentic.agent.max-tool-round-trips:6}") int maxRoundTrips) {
 
@@ -100,8 +105,12 @@ public class AiServiceFactory {
                 .storeRetrievedContentInChatMemory(false)
 
                 // Skill-scoped tools: only activate_skill and read_skill_resource are
-                // visible until the model activates a skill.
-                .toolProvider(skills.skills().toolProvider())
+                // visible until the model activates a skill. Wrapped so every tool
+                // RESULT is screened — guardrails run before and after the tool loop
+                // and can never see what a tool returned, which is exactly where
+                // indirect prompt injection arrives.
+                .toolProvider(new ToolResultScreeningProvider(
+                        skills.skills().toolProvider(), heuristics, meters))
 
                 // Order matters and is the annotation order: normalize first so every
                 // later check and the model itself see one canonical form.
