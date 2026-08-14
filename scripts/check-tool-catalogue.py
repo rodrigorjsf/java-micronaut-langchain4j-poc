@@ -13,6 +13,12 @@ WHY    A tool names a catalogue key and never a URL — that is the SSRF control
        The reverse direction matters too: a configured host nothing calls is an
        allow-listed destination with no reason to be reachable.
 
+       It also gates the scheme. Every base URL must be https, because a tool's
+       arguments are user text and a plaintext hop puts them on the wire in clear.
+       That rule is a convention nothing in the Java enforces, and a convention
+       written only in a document loses; see the rejected ip-api.com entry in
+       docs/03-security.md for the case that put it here.
+
 WHEN   After adding or renaming a tool, after editing `agentic.tools.apis`, and
        after merging tool code written in parallel — which is exactly when the two
        halves drift.
@@ -61,15 +67,17 @@ def keys_used() -> dict[str, set[Path]]:
     return used
 
 
-def keys_configured() -> set[str]:
-    """Immediate children of `agentic.tools.apis` — parsed by indentation on purpose.
+def keys_configured() -> dict[str, str]:
+    """Immediate children of `agentic.tools.apis`, mapped to their base URL.
 
-    A YAML library would be the obvious choice and would also pull a dependency
-    into a check that has to run before anything is installed.
+    Parsed by indentation on purpose. A YAML library would be the obvious choice
+    and would also pull a dependency into a check that has to run before anything
+    is installed.
     """
     lines = CONFIG.read_text(encoding="utf-8").splitlines()
-    configured: set[str] = set()
+    configured: dict[str, str] = {}
     apis_indent = None
+    current = None
     for line in lines:
         if apis_indent is None:
             if re.match(r"^(\s*)apis:\s*$", line):
@@ -82,7 +90,12 @@ def keys_configured() -> set[str]:
             break
         entry = re.match(r"^\s*([a-z0-9][a-z0-9-]*):\s*$", line)
         if entry and indent == apis_indent + 2:
-            configured.add(entry.group(1))
+            current = entry.group(1)
+            configured[current] = ""
+            continue
+        base = re.match(r"^\s*base-url:\s*(\S+)\s*$", line)
+        if base and current is not None:
+            configured[current] = base.group(1)
     return configured
 
 
@@ -90,8 +103,18 @@ def main() -> int:
     used = keys_used()
     configured = keys_configured()
 
-    missing = sorted(set(used) - configured)
-    unused = sorted(configured - set(used))
+    missing = sorted(set(used) - set(configured))
+    unused = sorted(set(configured) - set(used))
+    # An http:// base URL puts the tool's arguments on the wire in clear. It is a
+    # convention nothing in the Java enforces, so it is enforced here: see the
+    # rejected ip-api.com entry in docs/03-security.md for the case that prompted
+    # it. localhost is exempt because test fixtures serve over plain HTTP.
+    plaintext = sorted(
+        key
+        for key, url in configured.items()
+        if url.startswith("http://")
+        and not re.match(r"^http://(localhost|127\.0\.0\.1)([:/]|$)", url)
+    )
 
     print(f"tool classes declare {len(used)} catalogue keys")
     print(f"application.yml configures {len(configured)}")
@@ -108,8 +131,13 @@ def main() -> int:
         for key in unused:
             print(f"  {key}")
 
-    if not missing and not unused:
-        print("\nboth sides agree")
+    if plaintext:
+        print("\nPLAINTEXT BASE URL — a tool's arguments would travel unencrypted:")
+        for key in plaintext:
+            print(f"  {key:32s} {configured[key]}")
+
+    if not missing and not unused and not plaintext:
+        print("\nboth sides agree, and every base URL is https")
         return 0
     return 1
 
