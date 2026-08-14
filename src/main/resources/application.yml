@@ -151,23 +151,90 @@ agentic:
   # APIs return fat JSON and 32 KB is already ~8k tokens.
   # ---------------------------------------------------------------------------
   tools:
+    # The User-Agent every tool sends. Several hosts require an identifying one:
+    # Wikimedia answers 403 without it, and Nominatim, Crossref, crates.io and
+    # Open Library all ask for one in their policies.
+    #
+    # This exact string was probed against Wikimedia and returned 200 on every
+    # call, while two near-identical siblings were reproducibly rejected with 403
+    # on the same URL. No token rule explains it; the working string is pinned
+    # rather than theorised about. Override with TOOL_USER_AGENT.
+    user-agent: ${TOOL_USER_AGENT:`micronaut-l4j-poc/0.1 (rodrigo_rjsf@hotmail.com)`}
+
     apis:
+      # --- Brazil -----------------------------------------------------------
       brasilapi:
         base-url: https://brasilapi.com.br/api
-        timeout: PT6S
-        max-retries: 1
         max-response-bytes: 16384
+      brasilapi-ncm:
+        base-url: https://brasilapi.com.br/api/ncm
+        # Measured at 4.69 s in probing — the slowest endpoint in the catalogue.
+        timeout: PT9S
+        max-response-bytes: 8192
+      brasilapi-fipe:
+        base-url: https://brasilapi.com.br/api/fipe
+        max-response-bytes: 16384
+      viacep:
+        base-url: https://viacep.com.br/ws
+        max-response-bytes: 24576
+      ibge-servicodados:
+        base-url: https://servicodados.ibge.gov.br/api
+        max-response-bytes: 16384
+      ibge-localidades:
+        # 284 KB raw for one state's municipalities: the byte budget is a backstop,
+        # and the tool projects to names before the model ever sees it.
+        base-url: https://servicodados.ibge.gov.br/api/v1/localidades
+        max-response-bytes: 32768
+      bcb-sgs:
+        base-url: https://api.bcb.gov.br/dados/serie
+        max-response-bytes: 8192
+      bcb-olinda-ptax:
+        base-url: https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata
+        max-response-bytes: 8192
+      awesomeapi-economia:
+        base-url: https://economia.awesomeapi.com.br
+        max-response-bytes: 12288
+
+      # --- Geography and weather -------------------------------------------
       open-meteo-geocoding:
         base-url: https://geocoding-api.open-meteo.com
-        timeout: PT6S
-        max-retries: 1
         max-response-bytes: 8192
       open-meteo-forecast:
         base-url: https://api.open-meteo.com
-        timeout: PT6S
-        max-retries: 1
         max-response-bytes: 12288
+      open-meteo-archive:
+        base-url: https://archive-api.open-meteo.com
+        max-response-bytes: 12288
+      open-meteo-air-quality:
+        base-url: https://air-quality-api.open-meteo.com
+        max-response-bytes: 8192
+      open-meteo-marine:
+        base-url: https://marine-api.open-meteo.com
+        max-response-bytes: 8192
+      nominatim:
+        # OSM policy: identifying User-Agent and at most 1 request per second.
+        base-url: https://nominatim.openstreetmap.org
+        max-response-bytes: 12288
+      sunrise-sunset:
+        base-url: https://api.sunrise-sunset.org
+        max-response-bytes: 4096
+      zippopotam:
+        base-url: https://api.zippopotam.us
+        max-response-bytes: 8192
 
+      # --- Countries and economy -------------------------------------------
+      restcountries:
+        base-url: https://restcountries.com
+        max-response-bytes: 16384
+      worldbank:
+        base-url: https://api.worldbank.org/v2
+        max-response-bytes: 16384
+      frankfurter:
+        base-url: https://api.frankfurter.dev/v1
+        max-response-bytes: 8192
+      exchangerate-api:
+        base-url: https://open.er-api.com/v6
+        max-response-bytes: 16384
   guardrails:
     output:
       # Hosts the assistant may link to. Anything else in a response is treated as

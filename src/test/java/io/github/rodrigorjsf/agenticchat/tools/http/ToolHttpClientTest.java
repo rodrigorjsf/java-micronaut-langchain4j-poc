@@ -5,6 +5,7 @@ import io.micronaut.runtime.server.EmbeddedServer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
@@ -35,7 +36,8 @@ class ToolHttpClientTest {
                 "agentic.tools.apis.stub.user-agent", "agentic-chat-poc/0.1 (test)",
                 "agentic.tools.apis.slowapi.base-url", base,
                 "agentic.tools.apis.slowapi.timeout", "PT1S",
-                "agentic.tools.apis.slowapi.max-retries", 0));
+                "agentic.tools.apis.slowapi.max-retries", 0,
+                "agentic.tools.user-agent", "agentic-chat-poc/0.1 (default)"));
         client = ApplicationContext.run(config);
         tools = client.getBean(ToolHttpClient.class);
     }
@@ -71,6 +73,14 @@ class ToolHttpClientTest {
 
         assertThat(response.isOk()).isTrue();
         assertThat(response.body()).contains("rua da paz & cia");
+    }
+
+    @Test
+    @DisplayName("an endpoint with no User-Agent still gets the shared default")
+    void fallsBackToTheSharedUserAgent() {
+        // Java's default UA is the shape Wikimedia's bot policy rejects outright, so
+        // "no User-Agent configured" must never mean "no User-Agent sent".
+        assertThat(tools.get("slowapi", "/echo-agent").body()).contains("agentic-chat-poc/0.1 (default)");
     }
 
     @Test

@@ -52,9 +52,14 @@ public class ToolHttpClient {
 
     private final HttpClient httpClient;
     private final Map<String, ApiEndpointProperties> catalogue;
+    private final String defaultUserAgent;
 
-    public ToolHttpClient(HttpClient httpClient, List<ApiEndpointProperties> endpoints) {
+    public ToolHttpClient(HttpClient httpClient,
+                          List<ApiEndpointProperties> endpoints,
+                          @io.micronaut.context.annotation.Value(
+                                  "${agentic.tools.user-agent:agentic-chat-poc/0.1}") String defaultUserAgent) {
         this.httpClient = httpClient;
+        this.defaultUserAgent = defaultUserAgent;
         this.catalogue = endpoints.stream().collect(Collectors.toUnmodifiableMap(
                 ApiEndpointProperties::name, e -> e));
         LOG.info("Tool API catalogue: {}", new java.util.TreeSet<>(catalogue.keySet()));
@@ -116,10 +121,15 @@ public class ToolHttpClient {
      * conversation open for the global timeout.
      */
     private ToolResponse read(ApiEndpointProperties endpoint, URI uri) {
-        MutableHttpRequest<?> request = HttpRequest.GET(uri).accept("application/json");
-        if (endpoint.userAgent() != null && !endpoint.userAgent().isBlank()) {
-            request = request.header("User-Agent", endpoint.userAgent());
-        }
+        // One User-Agent for every host by default. Java's own default is
+        // "Java-http-client/<version>", which is the exact shape Wikimedia's bot
+        // policy rejects — so leaving it unset is a live 403, not a curiosity.
+        String userAgent = endpoint.userAgent() == null || endpoint.userAgent().isBlank()
+                ? defaultUserAgent
+                : endpoint.userAgent();
+        MutableHttpRequest<?> request = HttpRequest.GET(uri)
+                .accept("application/json")
+                .header("User-Agent", userAgent);
         String body = Mono.from(httpClient.retrieve(request, String.class))
                 .block(endpoint.timeout());
         return truncate(body == null ? "" : body, endpoint.maxResponseBytes());

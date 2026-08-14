@@ -75,7 +75,7 @@ class ChatModelRegistryTest {
             assertThatThrownBy(() -> ctx.getBean(ChatModelRegistry.class))
                     .rootCause()
                     .isInstanceOf(ChatModelRegistry.MissingCredentialsException.class)
-                    .hasMessageContaining("GOOGLE");
+                    .hasMessageContaining("API key");
         }
     }
 
