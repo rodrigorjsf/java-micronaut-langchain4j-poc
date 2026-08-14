@@ -72,6 +72,41 @@ silent hole in the accounting, not an error. Catch and log inside the listener.
 stable modules at `1.18.1` and the beta ones at `1.18.1-beta28`. Never pin one
 half by hand.
 
+## The tool layer
+
+**`ToolJson.project` with a container path keeps the container whole.**
+`project(body, "meals")` on `{"meals":[…]}` reads like a projection and drops
+nothing. Use `projectList(body, "meals", max, fields…)` for a list nested inside
+an object; `project` only reaches leaves.
+
+**A third-party URL in a tool result costs the whole answer, not the tokens.**
+`ExfiltrationGuardrail` withholds any response linking outside the tool
+catalogue, so a projection that keeps `strSource`, `strYoutube`, `website_url` or
+a thumbnail turns the most ordinary question in that skill into "The response was
+withheld by the output policy." Projections are **keep-lists**, never deny-lists:
+a deny-list has to be right about every field the source adds next.
+
+**A byte ceiling cannot classify semantics.** `max-response-bytes` was once used
+to separate a dish name from an ingredient, on three samples. Ten of eleven
+ordinary food words exceeded it, and each was told it had named an ingredient.
+Bound the list where the list is (`projectList`), and leave the ceiling as the
+transport backstop.
+
+**`max-response-bytes` is a TRANSPORT ceiling, not a context ceiling.** On a
+projecting endpoint it must sit ABOVE the raw body, because projection needs a
+complete document. Set it at the size you want the model to see and the cut lands
+mid-object, projection cannot parse it, and the tool answers "narrow your query"
+for a request that would have worked.
+
+**Every `base-url` is https.** A tool's arguments are user text.
+`check-tool-catalogue.py` fails on any other scheme; `localhost` is exempt for
+test fixtures. `ip-api.com` was rejected over exactly this — see
+`docs/03-security.md`.
+
+**The catalogue check runs in both directions.** A key in Java and absent from
+`application.yml` compiles, passes every test, and fails only when a user asks
+the question that reaches it.
+
 ## Java
 
 **Text-block `\` continuations keep any indentation beyond the block's common
