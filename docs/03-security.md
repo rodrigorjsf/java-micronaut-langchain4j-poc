@@ -83,6 +83,36 @@ Six attacks, and what stops each.
 | **Excessive agency / unbounded loops** | Six round trips per turn, and a bounded tool set that only widens on explicit activation. |
 | **Cost-exhaustion DoS** | Per-endpoint timeouts, no retry on 429, a triage gate that answers most refusals with a small model, and per-role cost metrics that make an anomaly visible. |
 
+### The catalogue entry that was rejected
+
+Worth recording, because a rejected source leaves no trace in the code and the
+next person re-adds it.
+
+`ip-api.com` is the better IP-geolocation source of the two that were evaluated —
+richer record, same latency — and it serves the free tier over **plain HTTP
+only**. Measured 2026-08-14: `https://ip-api.com/json/8.8.8.8` answered `403` in
+1.16 s, `http://ip-api.com/json/8.8.8.8` answered `200` in 0.27 s. TLS is a paid
+feature there.
+
+The argument that tool takes is a **user-supplied IP address**, so the plaintext
+version puts a value out of the user's message on the wire in clear, to buy a few
+hundred bytes of extra fields. `ipwho.is` answers the same question over TLS, so
+the catalogue carries that one and `ip-api` is absent by decision. Every base URL
+in `agentic.tools.apis` is `https://`.
+
+A rejection written only in prose is a convention, and conventions lose. So the
+rule is executable: `./scripts/check-tool-catalogue.py` fails on any `base-url`
+that is not `https://`, with `localhost` and `127.0.0.1` exempt because test
+fixtures serve over plain HTTP.
+
+```
+PLAINTEXT BASE URL — a tool's arguments would travel unencrypted:
+  ipwhois                          http://ipwho.is
+```
+
+That is the check firing against a deliberately downgraded entry — the negative
+control, because a gate nobody has seen fail is not known to work.
+
 ## What is *not* built, and why
 
 The distinction that matters: everything above is code plus tests in this

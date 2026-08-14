@@ -12,7 +12,7 @@ material is usually in what a measurement overturned, not in what it confirmed.
 |---|---|---|
 | — | [`README.md`](../README.md) | What this is and how to run it |
 | 1 | [Anatomy of a turn](01-request-path.md) | What happens between an HTTP request and a reply, and what each step costs |
-| 2 | [Context engineering, applied](02-context-engineering.md) | How 50+ tools, a growing conversation and a cache budget coexist |
+| 2 | [Context engineering, applied](02-context-engineering.md) | How 102 tools, a growing conversation and a cache budget coexist |
 | 3 | [Security](03-security.md) | The OWASP Agentic Top 10, mapped to the class that answers each item |
 | 4 | [Operations](04-operations.md) | Running it, the local AWS emulator, metrics, cost |
 | 5 | [Evaluation](05-evaluation.md) | How a prompt change is proved not to have broken anything |

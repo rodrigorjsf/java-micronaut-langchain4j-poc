@@ -36,11 +36,13 @@ turn of every conversation, so it gets the most attention.
 
 ## Lever 1 — progressive tool disclosure
 
-50+ tools. Declared normally, that is roughly 80 tokens of schema each, ~4000
-tokens standing, and a model choosing from a list of fifty.
+102 tools. Declared normally, that is roughly 80 tokens of schema each, ~8000
+tokens standing, and a model choosing from a list of a hundred.
 
-Skills replace that with names and one-line descriptions. **Measured: 81 tokens
-per skill.** Twelve skills is ~970 tokens, and the model chooses from twelve.
+Skills replace that with names and one-line descriptions. **Measured: 90 tokens
+per skill.** Fourteen skills is 1264 tokens, and the model chooses from
+fourteen — the cost grew by two descriptions while the tool count doubled, which
+is the whole point of the lever.
 
 ```
 before activation:  activate_skill, read_skill_resource

@@ -61,7 +61,7 @@ in-process and starting a real Valkey container for the cache.
 ./mvnw test                       # no network, no Docker, no API key
 ./mvnw test -Pit                  # + floci via Testcontainers
 ./mvnw test -Pevals               # + the triage golden set against a live model
-./scripts/check-tool-catalogue.py # tool code vs configured endpoints, both ways
+./scripts/check-tool-catalogue.py # tool code vs configured endpoints, both ways, https only
 ```
 
 ## What is in it
@@ -69,7 +69,7 @@ in-process and starting a real Valkey container for the cache.
 | | |
 |---|---|
 | **Triage gate** | a small, fast model decides whether a turn reaches the expensive one — and pre-filters and a cache mean most turns never reach it either |
-| **Skills** | 50+ tools over free public APIs, disclosed progressively: the prompt carries skill names, not tool schemas |
+| **Skills** | 102 tools over free public APIs, disclosed progressively: the prompt carries skill names, not tool schemas |
 | **Guardrails** | normalize → deterministic score → gray-zone classifier on the way in; canary and exfiltration checks on the way out; and a tool-result screen, which is the only place indirect injection can be caught |
 | **RAG** | over the assistant's own documentation, routed so it only runs when a tool is not going to answer |
 | **Memory** | Valkey in front of DynamoDB, with compaction that never drops a skill activation |

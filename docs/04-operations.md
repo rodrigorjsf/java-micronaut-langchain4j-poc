@@ -115,6 +115,7 @@ Everything is tagged by **role**, which is the point — see
 | answers ignore tools, model "just knows" | skill activation lost — memory window too small, or a store that dropped message attributes | `SkillActivationTest` covers both; check the window first |
 | every response containing a link is blocked | the link allow-list is empty | it is derived from the tool catalogue, so this means the catalogue is empty — check `agentic.tools.apis` loaded |
 | `this data source is not configured` | a tool names a catalogue key that is not in config | `./scripts/check-tool-catalogue.py` |
+| a tool's arguments visible to anything on the path | a catalogue entry with an `http://` base URL | same script — it fails on any non-https base URL |
 | tools all fail after a deploy | a `@Factory` method was reordered and stale bean definitions linger | `./mvnw clean` |
 
 ## The checks

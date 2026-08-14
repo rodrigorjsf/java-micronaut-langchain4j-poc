@@ -4,15 +4,15 @@
 
 ## Context
 
-The application exposes 50+ tools. Declaring them all on the AI service puts
+The application exposes 102 tools across 14 skills. Declaring them all on the AI service puts
 every schema in the system prompt on **every turn**, for the life of every
 conversation. Two costs, and the second is worse than the first:
 
 - **Tokens.** A tool schema with a description and two documented parameters runs
-  around 80 tokens. Fifty of them is roughly 4000 tokens of standing prompt,
+  around 80 tokens. A hundred of them is roughly 8000 tokens of standing prompt,
   charged on every request, unchanged.
-- **Accuracy.** A model picks less accurately from a list of fifty than from a
-  list of six. Paying more to choose worse is a bad trade twice over.
+- **Accuracy.** A model picks less accurately from a list of a hundred than from
+  a list of six. Paying more to choose worse is a bad trade twice over.
 
 LangChain4j 1.18.1 offers two mechanisms for showing a model fewer tools than
 exist.
@@ -52,12 +52,17 @@ with no guidance for using it.
 ### What it costs, measured
 
 ```
-skills index: 2 skills, 655 chars, ~163 tokens (~81 per skill)
+skills index: 14 skills, 5059 chars, ~1264 tokens (~90 per skill)
 ```
 
-At 81 tokens per skill, a twelve-skill catalogue is roughly **970 tokens**
-standing, against ~4000 for fifty raw schemas. Both numbers are asserted in
-`SkillCatalogTest`, with a documented per-skill ceiling of 90 tokens.
+At 90 tokens per skill the fourteen-skill catalogue costs **1264 tokens**
+standing, against ~8000 for a hundred raw schemas. Both numbers are asserted in
+`SkillCatalogTest`, with a per-skill ceiling of 95 tokens and a total ceiling of
+1500.
+
+The shape of that comparison is the argument. Going from 12 skills to 14 — from
+roughly 60 tools to 102 — added about 180 tokens to the standing prompt. Under
+raw declaration the same 42 tools would have added around 3400.
 
 The ceiling is deliberately generous. A description is the only thing the model
 sees before activating, so squeezing it below the point where it carries routing
