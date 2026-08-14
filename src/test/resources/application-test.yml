@@ -1,0 +1,12 @@
+# Unit tests must not need a network, a Docker daemon or an API key.
+#
+# No `agentic.llm.models` block on purpose: role definitions here would merge into
+# every test's programmatic properties and quietly change what is under test.
+# Tests that need a model declare it themselves.
+agentic:
+  persistence:
+    bootstrap-enabled: false
+  llm:
+    credentials:
+      google-api-key: test-key-not-used
+      openai-api-key: test-key-not-used

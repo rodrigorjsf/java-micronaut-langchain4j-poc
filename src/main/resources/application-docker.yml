@@ -1,0 +1,5 @@
+# Active when MICRONAUT_ENVIRONMENTS=docker (set by compose.yaml).
+# floci is reachable over the compose network, not through the published host ports.
+agentic:
+  persistence:
+    bootstrap-enabled: true

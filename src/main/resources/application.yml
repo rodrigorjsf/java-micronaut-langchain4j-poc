@@ -3,6 +3,7 @@ micronaut:
     name: agenticchat
   server:
     port: 8080
+
   metrics:
     enabled: true
     export:
@@ -19,3 +20,68 @@ endpoints:
   prometheus:
     enabled: true
     sensitive: false
+
+agentic:
+
+  # ---------------------------------------------------------------------------
+  # LLM roles.
+  #
+  # Nothing in the code names a model: it asks ChatModelRegistry for a role. That
+  # keeps model choice a deployment decision and makes per-role cost and latency
+  # separately measurable.
+  #
+  # judge  — runs on EVERY request before the agent, so latency is the budget.
+  #          gemini-2.5-flash-lite with thinking-budget 0 measured a 0.91 s median
+  #          on an 84-token triage prompt from this machine.
+  # agent  — the conversational model. Quality matters more than latency here, so
+  #          a Gemini 3.x model with thinking-level: low is the right trade.
+  #
+  # thinking-budget is a Gemini 2.x knob and thinking-level a Gemini 3.x one.
+  # Mixing them is rejected at startup by ModelRoleValidator, because sending
+  # thinking-budget to a 3.x model does not disable thinking — it just makes the
+  # call ~6.5x slower (median 5.93 s vs 0.91 s in the measurement above).
+  # ---------------------------------------------------------------------------
+  llm:
+    credentials:
+      # Placeholders resolve straight from the environment, so the untracked .env
+      # that Docker Compose loads is the only place a key ever lives.
+      google-api-key: ${GOOGLE_API_KEY:``}
+      openai-api-key: ${OPENAI_API_KEY:``}
+
+    models:
+      judge:
+        provider: GOOGLE
+        model-name: gemini-2.5-flash-lite
+        temperature: 0.0
+        max-output-tokens: 320
+        thinking-budget: 0
+        timeout: PT8S
+        max-retries: 1
+
+      agent:
+        provider: GOOGLE
+        model-name: gemini-3.1-flash-lite
+        temperature: 0.3
+        max-output-tokens: 2048
+        thinking-level: low
+        timeout: PT60S
+        max-retries: 2
+
+  aws:
+    endpoint: ${AWS_ENDPOINT_URL:`http://localhost:4566`}
+    region: ${AWS_REGION:`us-east-1`}
+    access-key-id: ${AWS_ACCESS_KEY_ID:`test`}
+    secret-access-key: ${AWS_SECRET_ACCESS_KEY:`test`}
+
+  valkey:
+    host: ${VALKEY_HOST:`localhost`}
+    port: ${VALKEY_PORT:6379}
+    replication-group-id: agentic-chat-cache
+    command-timeout: PT10S
+
+  persistence:
+    table-name: agentic_chat
+    conversation-ttl: PT24H
+    # Off by default; the local and docker environments below turn it on because
+    # floci is a disposable emulator.
+    bootstrap-enabled: false

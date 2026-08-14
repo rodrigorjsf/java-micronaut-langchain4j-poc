@@ -1,0 +1,10 @@
+# Active with `./mvnw mn:run -Dmicronaut.environments=local`, i.e. the app on the
+# host and floci in Docker. Endpoints come from the published ports.
+agentic:
+  aws:
+    endpoint: http://localhost:4566
+  valkey:
+    host: localhost
+    port: 6379
+  persistence:
+    bootstrap-enabled: true
