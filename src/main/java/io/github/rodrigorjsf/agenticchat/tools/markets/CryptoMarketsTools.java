@@ -46,7 +46,9 @@ public class CryptoMarketsTools implements SkillTools {
     private static final String COINGECKO = "coingecko";
     private static final String BINANCE = "binance";
 
-    /** CoinGecko ids per call. Five coins is a comparison; more is a report. */
+    /**
+     * CoinGecko ids per call. Five coins is a comparison; more is a report.
+     */
     private static final int MAX_COIN_IDS = 5;
     private static final int MAX_CURRENCIES = 3;
 

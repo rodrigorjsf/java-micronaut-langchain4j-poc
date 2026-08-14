@@ -55,7 +55,9 @@ public class ModelPrice {
         return outputPerMillion;
     }
 
-    /** Providers discount a cache hit; zero means "not priced separately". */
+    /**
+     * Providers discount a cache hit; zero means "not priced separately".
+     */
     public BigDecimal cachedInputPerMillion() {
         return cachedInputPerMillion;
     }

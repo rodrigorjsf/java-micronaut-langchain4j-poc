@@ -27,7 +27,9 @@ import java.util.regex.Pattern;
  */
 public final class ModelRoleValidator {
 
-    /** Matches the major version in names like {@code gemini-3.1-flash-lite}. */
+    /**
+     * Matches the major version in names like {@code gemini-3.1-flash-lite}.
+     */
     private static final Pattern GEMINI_MAJOR = Pattern.compile("^gemini-(\\d+)(?:\\.\\d+)?-");
 
     private ModelRoleValidator() {
@@ -77,7 +79,9 @@ public final class ModelRoleValidator {
                 : java.util.Optional.empty();
     }
 
-    /** Thrown at startup, on purpose: a bad model config must never reach production traffic. */
+    /**
+     * Thrown at startup, on purpose: a bad model config must never reach production traffic.
+     */
     public static class InvalidModelConfigurationException extends RuntimeException {
         public InvalidModelConfigurationException(String message) {
             super(message);

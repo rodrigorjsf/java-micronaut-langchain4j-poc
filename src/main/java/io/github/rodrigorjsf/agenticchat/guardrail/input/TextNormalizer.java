@@ -23,11 +23,15 @@ import java.util.regex.Pattern;
  */
 public final class TextNormalizer {
 
-    /** Zero-width space/joiners, BOM, bidi overrides, soft hyphen, word joiner. */
+    /**
+     * Zero-width space/joiners, BOM, bidi overrides, soft hyphen, word joiner.
+     */
     private static final Pattern INVISIBLE = Pattern.compile(
             "[\\u00AD\\u180E\\u200B-\\u200F\\u202A-\\u202E\\u2060-\\u2064\\u2066-\\u2069\\uFEFF]");
 
-    /** C0/C1 control characters, keeping tab, newline and carriage return. */
+    /**
+     * C0/C1 control characters, keeping tab, newline and carriage return.
+     */
     private static final Pattern CONTROLS = Pattern.compile(
             "[\\u0000-\\u0008\\u000B\\u000C\\u000E-\\u001F\\u007F-\\u009F]");
 
@@ -40,7 +44,7 @@ public final class TextNormalizer {
 
     /**
      * @return the canonical form of {@code raw}, or {@code raw} itself when it is
-     *         already canonical
+     * already canonical
      */
     public static String normalize(String raw) {
         if (raw == null || raw.isEmpty()) {
@@ -58,7 +62,9 @@ public final class TextNormalizer {
         return out.strip();
     }
 
-    /** How many invisible characters {@link #normalize} would remove. Counted before rewriting, since afterwards there are none left to see. */
+    /**
+     * How many invisible characters {@link #normalize} would remove. Counted before rewriting, since afterwards there are none left to see.
+     */
     public static int countInvisible(String raw) {
         if (raw == null || raw.isEmpty()) {
             return 0;

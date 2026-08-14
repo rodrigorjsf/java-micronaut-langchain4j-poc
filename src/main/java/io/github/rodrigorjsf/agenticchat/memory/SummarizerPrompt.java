@@ -18,17 +18,17 @@ public interface SummarizerPrompt {
     @SystemMessage("""
             You compress an older part of a conversation into notes for the assistant
             that will continue it. You are not talking to the user.
-
+            
             Keep, in this order of priority:
             - facts established from tool results, each with the tool that produced it
             - constraints and preferences the user stated ("answer in Portuguese",
               "I meant São Paulo in Portugal")
             - which capabilities are already in use
             - things already refused or ruled out
-
+            
             Leave out: raw JSON, error messages, URLs, the user's exact wording,
             pleasantries and apologies.
-
+            
             Write at most 8 short bullet points. No preamble, no closing line. If
             nothing in the excerpt is worth carrying forward, answer with the single
             word NOTHING.

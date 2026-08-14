@@ -15,8 +15,8 @@ public interface ConversationSummarizer {
 
     /**
      * @return a summary of at most a few hundred tokens, or an empty string when
-     *         summarisation is unavailable — the caller then keeps the messages
-     *         rather than losing them
+     * summarisation is unavailable — the caller then keeps the messages
+     * rather than losing them
      */
     String summarize(List<ChatMessage> messages);
 }

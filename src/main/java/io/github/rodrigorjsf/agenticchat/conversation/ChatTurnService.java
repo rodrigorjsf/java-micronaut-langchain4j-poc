@@ -2,10 +2,10 @@ package io.github.rodrigorjsf.agenticchat.conversation;
 
 import dev.langchain4j.guardrail.GuardrailException;
 import dev.langchain4j.invocation.InvocationParameters;
-import io.github.rodrigorjsf.agenticchat.rag.SkillAwareQueryRouter;
 import io.github.rodrigorjsf.agenticchat.agent.ChatAssistant;
 import io.github.rodrigorjsf.agenticchat.memory.ConversationCompactor;
 import io.github.rodrigorjsf.agenticchat.memory.ConversationId;
+import io.github.rodrigorjsf.agenticchat.rag.SkillAwareQueryRouter;
 import io.github.rodrigorjsf.agenticchat.skills.SkillCatalog;
 import io.github.rodrigorjsf.agenticchat.triage.RefusalTemplates;
 import io.github.rodrigorjsf.agenticchat.triage.TriageService;

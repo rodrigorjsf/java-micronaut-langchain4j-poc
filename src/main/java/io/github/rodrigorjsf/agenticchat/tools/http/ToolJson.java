@@ -22,7 +22,7 @@ import jakarta.inject.Singleton;
  * twenty as it did on turn one, and the model needed four fields of it.
  *
  * <h2>Truncation runs BEFORE projection, and that ordering has teeth</h2>
- *
+ * <p>
  * {@link ToolHttpClient} caps the transport at the endpoint's byte budget, and only
  * then does a tool project. If the raw body exceeded that budget, what arrives here
  * is a fragment ending mid-object — unparseable, so the string overloads return it
@@ -43,7 +43,9 @@ public class ToolJson {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    /** Marker appended when an array was capped, so the model knows the list is partial. */
+    /**
+     * Marker appended when an array was capped, so the model knows the list is partial.
+     */
     static final String MORE = "_more";
 
     /**
@@ -117,7 +119,9 @@ public class ToolJson {
         }
     }
 
-    /** Caps a top-level array without touching the shape of its elements. */
+    /**
+     * Caps a top-level array without touching the shape of its elements.
+     */
     public String cap(String json, int max) {
         if (json == null || json.isBlank()) {
             return json;
@@ -190,7 +194,9 @@ public class ToolJson {
             "That query returned more data than this tool can read. Narrow it — a more specific "
                     + "term, a smaller range, or fewer results — and try again.";
 
-    /** Convenience for the common shape: project a {@link ToolResponse} in place. */
+    /**
+     * Convenience for the common shape: project a {@link ToolResponse} in place.
+     */
     public ToolResponse project(ToolResponse response, String... paths) {
         return reshape(response, body -> projectCapped(body, Integer.MAX_VALUE, paths));
     }
@@ -199,12 +205,16 @@ public class ToolJson {
         return reshape(response, body -> projectCapped(body, max, paths));
     }
 
-    /** Convenience: cap a {@link ToolResponse}'s top-level array in place. */
+    /**
+     * Convenience: cap a {@link ToolResponse}'s top-level array in place.
+     */
     public ToolResponse cap(ToolResponse response, int max) {
         return reshape(response, body -> cap(body, max));
     }
 
-    /** Convenience for the nested case: see {@link #projectList(String, String, int, String...)}. */
+    /**
+     * Convenience for the nested case: see {@link #projectList(String, String, int, String...)}.
+     */
     public ToolResponse projectList(ToolResponse response, String arrayField, int max, String... paths) {
         return reshape(response, body -> projectList(body, arrayField, max, paths));
     }

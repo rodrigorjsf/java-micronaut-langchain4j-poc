@@ -59,7 +59,9 @@ public class KnowledgeResearchTools implements SkillTools {
     private static final String OPENALEX = "openalex";
     private static final String NCBI = "ncbi-eutils";
 
-    /** The MediaWiki action API, shared by every Wikipedia and Wikidata tool below. */
+    /**
+     * The MediaWiki action API, shared by every Wikipedia and Wikidata tool below.
+     */
     private static final String MEDIAWIKI_API = "/w/api.php";
 
     /**

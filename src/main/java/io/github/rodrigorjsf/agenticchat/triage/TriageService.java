@@ -40,7 +40,9 @@ public class TriageService {
 
     private static final Logger LOG = LoggerFactory.getLogger(TriageService.class);
 
-    /** Above this the request is refused without a model call; the guardrails cap it too. */
+    /**
+     * Above this the request is refused without a model call; the guardrails cap it too.
+     */
     private static final int MAX_CHARS = 12_000;
 
     /**

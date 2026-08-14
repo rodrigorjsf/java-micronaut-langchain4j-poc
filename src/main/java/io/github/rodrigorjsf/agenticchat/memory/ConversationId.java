@@ -24,7 +24,9 @@ public record ConversationId(String value) {
         return new ConversationId(UUID.randomUUID().toString().replace("-", ""));
     }
 
-    /** Accepts anything LangChain4j hands back as a {@code @MemoryId}. */
+    /**
+     * Accepts anything LangChain4j hands back as a {@code @MemoryId}.
+     */
     public static ConversationId of(Object memoryId) {
         return memoryId instanceof ConversationId id ? id : new ConversationId(String.valueOf(memoryId));
     }

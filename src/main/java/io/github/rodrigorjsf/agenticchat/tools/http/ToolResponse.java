@@ -16,15 +16,25 @@ package io.github.rodrigorjsf.agenticchat.tools.http;
 public record ToolResponse(String body, Outcome outcome, boolean truncated) {
 
     public enum Outcome {
-        /** The upstream answered and the body is usable. */
+        /**
+         * The upstream answered and the body is usable.
+         */
         OK,
-        /** The upstream answered "no such thing" — a valid answer, not a failure. */
+        /**
+         * The upstream answered "no such thing" — a valid answer, not a failure.
+         */
         NOT_FOUND,
-        /** The arguments were rejected. The model can fix this by retrying differently. */
+        /**
+         * The arguments were rejected. The model can fix this by retrying differently.
+         */
         INVALID_REQUEST,
-        /** Rate limited. Retrying the same call immediately will fail again. */
+        /**
+         * Rate limited. Retrying the same call immediately will fail again.
+         */
         RATE_LIMITED,
-        /** The upstream failed or timed out. Nothing the model can do about it. */
+        /**
+         * The upstream failed or timed out. Nothing the model can do about it.
+         */
         UPSTREAM_ERROR
     }
 
@@ -49,7 +59,7 @@ public record ToolResponse(String body, Outcome outcome, boolean truncated) {
         return switch (outcome) {
             case OK -> truncated
                     ? body + "\n\n[truncated: the response was longer than this tool's budget. "
-                            + "Narrow the query if you need the rest.]"
+                      + "Narrow the query if you need the rest.]"
                     : body;
             case NOT_FOUND -> "No result: " + body
                     + " Tell the user nothing was found; do not guess a value.";

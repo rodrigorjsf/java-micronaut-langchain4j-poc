@@ -94,7 +94,9 @@ public class ToolHttpClient {
         LOG.info("Tool API catalogue: {}", new java.util.TreeSet<>(catalogue.keySet()));
     }
 
-    /** Endpoint keys a tool may use. Exposed so a startup check can verify them. */
+    /**
+     * Endpoint keys a tool may use. Exposed so a startup check can verify them.
+     */
     public java.util.Set<String> knownApis() {
         return catalogue.keySet();
     }

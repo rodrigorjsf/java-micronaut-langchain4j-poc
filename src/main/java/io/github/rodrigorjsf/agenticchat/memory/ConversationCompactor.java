@@ -67,10 +67,14 @@ public class ConversationCompactor {
      */
     static final String ACTIVATED_SKILL_ATTRIBUTE = "activated_skill";
 
-    /** Kept verbatim at the end. Enough to preserve the immediate exchange. */
+    /**
+     * Kept verbatim at the end. Enough to preserve the immediate exchange.
+     */
     private static final int RECENCY_ANCHOR = 6;
 
-    /** Characters kept from a surviving tool result in the cheap pass. */
+    /**
+     * Characters kept from a surviving tool result in the cheap pass.
+     */
     private static final int TOOL_RESULT_CHARS = 1_600;
 
     private final ChatMemoryStore store;
@@ -247,7 +251,9 @@ public class ConversationCompactor {
         };
     }
 
-    /** Exposed for the test that pins the recency anchor. */
+    /**
+     * Exposed for the test that pins the recency anchor.
+     */
     static Set<String> failurePrefixes() {
         return Set.of("No result:", "Invalid arguments:", "Rate limited:", "The service is unavailable:");
     }

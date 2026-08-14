@@ -26,7 +26,7 @@ import java.util.List;
  *   0.7058  dados-publicos-brasileiros.md   "qual e a receita de bolo de cenoura"      &lt;-- irrelevant
  *   0.6826  sobre-o-assistente.md           "escreva um script em python"              &lt;-- irrelevant
  * </pre>
- *
+ * <p>
  * The distributions <em>overlap</em>: an irrelevant question outscores a relevant
  * one. No threshold separates them, so the earlier plan — "no router, just use
  * minScore" — was wrong, and the measurement is what said so.
@@ -43,7 +43,9 @@ import java.util.List;
 @Singleton
 public class SkillAwareQueryRouter implements QueryRouter {
 
-    /** Set by {@code ChatTurnService} through {@code InvocationParameters}. */
+    /**
+     * Set by {@code ChatTurnService} through {@code InvocationParameters}.
+     */
     public static final String SKILL_HINT = "triage.skillHint";
 
     private final ContentRetriever knowledge;

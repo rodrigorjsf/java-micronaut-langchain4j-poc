@@ -52,7 +52,9 @@ public class ScienceSpaceTools implements SkillTools {
      */
     private static final String NASA_KEY = "DEMO_KEY";
 
-    /** The first Astronomy Picture of the Day; there is nothing to fetch before it. */
+    /**
+     * The first Astronomy Picture of the Day; there is nothing to fetch before it.
+     */
     private static final LocalDate APOD_EPOCH = LocalDate.of(1995, 6, 16);
 
     /**
@@ -62,7 +64,9 @@ public class ScienceSpaceTools implements SkillTools {
      */
     private static final int MAX_LAUNCHES = 3;
 
-    /** Six events already cost ~4 KB of GeoJSON; more is a fat result, not a better answer. */
+    /**
+     * Six events already cost ~4 KB of GeoJSON; more is a fat result, not a better answer.
+     */
     private static final int MAX_EARTHQUAKES = 6;
 
     private final ToolHttpClient http;

@@ -34,7 +34,9 @@ public class InjectionTriageGuardrail implements InputGuardrail {
 
     private static final Logger LOG = LoggerFactory.getLogger(InjectionTriageGuardrail.class);
 
-    /** Below this, an INJECTION verdict is treated as noise and the turn passes. */
+    /**
+     * Below this, an INJECTION verdict is treated as noise and the turn passes.
+     */
     private static final double CONFIDENCE_THRESHOLD = 0.80;
 
     private static final String REJECTION = "I can't help with that request.";

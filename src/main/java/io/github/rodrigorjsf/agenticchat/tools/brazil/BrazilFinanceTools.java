@@ -354,7 +354,9 @@ public class BrazilFinanceTools implements SkillTools {
         return VEHICLE_TYPES.contains(type) ? type : null;
     }
 
-    /** @return the date as {@code YYYY-MM-DD}, or {@code null} when it is not a real date */
+    /**
+     * @return the date as {@code YYYY-MM-DD}, or {@code null} when it is not a real date
+     */
     private static String isoDate(String raw) {
         if (raw == null || raw.isBlank()) {
             return null;

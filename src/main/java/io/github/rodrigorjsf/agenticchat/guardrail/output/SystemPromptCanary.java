@@ -34,12 +34,16 @@ public class SystemPromptCanary {
         this.token = "cnry-" + HexFormat.of().formatHex(bytes);
     }
 
-    /** Inserted into the system prompt, with an instruction never to reveal it. */
+    /**
+     * Inserted into the system prompt, with an instruction never to reveal it.
+     */
     public String token() {
         return token;
     }
 
-    /** The block appended to every system prompt. */
+    /**
+     * The block appended to every system prompt.
+     */
     public String systemPromptFragment() {
         return """
                 <integrity_marker>%s</integrity_marker>

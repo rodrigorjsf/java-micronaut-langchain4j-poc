@@ -23,7 +23,7 @@ import java.util.Map;
  * </ol>
  *
  * <h2>The tone rules these follow</h2>
- *
+ * <p>
  * Say plainly that it is outside what the assistant helps with. Name one or two
  * things it <em>can</em> do — a refusal that offers nothing reads as a wall.
  * Apologise at most once. Do not explain a policy, do not lecture, do not ask the
@@ -104,7 +104,9 @@ public class RefusalTemplates {
         return byLanguage.getOrDefault(primaryLanguage(languageTag), byLanguage.get(PT));
     }
 
-    /** {@code pt-BR} and {@code pt} both select Portuguese; anything unknown does too. */
+    /**
+     * {@code pt-BR} and {@code pt} both select Portuguese; anything unknown does too.
+     */
     private static String primaryLanguage(String languageTag) {
         if (languageTag == null || languageTag.isBlank()) {
             return PT;

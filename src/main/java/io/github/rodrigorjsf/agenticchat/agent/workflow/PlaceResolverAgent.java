@@ -17,10 +17,10 @@ public interface PlaceResolverAgent {
 
     @SystemMessage("""
             You resolve a place name to coordinates using the find_place tool.
-
+            
             Return exactly one line in this form, and nothing else:
             <city>, <region>, <country> | <latitude> | <longitude>
-
+            
             If the top candidates are in different countries, pick the one in Brazil
             when there is one, otherwise the most populous. Never invent coordinates:
             if the tool returns nothing, return the single word UNKNOWN.

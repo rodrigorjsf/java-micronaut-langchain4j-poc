@@ -18,7 +18,7 @@ import org.slf4j.LoggerFactory;
  * The policy gate on every tool call: what goes in, and what comes back.
  *
  * <h2>Why this class has to exist</h2>
- *
+ * <p>
  * Guardrails cannot see tool results. LangChain4j runs the input chain, then the
  * entire multi-round-trip tool loop, then the output chain — so a
  * {@code ToolExecutionResultMessage} is produced strictly between the two chains
@@ -42,14 +42,14 @@ import org.slf4j.LoggerFactory;
  * alone would drop the attribute and silently disable progressive tool disclosure.
  *
  * <h2>Arguments are screened too</h2>
- *
+ * <p>
  * A credential-shaped string in a tool argument is exfiltration in progress: the
  * tool would send it to a third party as a query parameter, where it lands in that
  * service's access log. The model has no legitimate reason to put one there, so
  * the call is refused before it leaves the process.
  *
  * <h2>What a detection does</h2>
- *
+ * <p>
  * Replaces the body with a notice and lets the turn continue. Failing the whole
  * request would let anyone who can plant text in a public dataset take the
  * assistant offline; a neutralised result lets the model tell the user the source
@@ -59,7 +59,9 @@ public class ToolGuardProvider implements ToolProvider {
 
     private static final Logger LOG = LoggerFactory.getLogger(ToolGuardProvider.class);
 
-    /** Provider key shapes. Narrow on purpose: a broad rule would eat ordinary ids. */
+    /**
+     * Provider key shapes. Narrow on purpose: a broad rule would eat ordinary ids.
+     */
     private static final java.util.List<java.util.regex.Pattern> SECRET_SHAPES = java.util.List.of(
             java.util.regex.Pattern.compile("\\bsk-[A-Za-z0-9_-]{20,}"),
             java.util.regex.Pattern.compile("\\bAIza[0-9A-Za-z_-]{35}"),
@@ -81,8 +83,8 @@ public class ToolGuardProvider implements ToolProvider {
     private final MeterRegistry meters;
 
     public ToolGuardProvider(ToolProvider delegate,
-                                       InjectionHeuristics heuristics,
-                                       MeterRegistry meters) {
+                             InjectionHeuristics heuristics,
+                             MeterRegistry meters) {
         this.delegate = delegate;
         this.heuristics = heuristics;
         this.meters = meters;
@@ -105,7 +107,9 @@ public class ToolGuardProvider implements ToolProvider {
         return guarded.build();
     }
 
-    /** Must mirror the delegate: it decides whether the tool set is recomputed per round trip. */
+    /**
+     * Must mirror the delegate: it decides whether the tool set is recomputed per round trip.
+     */
     @Override
     public boolean isDynamic() {
         return delegate.isDynamic();

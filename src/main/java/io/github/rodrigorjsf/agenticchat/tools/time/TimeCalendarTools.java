@@ -164,7 +164,9 @@ public class TimeCalendarTools implements SkillTools {
 
     // ------------------------------------------------------------------
 
-    /** @return the year as a string when it is plausible, otherwise {@code null} */
+    /**
+     * @return the year as a string when it is plausible, otherwise {@code null}
+     */
     private static String validYear(String raw) {
         String digits = raw == null ? "" : raw.replaceAll("\\D", "");
         if (digits.length() != 4) {
@@ -175,7 +177,9 @@ public class TimeCalendarTools implements SkillTools {
         return value < current - YEARS_BACK || value > current + YEARS_AHEAD ? null : digits;
     }
 
-    /** @return the upper-case alpha-2 code, or {@code null} when it is not one */
+    /**
+     * @return the upper-case alpha-2 code, or {@code null} when it is not one
+     */
     private static String countryCode(String raw) {
         String clean = raw == null ? "" : raw.strip().toUpperCase(Locale.ROOT);
         return clean.matches("[A-Z]{2}") ? clean : null;

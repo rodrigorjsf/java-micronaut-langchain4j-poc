@@ -43,12 +43,16 @@ public class CountriesEconomyTools implements SkillTools {
     private static final String FRANKFURTER_API = "frankfurter";
     private static final String BROAD_FX_API = "exchangerate-api";
 
-    /** ECB reference rates, which Frankfurter serves, start in 1999. */
+    /**
+     * ECB reference rates, which Frankfurter serves, start in 1999.
+     */
     private static final int FIRST_FX_YEAR = 1999;
 
     private static final String ISO_CODE = "[A-Za-z]{2,3}";
     private static final String CURRENCY_CODE = "[A-Za-z]{3}";
-    /** World Bank indicator ids look like NY.GDP.MKTP.CD or SP.POP.TOTL. */
+    /**
+     * World Bank indicator ids look like NY.GDP.MKTP.CD or SP.POP.TOTL.
+     */
     private static final String INDICATOR_CODE = "[A-Za-z0-9][A-Za-z0-9._-]{2,39}";
 
     private final ToolHttpClient http;
@@ -285,7 +289,7 @@ public class CountriesEconomyTools implements SkillTools {
 
     /**
      * @return the codes uppercased and comma-joined, or {@code null} when the input
-     *         is empty, too long, or holds something that is not a currency code
+     * is empty, too long, or holds something that is not a currency code
      */
     private static String currencyList(String raw) {
         if (raw == null || raw.isBlank()) {

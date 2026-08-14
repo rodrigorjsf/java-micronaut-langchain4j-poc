@@ -335,7 +335,9 @@ public class DeveloperTools implements SkillTools {
 
     // ------------------------------------------------------------------
 
-    /** Both Algolia-backed tools share one answer shape, one budget check and one projection. */
+    /**
+     * Both Algolia-backed tools share one answer shape, one budget check and one projection.
+     */
     private String hnSearch(String path, Map<String, String> params, String nothingFound) {
         var raw = http.get(HN_SEARCH, path, params);
         if (raw.truncated()) {

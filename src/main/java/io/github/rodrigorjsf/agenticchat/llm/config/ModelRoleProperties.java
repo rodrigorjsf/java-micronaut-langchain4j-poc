@@ -65,7 +65,9 @@ public class ModelRoleProperties {
         this.logResponses = logResponses;
     }
 
-    /** The role key, e.g. {@code judge}. */
+    /**
+     * The role key, e.g. {@code judge}.
+     */
     public String name() {
         return name;
     }

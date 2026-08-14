@@ -6,16 +6,22 @@ import io.micronaut.core.bind.annotation.Bindable;
 
 import java.time.Duration;
 
-/** Table names and retention for everything the chat persists. */
+/**
+ * Table names and retention for everything the chat persists.
+ */
 @ConfigurationProperties("agentic.persistence")
 @AccessorsStyle(readPrefixes = "")
 public interface PersistenceProperties {
 
-    /** Single DynamoDB table; every entity is discriminated by its pk/sk prefix. */
+    /**
+     * Single DynamoDB table; every entity is discriminated by its pk/sk prefix.
+     */
     @Bindable(defaultValue = "agentic_chat")
     String tableName();
 
-    /** Written to the DynamoDB TTL attribute and used as the Valkey key expiry. */
+    /**
+     * Written to the DynamoDB TTL attribute and used as the Valkey key expiry.
+     */
     @Bindable(defaultValue = "PT24H")
     Duration conversationTtl();
 

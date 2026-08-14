@@ -122,7 +122,9 @@ public class KnowledgeBase {
         }
     }
 
-    /** Works whether the classes are on disk or packaged inside the fat jar. */
+    /**
+     * Works whether the classes are on disk or packaged inside the fat jar.
+     */
     private static Path resolve(java.net.URI uri) throws IOException {
         if (!"jar".equals(uri.getScheme())) {
             return Path.of(uri);
