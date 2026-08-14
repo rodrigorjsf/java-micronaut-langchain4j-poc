@@ -85,3 +85,39 @@ agentic:
     # Off by default; the local and docker environments below turn it on because
     # floci is a disposable emulator.
     bootstrap-enabled: false
+
+  # ---------------------------------------------------------------------------
+  # Tool API catalogue.
+  #
+  # This list IS the SSRF control: no tool takes a URL, only a key from this map
+  # plus a path. A host that is not here cannot be reached, whatever the model
+  # asks for. max-response-bytes is a context budget, not a safety limit — these
+  # APIs return fat JSON and 32 KB is already ~8k tokens.
+  # ---------------------------------------------------------------------------
+  tools:
+    apis:
+      brasilapi:
+        base-url: https://brasilapi.com.br/api
+        timeout: PT6S
+        max-retries: 1
+        max-response-bytes: 16384
+      open-meteo-geocoding:
+        base-url: https://geocoding-api.open-meteo.com
+        timeout: PT6S
+        max-retries: 1
+        max-response-bytes: 8192
+      open-meteo-forecast:
+        base-url: https://api.open-meteo.com
+        timeout: PT6S
+        max-retries: 1
+        max-response-bytes: 12288
+
+  guardrails:
+    output:
+      # Hosts the assistant may link to. Anything else in a response is treated as
+      # exfiltration, because a rendered markdown image fires with no user click.
+      allowed-link-hosts:
+        - brasilapi.com.br
+        - open-meteo.com
+        - wikipedia.org
+        - ibge.gov.br
