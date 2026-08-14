@@ -16,6 +16,8 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -42,6 +44,9 @@ import java.util.stream.Collectors;
  *   <li><b>Bounded retries.</b> Only idempotent GETs, only on timeouts and 5xx,
  *       never on 4xx or 429. A model already retries by calling the tool again;
  *       retrying underneath it multiplies the load on a free public API.</li>
+ *   <li><b>Bounded concurrency.</b> A permit per in-flight request, because the
+ *       calling threads are cheap and the memory behind them is not — see
+ *       {@link #IN_FLIGHT_LIMIT}.</li>
  * </ul>
  */
 @Singleton
@@ -50,9 +55,33 @@ public class ToolHttpClient {
     private static final Logger LOG = LoggerFactory.getLogger(ToolHttpClient.class);
     private static final Duration RETRY_BACKOFF = Duration.ofMillis(250);
 
+    /**
+     * How many tool requests may be in flight at once, across every endpoint.
+     *
+     * <p>Virtual threads make the caller free and the buffer behind it expensive. A
+     * response is read whole into a String before anything trims it, so the transient
+     * cost of one call is a multiple of the wire size — and the largest ceiling in the
+     * catalogue admits a body measured at 664 KB. Unbounded fan-out turns that into
+     * heap pressure that looks like a leak, on a path where nothing else says stop.
+     *
+     * <p>Twelve is not tuned; it is the number of concurrent lookups a handful of
+     * simultaneous conversations can produce, and it is sized to the free public APIs
+     * downstream rather than to this process. Raise it when a measurement, not a
+     * feeling, says requests are queueing.
+     */
+    private static final int IN_FLIGHT_LIMIT = 12;
+
+    /**
+     * How long a call waits for a permit before giving up. Long enough to ride out a
+     * burst, short enough that the model gets an answer it can act on rather than a
+     * turn that stalls.
+     */
+    private static final Duration PERMIT_WAIT = Duration.ofSeconds(5);
+
     private final HttpClient httpClient;
     private final Map<String, ApiEndpointProperties> catalogue;
     private final String defaultUserAgent;
+    private final Semaphore inFlight = new Semaphore(IN_FLIGHT_LIMIT);
 
     public ToolHttpClient(HttpClient httpClient,
                           List<ApiEndpointProperties> endpoints,
@@ -92,6 +121,28 @@ public class ToolHttpClient {
         URI uri = buildUri(endpoint, path, query);
         int attempts = endpoint.maxRetries() + 1;
 
+        boolean admitted;
+        try {
+            admitted = inFlight.tryAcquire(PERMIT_WAIT.toMillis(), TimeUnit.MILLISECONDS);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            return ToolResponse.failure(ToolResponse.Outcome.UPSTREAM_ERROR,
+                    "the request to " + endpoint.name() + " was cancelled.");
+        }
+        if (!admitted) {
+            LOG.warn("Tool request to {} gave up waiting for an in-flight permit ({} in use)",
+                    endpoint.name(), IN_FLIGHT_LIMIT);
+            return ToolResponse.failure(ToolResponse.Outcome.RATE_LIMITED,
+                    "too many lookups are in progress. Answer from what you already have.");
+        }
+        try {
+            return attempt(endpoint, uri, attempts);
+        } finally {
+            inFlight.release();
+        }
+    }
+
+    private ToolResponse attempt(ApiEndpointProperties endpoint, URI uri, int attempts) {
         for (int attempt = 1; attempt <= attempts; attempt++) {
             try {
                 return read(endpoint, uri);

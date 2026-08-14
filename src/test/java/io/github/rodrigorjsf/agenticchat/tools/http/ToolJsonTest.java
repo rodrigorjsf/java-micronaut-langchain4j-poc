@@ -147,4 +147,75 @@ class ToolJsonTest {
         // Still valid JSON — which byte truncation would not have been.
         assertThat(projected).startsWith("[").endsWith("]");
     }
+
+    // ------------------------------------------------------------------
+    // projectList — the nested case, and the reason it exists
+    // ------------------------------------------------------------------
+
+    @Test
+    @DisplayName("naming a nested array as a path keeps it WHOLE — the trap projectList exists for")
+    void aContainerPathKeepsEverythingUnderIt() {
+        var body = """
+                {"meals":[{"strMeal":"Lasagne","strSource":"https://www.bbcgoodfood.com/x",
+                 "strYoutube":"https://www.youtube.com/watch?v=y"}]}""";
+
+        var projected = json.project(body, "meals");
+
+        // Reads like a projection and drops nothing. Two third-party hosts survive,
+        // and a response quoting either is withheld whole by the output link policy.
+        assertThat(projected).contains("bbcgoodfood.com", "youtube.com");
+    }
+
+    @Test
+    @DisplayName("projectList keeps only the named fields of a nested array's elements")
+    void projectsThroughANestedArray() {
+        var body = """
+                {"meals":[{"strMeal":"Lasagne","strCategory":"Pasta",
+                 "strSource":"https://www.bbcgoodfood.com/x",
+                 "strYoutube":"https://www.youtube.com/watch?v=y",
+                 "strMealThumb":"https://www.themealdb.com/i/1.jpg"}]}""";
+
+        var projected = json.projectList(body, "meals", 3, "strMeal", "strCategory");
+
+        assertThat(projected).contains("Lasagne", "Pasta");
+        assertThat(projected).doesNotContain("bbcgoodfood.com", "youtube.com", "themealdb.com");
+    }
+
+    @Test
+    void capsANestedArrayAndSaysHowManyWereDropped() {
+        var body = """
+                {"drinks":[{"strDrink":"a"},{"strDrink":"b"},{"strDrink":"c"},
+                 {"strDrink":"d"},{"strDrink":"e"},{"strDrink":"f"}]}""";
+
+        var projected = json.projectList(body, "drinks", 3, "strDrink");
+
+        assertThat(projected).contains("\"a\"", "\"b\"", "\"c\"", "\"_more\":3");
+        assertThat(projected).doesNotContain("\"d\"", "\"e\"", "\"f\"");
+    }
+
+    @Test
+    @DisplayName("a null list survives untouched, because that is how these APIs say 'nothing found'")
+    void leavesANullListAlone() {
+        var body = "{\"meals\":null}";
+
+        assertThat(json.projectList(body, "meals", 3, "strMeal")).isEqualTo(body);
+    }
+
+    @Test
+    void leavesABodyWithoutTheNamedArrayAlone() {
+        var body = "{\"error\":true,\"message\":\"nothing matched\"}";
+
+        assertThat(json.projectList(body, "meals", 3, "strMeal")).isEqualTo(body);
+    }
+
+    @Test
+    void everythingOutsideTheNamedArrayIsDropped() {
+        var body = """
+                {"count":812,"page":1,"meals":[{"strMeal":"Lasagne","strSource":"https://x.test/1"}]}""";
+
+        var projected = json.projectList(body, "meals", 3, "strMeal");
+
+        assertThat(projected).contains("Lasagne");
+        assertThat(projected).doesNotContain("812", "x.test");
+    }
 }

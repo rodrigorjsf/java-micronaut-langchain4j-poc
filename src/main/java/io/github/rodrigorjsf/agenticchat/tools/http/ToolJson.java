@@ -77,6 +77,46 @@ public class ToolJson {
         }
     }
 
+    /**
+     * Projects the elements of an array <em>nested inside</em> an object, and caps it.
+     *
+     * <p>{@link #project} takes dotted paths, so it is easy to believe that naming the
+     * array projects through it. It does not: a path that lands on a container keeps
+     * that container <em>whole</em>. {@code project(body, "meals")} on
+     * {@code {"meals":[…]}} returns every field of every meal, which is the opposite
+     * of what the call reads like — and it is how third-party URLs, thumbnails and
+     * six translations of an instruction sheet reach the model.
+     *
+     * <p>So the nested case gets its own method with the array named separately from
+     * the fields:
+     *
+     * <pre>{@code
+     * projectList(body, "meals", 3, "strMeal", "strCategory", "strInstructions")
+     * // {"meals":[{"strMeal":…,"strCategory":…,"strInstructions":…}, …, {"_more":11}]}
+     * }</pre>
+     *
+     * <p>Everything outside the named array is dropped. If the key is absent or is not
+     * an array, the body comes back unchanged — a missing key is how these APIs report
+     * "no result", and turning that into an empty envelope would hide it.
+     */
+    public String projectList(String json, String arrayField, int max, String... paths) {
+        if (json == null || json.isBlank()) {
+            return json;
+        }
+        try {
+            JsonNode root = MAPPER.readTree(json);
+            JsonNode array = root == null ? null : root.get(arrayField);
+            if (array == null || !array.isArray()) {
+                return json;
+            }
+            ObjectNode out = MAPPER.createObjectNode();
+            out.set(arrayField, projectArray((ArrayNode) array, max, paths));
+            return MAPPER.writeValueAsString(out);
+        } catch (Exception cannotParse) {
+            return json;
+        }
+    }
+
     /** Caps a top-level array without touching the shape of its elements. */
     public String cap(String json, int max) {
         if (json == null || json.isBlank()) {
@@ -162,6 +202,11 @@ public class ToolJson {
     /** Convenience: cap a {@link ToolResponse}'s top-level array in place. */
     public ToolResponse cap(ToolResponse response, int max) {
         return reshape(response, body -> cap(body, max));
+    }
+
+    /** Convenience for the nested case: see {@link #projectList(String, String, int, String...)}. */
+    public ToolResponse projectList(ToolResponse response, String arrayField, int max, String... paths) {
+        return reshape(response, body -> projectList(body, arrayField, max, paths));
     }
 
     /**
