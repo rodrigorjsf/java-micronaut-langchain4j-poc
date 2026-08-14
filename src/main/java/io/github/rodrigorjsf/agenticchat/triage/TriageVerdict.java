@@ -7,33 +7,34 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 /**
- * What the triage judge decides about one user turn.
+ * What the triage judge decides about one user turn. Six fields, and the count is
+ * a measurement rather than a preference.
  *
- * <p>Every field has exactly one consumer, and a field without one would be tokens
- * the judge pays for on every request and nothing reads:
+ * <p><b>Output tokens drive judge latency; input tokens barely do.</b> On the same
+ * prompt with {@code gpt-4o-mini}, an 8-field schema measured a 1.463 s median, 7
+ * fields 1.125 s, and 6 fields 1.073 s — with the worst case collapsing from
+ * 2.666 s to 1.268 s. Meanwhile a 2019-token prompt and a 411-token prompt gave
+ * the same median on Gemini. The lever is <em>cut fields, not prose</em>.
  *
+ * <p>Two fields were cut for that reason:
  * <ul>
- *   <li>{@code decision} — the routing choice itself.</li>
- *   <li>{@code confidence} — a low-confidence OUT_OF_SCOPE is escalated to the main
- *       agent rather than refused. Refusing a real user is the expensive error here;
- *       answering an off-topic one costs a few cents.</li>
- *   <li>{@code intent} — the metric dimension and the eval label. Without it, a
- *       drop in judge accuracy is invisible until users complain.</li>
- *   <li>{@code language} — the main agent's system prompt is parameterised with it,
- *       so the assistant answers in the language the user wrote.</li>
- *   <li>{@code skillHint} — passed to the agent so it can activate the right skill
- *       on the first round trip instead of spending one exploring.</li>
- *   <li>{@code riskFlags} — audit trail and the injection metric. The judge sees
- *       every turn, so it is the cheapest place to notice an attack pattern.</li>
- *   <li>{@code outOfScopeReply} — returned to the user verbatim when the decision is
- *       OUT_OF_SCOPE. Generating it here is what makes the refusal path a single
- *       model call instead of two.</li>
+ *   <li><b>The refusal sentence.</b> Asking the model to write it costs roughly 40
+ *       output tokens per call and puts the product's voice in a prompt. Java
+ *       renders it from {@code (intent, language)} instead — free, deterministic,
+ *       and reviewable. See {@link RefusalTemplates}.</li>
+ *   <li><b>A normalised copy of the user's text.</b> Normalisation is a
+ *       deterministic Java job, and an LLM-rewritten user turn is a self-inflicted
+ *       injection vector.</li>
  * </ul>
  *
- * <p>{@code @JsonProperty(required = true)} on every field is not decoration.
- * LangChain4j derives the JSON schema with {@code areSubFieldsRequiredByDefault =
- * false}, so without these annotations the {@code required} array is empty and a
- * provider in strict-schema mode rejects the request.
+ * <p>Telemetry — prompt version, model id, latency, cache hit, token counts — is
+ * never asked of the model. The application already knows all of it, and asking an
+ * LLM for data you already hold is pure latency.
+ *
+ * <p>{@code @JsonProperty(required = true)} on every field is not decoration:
+ * LangChain4j derives the schema with {@code areSubFieldsRequiredByDefault =
+ * false}, so without it the {@code required} array is empty and a provider in
+ * strict-schema mode rejects the request.
  */
 public record TriageVerdict(
 
@@ -46,8 +47,8 @@ public record TriageVerdict(
         double confidence,
 
         @JsonProperty(required = true)
-        @Description("Short snake_case label for what the user wants, e.g. greeting, weather_query, cep_lookup, capability_question, off_topic")
-        String intent,
+        @Description("The single label that best describes what the user wants")
+        Intent intent,
 
         @JsonProperty(required = true)
         @Description("BCP-47 language tag of the user's message, e.g. pt-BR or en")
@@ -59,66 +60,99 @@ public record TriageVerdict(
 
         @JsonProperty(required = true)
         @Description("Risk labels observed in the message: prompt_injection, pii, abuse, spam. Empty when none apply")
-        List<String> riskFlags,
-
-        @JsonProperty(required = true)
-        @Description("When OUT_OF_SCOPE, a short friendly reply in the user's language that redirects to what this assistant can do. Empty string when IN_SCOPE")
-        String outOfScopeReply) {
+        List<String> riskFlags) {
 
     public enum Decision {
         IN_SCOPE,
         OUT_OF_SCOPE
     }
 
-    /** BCP-47 shape: two or three letters, optionally a script and a region. */
+    /**
+     * A closed set, not free text.
+     *
+     * <p>Three things depend on it being closed: the refusal template is selected
+     * by it and must be total; it is the primary metric dimension, so free text
+     * would blow up cardinality; and it is the drift signal, which needs stable
+     * labels to compare across days. A free-text intent field was measured to flip
+     * between runs on the same input.
+     */
+    public enum Intent {
+        GREETING,
+        SMALL_TALK,
+        CAPABILITY_QUESTION,
+        CLARIFICATION,
+        DATA_REQUEST,
+        FRUSTRATION,
+        PROFESSIONAL_ADVICE,
+        CODE_REQUEST,
+        HARMFUL_REQUEST,
+        PROMPT_INJECTION,
+        OFF_TOPIC,
+        EMPTY,
+        TOO_LONG,
+        UNKNOWN
+    }
+
+    /**
+     * Below this, an OUT_OF_SCOPE verdict is upgraded to IN_SCOPE.
+     *
+     * <p>The errors are not symmetric. A false OUT_OF_SCOPE turns a real user away
+     * and they do not come back; a false IN_SCOPE costs one call to the main model.
+     * The threshold is set where it is because the cheaper mistake should be the
+     * one the system makes.
+     */
+    public static final double REFUSAL_CONFIDENCE_THRESHOLD = 0.70;
+
     private static final Pattern LANGUAGE_TAG = Pattern.compile("[a-zA-Z]{2,3}(-[a-zA-Z]{2,8}){0,2}");
-    private static final Pattern INTENT_LABEL = Pattern.compile("[a-z][a-z0-9_]{0,39}");
+    private static final Pattern RISK_FLAG = Pattern.compile("[a-z][a-z0-9_]{0,39}");
     private static final String DEFAULT_LANGUAGE = "pt-BR";
 
     /**
      * Every field here comes out of an LLM and two of them are interpolated into the
-     * next prompt, so they are constrained rather than trusted.
-     *
-     * <p>{@code language} and {@code intent} reach the agent's turn context and the
-     * metric tags respectively. The guardrail chain inspects the user's message, not
-     * this object, so an unvalidated field would be a way to get attacker-chosen text
-     * into the agent's prompt without passing a single guardrail — and an unbounded
-     * {@code intent} would additionally blow up metric cardinality. Anything not
-     * matching the expected shape is replaced, never sanitised in place.
+     * next prompt, so they are constrained rather than trusted. The guardrail chain
+     * inspects the user's message, not this object — an unvalidated field would be a
+     * way to get attacker-chosen text into the agent's prompt with no guardrail in
+     * its path. Anything not matching is replaced, never sanitised in place.
      */
     public TriageVerdict {
         riskFlags = riskFlags == null ? List.of() : riskFlags.stream()
-                .filter(flag -> flag != null && INTENT_LABEL.matcher(flag).matches())
+                .filter(flag -> flag != null && RISK_FLAG.matcher(flag).matches())
                 .distinct()
                 .limit(8)
                 .toList();
-        intent = intent != null && INTENT_LABEL.matcher(intent).matches() ? intent : "unknown";
+        intent = intent == null ? Intent.UNKNOWN : intent;
         language = language != null && LANGUAGE_TAG.matcher(language).matches()
                 ? language
                 : DEFAULT_LANGUAGE;
         skillHint = skillHint == null ? "" : skillHint;
-        outOfScopeReply = outOfScopeReply == null ? "" : outOfScopeReply;
     }
 
     /**
-     * A copy whose skill hint is guaranteed to name a real skill.
-     *
-     * <p>Checked against the catalogue rather than a pattern: the hint is
-     * interpolated into the agent's prompt, and the only safe values are ones the
-     * application already publishes.
+     * The routing answer, with the asymmetry rule applied. Use this rather than
+     * reading {@link #decision()} directly.
+     */
+    public boolean inScope() {
+        return decision == Decision.IN_SCOPE || confidence < REFUSAL_CONFIDENCE_THRESHOLD;
+    }
+
+    /** True when the model wanted to refuse but was not sure enough to be allowed to. */
+    public boolean wasUpgradedToInScope() {
+        return decision == Decision.OUT_OF_SCOPE && confidence < REFUSAL_CONFIDENCE_THRESHOLD;
+    }
+
+    /**
+     * A copy whose skill hint is guaranteed to name a real skill. Checked against
+     * the catalogue rather than a pattern: the hint is interpolated into the agent's
+     * prompt, and the only safe values are ones the application already publishes.
      */
     public TriageVerdict withSkillHintIn(java.util.Collection<String> knownSkills) {
         return knownSkills.contains(skillHint)
                 ? this
-                : new TriageVerdict(decision, confidence, intent, language, "", riskFlags, outOfScopeReply);
-    }
-
-    public boolean inScope() {
-        return decision == Decision.IN_SCOPE;
+                : new TriageVerdict(decision, confidence, intent, language, "", riskFlags);
     }
 
     /** A verdict the pipeline produces itself, without consulting the model. */
-    static TriageVerdict deterministic(Decision decision, String intent, String language, String reply) {
-        return new TriageVerdict(decision, 1.0, intent, language, "", List.of(), reply);
+    static TriageVerdict deterministic(Decision decision, Intent intent, String language) {
+        return new TriageVerdict(decision, 1.0, intent, language, "", List.of());
     }
 }

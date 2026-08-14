@@ -67,6 +67,18 @@ agentic:
         timeout: PT8S
         max-retries: 1
 
+      # Second provider for the judge. It exists because Google's free tier returns
+      # RESOURCE_EXHAUSTED at roughly 10-20 requests per minute (measured), and the
+      # judge runs before every request. Failover fires only on rate limiting;
+      # anything else fails open.
+      judge-fallback:
+        provider: OPENAI
+        model-name: gpt-4o-mini
+        temperature: 0.0
+        max-output-tokens: 320
+        timeout: PT8S
+        max-retries: 1
+
       agent:
         provider: GOOGLE
         model-name: gemini-3.1-flash-lite

@@ -15,6 +15,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.github.rodrigorjsf.agenticchat.llm.ChatModelRegistry;
 import io.github.rodrigorjsf.agenticchat.memory.SummarizerPrompt;
 import io.github.rodrigorjsf.agenticchat.skills.SkillCatalog;
+import io.github.rodrigorjsf.agenticchat.triage.FailoverTriageJudge;
 import io.github.rodrigorjsf.agenticchat.triage.TriageJudge;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Value;
@@ -40,10 +41,26 @@ public class AiServiceFactory {
      * guardrail would call this same class and recurse.
      */
     @Singleton
-    TriageJudge triageJudge(ChatModelRegistry models) {
-        return AiServices.builder(TriageJudge.class)
+    TriageJudge triageJudge(ChatModelRegistry models, MeterRegistry meters) {
+        var primary = AiServices.builder(TriageJudge.class)
                 .chatModel(models.forRole("judge"))
                 .build();
+
+        // Google's free tier returns RESOURCE_EXHAUSTED at roughly 10-20 requests per
+        // minute, and this component runs before every request. A second provider is
+        // not redundancy, it is the difference between a rate limit degrading the
+        // service and stopping it. Optional: with no judge-fallback role configured
+        // the rate-limited turn simply fails open.
+        TriageJudge fallback = null;
+        if (models.roles().contains("judge-fallback")) {
+            fallback = AiServices.builder(TriageJudge.class)
+                    .chatModel(models.forRole("judge-fallback"))
+                    .build();
+            LOG.info("Triage judge has a fallback provider configured");
+        } else {
+            LOG.warn("No judge-fallback role configured; a rate-limited judge will fail open");
+        }
+        return new FailoverTriageJudge(primary, fallback, meters);
     }
 
     /**

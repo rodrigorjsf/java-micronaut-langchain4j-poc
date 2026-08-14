@@ -33,7 +33,7 @@ public record ChatResponse(String conversationId,
                 conversationId,
                 turn.reply(),
                 turn.outcome().name(),
-                turn.verdict().intent(),
+                turn.verdict().intent().name(),
                 turn.toolsUsed(),
                 usage);
     }

@@ -81,24 +81,22 @@ public class TriageService {
             // Fail open: the guardrail chain still runs on the escalated turn.
             LOG.warn("Triage judge unavailable, escalating the turn to the main agent", e);
             return TriageVerdict.deterministic(
-                    TriageVerdict.Decision.IN_SCOPE, "judge_unavailable", "pt-BR", "");
+                    TriageVerdict.Decision.IN_SCOPE, TriageVerdict.Intent.UNKNOWN, "pt-BR");
         }
     }
 
     private TriageVerdict preFilter(String normalized) {
         if (normalized.isBlank()) {
             return TriageVerdict.deterministic(
-                    TriageVerdict.Decision.OUT_OF_SCOPE, "empty_message", "pt-BR",
-                    "Não recebi nenhuma mensagem. Pode escrever o que você precisa?");
+                    TriageVerdict.Decision.OUT_OF_SCOPE, TriageVerdict.Intent.EMPTY, "pt-BR");
         }
         if (normalized.length() > MAX_CHARS) {
             return TriageVerdict.deterministic(
-                    TriageVerdict.Decision.OUT_OF_SCOPE, "message_too_long", "pt-BR",
-                    "Essa mensagem é longa demais para eu processar. Pode resumir o que você precisa?");
+                    TriageVerdict.Decision.OUT_OF_SCOPE, TriageVerdict.Intent.TOO_LONG, "pt-BR");
         }
         if (isGreeting(normalized)) {
             return TriageVerdict.deterministic(
-                    TriageVerdict.Decision.IN_SCOPE, "greeting", "pt-BR", "");
+                    TriageVerdict.Decision.IN_SCOPE, TriageVerdict.Intent.GREETING, "pt-BR");
         }
         return null;
     }
@@ -118,8 +116,15 @@ public class TriageService {
     private void count(TriageVerdict verdict, String source) {
         meters.counter("agentic.triage.decisions",
                 "decision", verdict.decision().name(),
-                "intent", verdict.intent(),
+                "intent", verdict.intent().name(),
                 "source", source).increment();
+        if (verdict.wasUpgradedToInScope()) {
+            // The judge wanted to refuse and was not confident enough to be allowed
+            // to. Worth its own counter: a rise here means the scope prompt no longer
+            // matches real traffic.
+            meters.counter("agentic.triage.upgraded_to_in_scope",
+                    "intent", verdict.intent().name()).increment();
+        }
         verdict.riskFlags().forEach(flag ->
                 meters.counter("agentic.triage.risk_flags", "flag", flag).increment());
     }

@@ -60,8 +60,8 @@ class SkillActivationTest {
 
     private static String inScope() {
         return """
-                {"decision":"IN_SCOPE","confidence":0.95,"intent":"cep_lookup","language":"pt-BR",
-                 "skillHint":"","riskFlags":[],"outOfScopeReply":""}""";
+                {"decision":"IN_SCOPE","confidence":0.95,"intent":"DATA_REQUEST","language":"pt-BR",
+                 "skillHint":"","riskFlags":[]}""";
     }
 
     private static List<String> toolNames(ChatRequest request) {

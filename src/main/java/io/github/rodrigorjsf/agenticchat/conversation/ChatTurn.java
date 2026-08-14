@@ -35,8 +35,8 @@ public record ChatTurn(String reply,
         toolsUsed = toolsUsed == null ? List.of() : List.copyOf(toolsUsed);
     }
 
-    static ChatTurn refused(TriageVerdict verdict) {
-        return new ChatTurn(verdict.outOfScopeReply(), Outcome.REFUSED, verdict, List.of(), null);
+    static ChatTurn refused(TriageVerdict verdict, String reply) {
+        return new ChatTurn(reply, Outcome.REFUSED, verdict, List.of(), null);
     }
 
     static ChatTurn blocked(TriageVerdict verdict, String reply) {

@@ -71,8 +71,8 @@ class CostAccountingTest {
             var models = (io.github.rodrigorjsf.agenticchat.testsupport.StubChatModelRegistry)
                     ctx.getBean(ChatModelRegistry.class);
             models.model("judge").replyWith("""
-                    {"decision":"IN_SCOPE","confidence":0.9,"intent":"chat","language":"pt-BR",
-                     "skillHint":"","riskFlags":[],"outOfScopeReply":""}""");
+                    {"decision":"IN_SCOPE","confidence":0.9,"intent":"SMALL_TALK","language":"pt-BR",
+                     "skillHint":"","riskFlags":[]}""");
             models.model("agent").replyWith("resposta");
 
             ctx.getBean(io.github.rodrigorjsf.agenticchat.conversation.ChatTurnService.class)

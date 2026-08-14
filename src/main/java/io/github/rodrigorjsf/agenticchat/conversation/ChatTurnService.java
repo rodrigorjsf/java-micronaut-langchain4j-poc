@@ -7,6 +7,7 @@ import io.github.rodrigorjsf.agenticchat.agent.ChatAssistant;
 import io.github.rodrigorjsf.agenticchat.memory.ConversationCompactor;
 import io.github.rodrigorjsf.agenticchat.memory.ConversationId;
 import io.github.rodrigorjsf.agenticchat.skills.SkillCatalog;
+import io.github.rodrigorjsf.agenticchat.triage.RefusalTemplates;
 import io.github.rodrigorjsf.agenticchat.triage.TriageService;
 import io.github.rodrigorjsf.agenticchat.triage.TriageVerdict;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -39,17 +40,20 @@ public class ChatTurnService {
     private final TriageService triage;
     private final ChatAssistant assistant;
     private final SkillCatalog skills;
+    private final RefusalTemplates refusals;
     private final ConversationCompactor compactor;
     private final MeterRegistry meters;
 
     public ChatTurnService(TriageService triage,
                            ChatAssistant assistant,
                            SkillCatalog skills,
+                           RefusalTemplates refusals,
                            ConversationCompactor compactor,
                            MeterRegistry meters) {
         this.triage = triage;
         this.assistant = assistant;
         this.skills = skills;
+        this.refusals = refusals;
         this.compactor = compactor;
         this.meters = meters;
     }
@@ -65,7 +69,7 @@ public class ChatTurnService {
             sample.stop(meters.timer("agentic.turn.latency", "path", "refused"));
             LOG.info("Turn refused as out of scope: conversation={} intent={}",
                     conversationId, verdict.intent());
-            return ChatTurn.refused(verdict);
+            return ChatTurn.refused(verdict, refusals.refusalFor(verdict));
         }
 
         try {
