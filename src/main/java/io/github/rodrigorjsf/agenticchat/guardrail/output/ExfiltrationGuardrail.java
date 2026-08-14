@@ -40,12 +40,16 @@ public class ExfiltrationGuardrail implements OutputGuardrail {
 
     private static final Logger LOG = LoggerFactory.getLogger(ExfiltrationGuardrail.class);
 
-    /** Markdown image or link: captures the destination for both forms. */
+    /**
+     * Markdown image or link: captures the destination for both forms.
+     */
     private static final Pattern MARKDOWN_URL = Pattern.compile("!?\\[[^\\]]*]\\(\\s*([^)\\s]+)");
     private static final Pattern BARE_URL = Pattern.compile("\\bhttps?://([^\\s/\"'<>)\\]]+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern DATA_URI = Pattern.compile("data:[^;\\s]+;base64,", Pattern.CASE_INSENSITIVE);
 
-    /** Provider key shapes. Deliberately narrow: a broad rule would eat ordinary base64. */
+    /**
+     * Provider key shapes. Deliberately narrow: a broad rule would eat ordinary base64.
+     */
     private static final List<Pattern> SECRET_SHAPES = List.of(
             Pattern.compile("\\bsk-[A-Za-z0-9_-]{20,}"),          // OpenAI
             Pattern.compile("\\bAIza[0-9A-Za-z_-]{35}"),           // Google

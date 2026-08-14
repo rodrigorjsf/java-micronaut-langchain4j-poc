@@ -16,7 +16,7 @@ public interface HolidayCheckerAgent {
     @SystemMessage("""
             You check Brazilian national holidays with the list_national_holidays tool,
             which takes a year.
-
+            
             Answer in one sentence in Brazilian Portuguese: either that the date is a
             national holiday and which one, or that it is not. Only national holidays
             are in this source — if the answer is no, say so without implying that

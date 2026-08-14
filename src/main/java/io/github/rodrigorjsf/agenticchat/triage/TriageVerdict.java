@@ -135,7 +135,9 @@ public record TriageVerdict(
         return decision == Decision.IN_SCOPE || confidence < REFUSAL_CONFIDENCE_THRESHOLD;
     }
 
-    /** True when the model wanted to refuse but was not sure enough to be allowed to. */
+    /**
+     * True when the model wanted to refuse but was not sure enough to be allowed to.
+     */
     public boolean wasUpgradedToInScope() {
         return decision == Decision.OUT_OF_SCOPE && confidence < REFUSAL_CONFIDENCE_THRESHOLD;
     }
@@ -151,7 +153,9 @@ public record TriageVerdict(
                 : new TriageVerdict(decision, confidence, intent, language, "", riskFlags);
     }
 
-    /** A verdict the pipeline produces itself, without consulting the model. */
+    /**
+     * A verdict the pipeline produces itself, without consulting the model.
+     */
     static TriageVerdict deterministic(Decision decision, Intent intent, String language) {
         return new TriageVerdict(decision, 1.0, intent, language, "", List.of());
     }

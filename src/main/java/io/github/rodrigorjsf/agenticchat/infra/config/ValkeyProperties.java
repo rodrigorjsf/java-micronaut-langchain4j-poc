@@ -24,7 +24,9 @@ public interface ValkeyProperties {
     @Bindable(defaultValue = "6379")
     int port();
 
-    /** ElastiCache replication group that {@code LocalAwsBootstrap} creates on floci. */
+    /**
+     * ElastiCache replication group that {@code LocalAwsBootstrap} creates on floci.
+     */
     @Bindable(defaultValue = "agentic-chat-cache")
     String replicationGroupId();
 

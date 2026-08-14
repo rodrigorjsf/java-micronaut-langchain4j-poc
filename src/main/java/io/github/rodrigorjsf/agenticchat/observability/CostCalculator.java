@@ -34,7 +34,7 @@ public class CostCalculator {
 
     /**
      * @return USD for one model call, or {@link BigDecimal#ZERO} when the model has
-     *         no configured price
+     * no configured price
      */
     public BigDecimal costOf(String modelName, long inputTokens, long outputTokens, long cachedInputTokens) {
         var price = pricesByModel.get(normalise(modelName));
@@ -52,7 +52,9 @@ public class CostCalculator {
         return modelName != null && pricesByModel.containsKey(normalise(modelName));
     }
 
-    /** Property keys cannot contain dots, so the config writes them as hyphens. */
+    /**
+     * Property keys cannot contain dots, so the config writes them as hyphens.
+     */
     private static String normalise(String modelName) {
         return modelName == null ? "" : modelName.toLowerCase(Locale.ROOT).replace('.', '-');
     }

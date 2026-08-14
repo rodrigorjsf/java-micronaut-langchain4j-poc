@@ -196,7 +196,7 @@ public class NetworkIdentityTools implements SkillTools {
      * asking would spend one of a very small per-minute budget to be told so.
      *
      * @return {@code null} when the address may be looked up, otherwise the sentence
-     *         to hand back to the model
+     * to hand back to the model
      */
     private static String complaintAbout(String address) {
         if (address.isEmpty()) {
@@ -338,7 +338,9 @@ public class NetworkIdentityTools implements SkillTools {
                 + what + " from how the name looks or sounds.";
     }
 
-    /** Compares against a whitespace-free copy so pretty-printed JSON matches too. */
+    /**
+     * Compares against a whitespace-free copy so pretty-printed JSON matches too.
+     */
     private static boolean carries(String text, String marker) {
         return text.replace(" ", "").contains(marker);
     }

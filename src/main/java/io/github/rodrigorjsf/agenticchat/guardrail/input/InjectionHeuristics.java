@@ -42,9 +42,13 @@ import java.util.regex.Pattern;
 @Singleton
 public class InjectionHeuristics {
 
-    /** Structural certainty: block without consulting anything else. */
+    /**
+     * Structural certainty: block without consulting anything else.
+     */
     public static final int HARD_BLOCK = 6;
-    /** Enough smoke to be worth an LLM opinion, not enough to block on. */
+    /**
+     * Enough smoke to be worth an LLM opinion, not enough to block on.
+     */
     public static final int GRAY_ZONE = 2;
 
     private static final int PROBE_SCORE = 3;
@@ -57,14 +61,18 @@ public class InjectionHeuristics {
     private static final Pattern CODE_FENCE = Pattern.compile("```.*?```", Pattern.DOTALL);
     private static final Pattern DIACRITICS = Pattern.compile("\\p{InCombiningDiacriticalMarks}+");
 
-    /** Chat-template and role delimiters. None of these occurs in real user text. */
+    /**
+     * Chat-template and role delimiters. None of these occurs in real user text.
+     */
     private static final Pattern ROLE_DELIMITERS = Pattern.compile(
             "<\\|(im_start|im_end|system|user|assistant|endoftext)\\|>"
                     + "|<<\\s*/?\\s*SYS\\s*>>|\\[/?INST]|</?s>"
                     + "|^###\\s*(system|instruc(ao|oes))\\b",
             Pattern.CASE_INSENSITIVE | Pattern.MULTILINE);
 
-    /** A code fence claiming to be a privileged role. */
+    /**
+     * A code fence claiming to be a privileged role.
+     */
     private static final Pattern ROLE_FENCE = Pattern.compile(
             "```\\s*(system|assistant|developer|tool)\\b", Pattern.CASE_INSENSITIVE);
 

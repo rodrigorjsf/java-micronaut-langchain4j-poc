@@ -79,7 +79,7 @@ public class ChatModelRegistry {
 
     /**
      * @throws UnknownModelRoleException if nothing is configured under that role —
-     *         a typo in a role name must not silently fall back to another model.
+     *                                   a typo in a role name must not silently fall back to another model.
      */
     public ChatModel forRole(String role) {
         var model = modelsByRole.get(role);

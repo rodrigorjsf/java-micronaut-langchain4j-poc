@@ -23,11 +23,17 @@ public record ChatTurn(String reply,
                        TokenUsage usage) {
 
     public enum Outcome {
-        /** The agent answered. */
+        /**
+         * The agent answered.
+         */
         ANSWERED,
-        /** Triage judged the request outside the assistant's scope. */
+        /**
+         * Triage judged the request outside the assistant's scope.
+         */
         REFUSED,
-        /** A guardrail stopped the turn on the way in or on the way out. */
+        /**
+         * A guardrail stopped the turn on the way in or on the way out.
+         */
         BLOCKED
     }
 
@@ -46,9 +52,9 @@ public record ChatTurn(String reply,
     static ChatTurn answered(TriageVerdict verdict, Result<String> result) {
         var tools = result.toolExecutions() == null ? List.<String>of()
                 : result.toolExecutions().stream()
-                        .map(execution -> execution.request().name())
-                        .distinct()
-                        .toList();
+                .map(execution -> execution.request().name())
+                .distinct()
+                .toList();
         return new ChatTurn(result.content(), Outcome.ANSWERED, verdict, tools, result.tokenUsage());
     }
 }

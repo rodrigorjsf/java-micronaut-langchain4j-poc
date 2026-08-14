@@ -87,7 +87,9 @@ public class HealthFoodTools implements SkillTools {
      */
     private static final String SEARCH_FIELDS = "product_name,brands,nutriscore_grade,code";
 
-    /** Three is enough to say "there are several"; a fourth is never quoted in an answer. */
+    /**
+     * Three is enough to say "there are several"; a fourth is never quoted in an answer.
+     */
     private static final int MAX_RECIPES = 3;
 
     /**
@@ -104,7 +106,9 @@ public class HealthFoodTools implements SkillTools {
         return fields.toArray(String[]::new);
     }
 
-    /** As {@link #recipeFields()}; a cocktail has fifteen ingredient slots, not twenty. */
+    /**
+     * As {@link #recipeFields()}; a cocktail has fifteen ingredient slots, not twenty.
+     */
     private static String[] cocktailFields() {
         var fields = new ArrayList<String>(
                 List.of("strDrink", "strCategory", "strAlcoholic", "strGlass", "strInstructions"));

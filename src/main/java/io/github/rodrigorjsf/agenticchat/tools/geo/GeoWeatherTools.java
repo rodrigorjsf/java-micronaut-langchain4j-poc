@@ -61,7 +61,9 @@ public class GeoWeatherTools implements SkillTools {
     private static final String ARCHIVE_DAILY_FIELDS =
             "temperature_2m_max,temperature_2m_min,precipitation_sum";
 
-    /** The longest range the archive tool will ask for, in days, inclusive. */
+    /**
+     * The longest range the archive tool will ask for, in days, inclusive.
+     */
     private static final int MAX_ARCHIVE_SPAN_DAYS = 31;
 
     private final ToolHttpClient http;

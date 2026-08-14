@@ -5,18 +5,18 @@ import dev.langchain4j.rag.RetrievalAugmentor;
 import dev.langchain4j.service.AiServices;
 import dev.langchain4j.service.tool.ToolErrorHandlerResult;
 import dev.langchain4j.store.memory.chat.ChatMemoryStore;
+import io.github.rodrigorjsf.agenticchat.guardrail.input.InjectionHeuristics;
 import io.github.rodrigorjsf.agenticchat.guardrail.input.InjectionTriageGuardrail;
 import io.github.rodrigorjsf.agenticchat.guardrail.input.NormalizingInputGuardrail;
 import io.github.rodrigorjsf.agenticchat.guardrail.output.ExfiltrationGuardrail;
-import io.github.rodrigorjsf.agenticchat.guardrail.input.InjectionHeuristics;
 import io.github.rodrigorjsf.agenticchat.guardrail.output.SystemPromptLeakageGuardrail;
 import io.github.rodrigorjsf.agenticchat.guardrail.tool.ToolGuardProvider;
-import io.micrometer.core.instrument.MeterRegistry;
 import io.github.rodrigorjsf.agenticchat.llm.ChatModelRegistry;
 import io.github.rodrigorjsf.agenticchat.memory.SummarizerPrompt;
 import io.github.rodrigorjsf.agenticchat.skills.SkillCatalog;
 import io.github.rodrigorjsf.agenticchat.triage.FailoverTriageJudge;
 import io.github.rodrigorjsf.agenticchat.triage.TriageJudge;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Value;
 import jakarta.inject.Singleton;
@@ -77,18 +77,18 @@ public class AiServiceFactory {
 
     @Singleton
     ChatAssistant chatAssistant(ChatModelRegistry models,
-                               SystemPromptBuilder systemPrompt,
-                               SkillCatalog skills,
-                               ChatMemoryStore memoryStore,
-                               RetrievalAugmentor retrievalAugmentor,
-                               NormalizingInputGuardrail normalizer,
-                               InjectionTriageGuardrail injectionTriage,
-                               SystemPromptLeakageGuardrail leakage,
-                               ExfiltrationGuardrail exfiltration,
-                               InjectionHeuristics heuristics,
-                               MeterRegistry meters,
-                               @Value("${agentic.agent.memory-window-messages:20}") int memoryWindow,
-                               @Value("${agentic.agent.max-tool-round-trips:6}") int maxRoundTrips) {
+                                SystemPromptBuilder systemPrompt,
+                                SkillCatalog skills,
+                                ChatMemoryStore memoryStore,
+                                RetrievalAugmentor retrievalAugmentor,
+                                NormalizingInputGuardrail normalizer,
+                                InjectionTriageGuardrail injectionTriage,
+                                SystemPromptLeakageGuardrail leakage,
+                                ExfiltrationGuardrail exfiltration,
+                                InjectionHeuristics heuristics,
+                                MeterRegistry meters,
+                                @Value("${agentic.agent.memory-window-messages:20}") int memoryWindow,
+                                @Value("${agentic.agent.max-tool-round-trips:6}") int maxRoundTrips) {
 
         LOG.info("Assembling the chat assistant: memory window {} messages, max {} tool round trips",
                 memoryWindow, maxRoundTrips);

@@ -42,8 +42,8 @@ says which:
   `includeInternalNotes: true`. Injected text talks the model into flipping it
   and the tool complies, because complying is the whole job. This belongs in the
   system bucket: set outside the schema, or the capability goes.
-- **It changes which question is being answered.** Not a flag — two tools. Run
-  the cannot-decide sentence on each half.
+- **It changes which question is being answered** — see
+  [`SPLIT-TRIGGERS.md`](SPLIT-TRIGGERS.md).
 
 A boolean surviving all three is rare. When one does, its description names the
 sentence from the list that sets it, exactly as a parameter's does.

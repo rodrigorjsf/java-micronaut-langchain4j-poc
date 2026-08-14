@@ -5,10 +5,9 @@ description: Turn "we need a tool for X" into a tool contract before any of it i
 
 # Authoring an agent tool
 
-**"Add a tool that looks up an order"** names an implementation somebody already
-pictured. Nobody has said what question a user asks, what the model answers
-without it, or what a wrong answer costs. Built as stated, a tool comes out
-shaped like the API it wraps.
+**"Add a tool that looks up an order"** names an implementation someone pictured.
+Nobody has said what question a user asks, what the model answers without it, or
+what a wrong answer costs. Built as stated, it is shaped like the API it wraps.
 
 What a parameter may accept, what a result may cost, what the model sees when a
 call fails — those boundary questions have their own answers. This is the pass
@@ -189,18 +188,16 @@ lamp, ordered Tuesday"` and the model calls `get_order_status("blue lamp")` — 
 invented argument the buckets just killed, reintroduced between two tools. Return
 `"#88231 — blue lamp, ordered Tuesday"` and it cannot.
 
-The cannot-decide sentence catches most splits. **When it does not fire and the
-tool still feels like two — a read and a write behind one name, two questions
-sharing a verb, a fixed sequence you are tempted to split — read
-[`SPLIT-TRIGGERS.md`](SPLIT-TRIGGERS.md).**
+**When that sentence does not fire and the tool still feels like two — a read and
+a write behind one name — read [`SPLIT-TRIGGERS.md`](SPLIT-TRIGGERS.md).**
 
 ## The tests that gate the ship
 
 **One per taxonomy branch**, asserting the returned **text** — not an exception
 type or a status code, because that text is the next prompt the model reads. It
 gates because it proves the enumeration closed: an outcome you cannot construct a
-case for is imaginary and gets deleted, and a result landing outside every
-outcome means the taxonomy is still open.
+case for is imaginary and gets deleted, and a result outside every outcome means
+the taxonomy is still open.
 
 - **Routing** — every sentence in the list reaches this tool, asserted against
   the description clause derived above; then a sentence belonging to the

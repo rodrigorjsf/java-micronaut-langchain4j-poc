@@ -104,10 +104,14 @@ public class FunTriviaTools implements SkillTools {
     private static final String BLOCKED_JOKE_FLAGS =
             "nsfw,religious,political,racist,sexist,explicit";
 
-    /** Ten cards is already ~2.4 KB, because each card carries three picture links. */
+    /**
+     * Ten cards is already ~2.4 KB, because each card carries three picture links.
+     */
     private static final int MAX_CARDS = 10;
 
-    /** Six decks is what the service allows, and more than any table game needs. */
+    /**
+     * Six decks is what the service allows, and more than any table game needs.
+     */
     private static final int MAX_DECKS = 6;
 
     private final ToolHttpClient http;
