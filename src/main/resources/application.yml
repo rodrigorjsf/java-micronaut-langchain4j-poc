@@ -4,6 +4,15 @@ micronaut:
   server:
     port: 8080
 
+  caches:
+    # Triage verdicts are cacheable because the judge is stateless at temperature 0:
+    # the same text always yields the same verdict. Repeated and adversarial traffic
+    # hits this hardest, which is exactly when the saving matters. The TTL bounds how
+    # long a prompt change takes to take effect.
+    triage-verdicts:
+      maximum-size: 5000
+      expire-after-write: 30m
+
   metrics:
     enabled: true
     export:
@@ -80,6 +89,11 @@ agentic:
     command-timeout: PT10S
 
   persistence:
+    # write-through = Valkey in front of DynamoDB (the real thing).
+    # in-memory     = process-local, for running without Docker. Never selected
+    #                 automatically: degrading silently would lose every conversation
+    #                 on a restart while the health check stayed green.
+    memory-backend: write-through
     table-name: agentic_chat
     conversation-ttl: PT24H
     # Off by default; the local and docker environments below turn it on because
@@ -121,3 +135,19 @@ agentic:
         - open-meteo.com
         - wikipedia.org
         - ibge.gov.br
+
+  agent:
+    # 20 messages is ~10 exchanges. A message window rather than a token window: the
+    # prompt cost is slightly less tight but the number of retained turns is the same
+    # in a test and in production, which a token window cannot promise.
+    memory-window-messages: 20
+    # activate_skill plus a couple of chained lookups fits in six. Beyond that the
+    # model is looping, and every loop pays for the whole prompt again.
+    max-tool-round-trips: 6
+
+  guardrails:
+    input:
+      # The gray-zone second opinion. Disabling it leaves the deterministic rules in
+      # place and lets ambiguous turns through — the same fail-open posture used
+      # everywhere else in the pipeline.
+      llm-classifier-enabled: true

@@ -3,6 +3,7 @@ package io.github.rodrigorjsf.agenticchat.memory;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.store.memory.chat.ChatMemoryStore;
 import io.micronaut.context.annotation.Primary;
+import io.micronaut.context.annotation.Requires;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.slf4j.Logger;
@@ -27,6 +28,7 @@ import java.util.List;
  */
 @Singleton
 @Primary
+@Requires(property = "agentic.persistence.memory-backend", value = "write-through", defaultValue = "write-through")
 public class WriteThroughChatMemoryStore implements ChatMemoryStore {
 
     private static final Logger LOG = LoggerFactory.getLogger(WriteThroughChatMemoryStore.class);

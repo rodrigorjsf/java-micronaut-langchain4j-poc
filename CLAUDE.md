@@ -80,6 +80,11 @@ When something fails repeatedly, when User has to re-explain, or when a workarou
 
 - Agents fail silently on wrong paths. Always verify hardcoded paths.
 - Before creating a new project artifact, check if an existing one can be extended or merged.
+- Java text block `\` continuation keeps extra indent; prompts get stray spaces.
+- Micronaut `@ConfigurationProperties` interface needs `@AccessorsStyle(readPrefixes = "")`.
+- `@EachProperty` + `@Parameter` needs a class, not an interface.
+- Micronaut `@Cacheable` is proxy-based: self-invocation never caches.
+- `@EachProperty` entries in application.yml merge into every test context.
 
 
 

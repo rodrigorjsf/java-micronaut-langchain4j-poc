@@ -6,6 +6,7 @@
 agentic:
   persistence:
     bootstrap-enabled: false
+    memory-backend: in-memory
   llm:
     credentials:
       google-api-key: test-key-not-used
