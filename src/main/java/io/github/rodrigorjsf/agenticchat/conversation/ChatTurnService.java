@@ -1,6 +1,8 @@
 package io.github.rodrigorjsf.agenticchat.conversation;
 
 import dev.langchain4j.guardrail.GuardrailException;
+import dev.langchain4j.invocation.InvocationParameters;
+import io.github.rodrigorjsf.agenticchat.rag.SkillAwareQueryRouter;
 import io.github.rodrigorjsf.agenticchat.agent.ChatAssistant;
 import io.github.rodrigorjsf.agenticchat.memory.ConversationId;
 import io.github.rodrigorjsf.agenticchat.skills.SkillCatalog;
@@ -63,8 +65,12 @@ public class ChatTurnService {
         }
 
         try {
+            // The skill hint travels as an invocation parameter, not in the prompt:
+            // the query router needs it, and the model does not need to read it twice.
+            var parameters = InvocationParameters.from(
+                    SkillAwareQueryRouter.SKILL_HINT, verdict.skillHint());
             var result = assistant.chat(
-                    conversationId.value(), message, verdict.language(), verdict.skillHint());
+                    conversationId.value(), message, verdict.language(), verdict.skillHint(), parameters);
             sample.stop(meters.timer("agentic.turn.latency", "path", "answered"));
             return ChatTurn.answered(verdict, result);
         } catch (GuardrailException e) {

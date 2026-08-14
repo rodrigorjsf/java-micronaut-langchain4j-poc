@@ -1,6 +1,7 @@
 package io.github.rodrigorjsf.agenticchat.agent;
 
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
+import dev.langchain4j.rag.RetrievalAugmentor;
 import dev.langchain4j.service.AiServices;
 import dev.langchain4j.service.tool.ToolErrorHandlerResult;
 import dev.langchain4j.store.memory.chat.ChatMemoryStore;
@@ -46,6 +47,7 @@ public class AiServiceFactory {
                                SystemPromptBuilder systemPrompt,
                                SkillCatalog skills,
                                ChatMemoryStore memoryStore,
+                               RetrievalAugmentor retrievalAugmentor,
                                NormalizingInputGuardrail normalizer,
                                InjectionTriageGuardrail injectionTriage,
                                SystemPromptLeakageGuardrail leakage,
@@ -70,6 +72,16 @@ public class AiServiceFactory {
                         .build())
 
                 .systemMessageProvider(conversationId -> systemPrompt.prompt())
+
+                // Retrieval over the assistant's own documentation, routed so it only
+                // runs when a tool is not going to answer instead.
+                .retrievalAugmentor(retrievalAugmentor)
+
+                // Default is true, which writes every retrieved segment into persisted
+                // chat memory: it inflates each DynamoDB item and replays the same
+                // prose into every later prompt in the conversation. Retrieval is cheap
+                // enough to redo per turn; storing it is not.
+                .storeRetrievedContentInChatMemory(false)
 
                 // Skill-scoped tools: only activate_skill and read_skill_resource are
                 // visible until the model activates a skill.

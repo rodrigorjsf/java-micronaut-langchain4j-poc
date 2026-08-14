@@ -175,6 +175,18 @@ agentic:
     # model is looping, and every loop pays for the whole prompt again.
     max-tool-round-trips: 6
 
+  rag:
+    # minScore is a relevance score in [0,1], not raw cosine similarity. 0.6 lets
+    # capability questions through while keeping a CEP lookup — which a tool should
+    # answer — from dragging in prose about what a CEP is.
+    max-results: 3
+    # 0.72, chosen from a measurement rather than a guess. On this corpus the
+    # quantized MiniLM scores relevant questions 0.7299-0.8475 and irrelevant ones
+    # 0.6826-0.7342 — distributions that OVERLAP, which is why SkillAwareQueryRouter
+    # exists at all. 0.72 admits every relevant question in the test corpus and
+    # excludes most of the irrelevant ones; the router handles the rest.
+    min-score: 0.72
+
   guardrails:
     input:
       # The gray-zone second opinion. Disabling it leaves the deterministic rules in

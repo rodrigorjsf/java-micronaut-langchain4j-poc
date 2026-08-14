@@ -19,3 +19,4 @@ by a command run in the main session, quoted verbatim. Records marked
 | [0007](0007-write-through-conversation-memory.md) | Valkey in front of DynamoDB for chat memory | Accepted |
 | [0008](0008-layered-prompt-injection-defence.md) | Normalize, then score, then ask a model | Accepted |
 | [0009](0009-tool-http-catalogue.md) | Tools name a catalogue key, never a URL | Accepted |
+| [0010](0010-rag-over-the-assistants-own-documentation.md) | Retrieve the assistant's own docs, routed by skill hint | Accepted |
