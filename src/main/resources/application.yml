@@ -235,6 +235,81 @@ agentic:
       exchangerate-api:
         base-url: https://open.er-api.com/v6
         max-response-bytes: 16384
+      # --- Science and space -----------------------------------------------
+      wheretheiss:
+        base-url: https://api.wheretheiss.at
+        max-response-bytes: 4096
+      launch-library:
+        base-url: https://ll.thespacedevs.com
+        # 19 KB for two launches; the tool projects hard before the model sees it.
+        max-response-bytes: 24576
+      nasa:
+        # DEMO_KEY works without registration at a low hourly limit, which is the
+        # right trade for a demo: no signup, and a 429 the tool already handles.
+        base-url: https://api.nasa.gov
+        max-response-bytes: 8192
+      usgs-earthquake:
+        base-url: https://earthquake.usgs.gov
+        max-response-bytes: 16384
+
+      # --- Knowledge and research -------------------------------------------
+      wikipedia-pt:
+        base-url: https://pt.wikipedia.org
+        max-response-bytes: 8192
+      wikipedia-en:
+        base-url: https://en.wikipedia.org
+        max-response-bytes: 8192
+      wikidata:
+        base-url: https://www.wikidata.org
+        max-response-bytes: 12288
+      crossref:
+        base-url: https://api.crossref.org
+        max-response-bytes: 16384
+      openalex:
+        # 36 KB for two results — one of the fattest in the catalogue.
+        base-url: https://api.openalex.org
+        max-response-bytes: 16384
+      ncbi-eutils:
+        base-url: https://eutils.ncbi.nlm.nih.gov/entrez/eutils
+        max-response-bytes: 12288
+
+      # --- Books -------------------------------------------------------------
+      openlibrary:
+        # /isbn/{isbn}.json answers 302 to the work record; the client follows it.
+        base-url: https://openlibrary.org
+        max-response-bytes: 12288
+
+      # --- Developer tools ---------------------------------------------------
+      github:
+        # 60 requests per hour per IP unauthenticated. The skill tells the model to
+        # use it sparingly and what to say once the budget is gone.
+        base-url: https://api.github.com
+        max-response-bytes: 16384
+      stackexchange:
+        base-url: https://api.stackexchange.com/2.3
+        max-response-bytes: 16384
+      hackernews:
+        base-url: https://hacker-news.firebaseio.com/v0
+        max-response-bytes: 8192
+      hn-search:
+        base-url: https://hn.algolia.com/api/v1
+        max-response-bytes: 16384
+      maven-central:
+        base-url: https://central.sonatype.com
+        max-response-bytes: 12288
+      npm-registry:
+        base-url: https://registry.npmjs.org
+        max-response-bytes: 12288
+      pypi:
+        # 193 KB for one package. The byte cap is a backstop; the projection is what
+        # actually keeps this out of the conversation.
+        base-url: https://pypi.org/pypi
+        max-response-bytes: 12288
+      cratesio:
+        # 432 KB for one crate — the fattest response measured anywhere here.
+        base-url: https://crates.io/api/v1
+        max-response-bytes: 12288
+
   guardrails:
     output:
       # Hosts the assistant may link to. Anything else in a response is treated as

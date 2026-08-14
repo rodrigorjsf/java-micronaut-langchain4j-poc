@@ -32,21 +32,32 @@ REPO = Path(__file__).resolve().parent.parent
 TOOLS_DIR = REPO / "src/main/java/io/github/rodrigorjsf/agenticchat"
 CONFIG = REPO / "src/main/resources/application.yml"
 
-# A catalogue key is a String constant passed to ToolHttpClient.get(...). Matching
-# the constant declaration rather than the call site keeps this robust against
-# formatting, and every tool class in this repository follows that shape.
-CONSTANT = re.compile(r'static final String\s+\w+\s*=\s*"([a-z0-9][a-z0-9-]{2,60})"\s*;')
+# Resolved in two steps rather than one, because a class holds other String
+# constants too — a User-Agent, a sort-key prefix — and treating every constant as
+# a catalogue key produces false alarms that get the check ignored.
+#
+#   1. which constant NAMES are passed to http.get(...) as the first argument
+#   2. what those names are declared as
+CONSTANT_DECL = re.compile(r'static final String\s+(\w+)\s*=\s*"([^"]+)"\s*;')
+GET_CALL = re.compile(r'\.get\(\s*([A-Z][A-Z0-9_]*)\s*,')
+# A tool may pick its endpoint indirectly — `case "en" -> WIKIPEDIA_EN;` — and the
+# chosen constant then reaches .get(...) through a local variable. Those count too.
+SWITCH_ARM = re.compile(r'(?:case\s+[^-\n]*|default)\s*->\s*([A-Z][A-Z0-9_]*)\s*;')
 
 
 def keys_used() -> dict[str, set[Path]]:
-    """Catalogue-shaped constants declared in classes that call ToolHttpClient."""
+    """Catalogue keys actually passed to ToolHttpClient.get(...)."""
     used: dict[str, set[Path]] = {}
     for java in TOOLS_DIR.rglob("*.java"):
         text = java.read_text(encoding="utf-8")
         if "ToolHttpClient" not in text:
             continue
-        for key in CONSTANT.findall(text):
-            used.setdefault(key, set()).add(java.relative_to(REPO))
+        declared = dict(CONSTANT_DECL.findall(text))
+        names = set(GET_CALL.findall(text)) | set(SWITCH_ARM.findall(text))
+        for name in names:
+            value = declared.get(name)
+            if value:
+                used.setdefault(value, set()).add(java.relative_to(REPO))
     return used
 
 
