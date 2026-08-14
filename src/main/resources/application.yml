@@ -395,6 +395,54 @@ agentic:
         timeout: PT8S
         max-response-bytes: 4096
 
+      # --- Fun and trivia ----------------------------------------------------
+      deckofcards:
+        # 2 357 B for ten cards, measured — each card carries three picture links.
+        # The count cap in the tool is the real lever; this is the backstop.
+        base-url: https://deckofcardsapi.com/api/deck
+        max-response-bytes: 8192
+      pokeapi:
+        # The largest transport ceiling in the catalogue, and the reason is worth
+        # stating: this API has no field selection, so the whole record travels.
+        # Measured 2026-08-14: eevee 233 502 B, pikachu 290 335 B, mewtwo 427 298 B,
+        # mew 664 610 B. The model never sees any of it — ToolJson projects to a
+        # handful of fields — but projection needs a COMPLETE document, so the
+        # ceiling has to clear the worst case or the biggest Pokemon become the
+        # ones that fail.
+        base-url: https://pokeapi.co/api/v2
+        max-response-bytes: 1048576
+      rickandmorty:
+        base-url: https://rickandmortyapi.com/api
+        max-response-bytes: 8192
+      dog-ceo:
+        # Returns image URLs on images.dog.ceo. LinkAllowList matches the
+        # registrable domain, so dog.ceo here covers that subdomain and the
+        # picture survives the exfiltration check.
+        base-url: https://dog.ceo/api
+        max-response-bytes: 4096
+      catfact:
+        base-url: https://catfact.ninja
+        max-response-bytes: 4096
+      chucknorris:
+        base-url: https://api.chucknorris.io
+        max-response-bytes: 4096
+      jokeapi:
+        base-url: https://v2.jokeapi.dev
+        max-response-bytes: 4096
+      uselessfacts:
+        base-url: https://uselessfacts.jsph.pl/api/v2
+        max-response-bytes: 4096
+      adviceslip:
+        # The slowest host in the catalogue: 3.00-4.36 s across four probes here
+        # and 8.28 s cold from a second machine. At the PT6S default the first
+        # call of the day times out and the retry pays the latency twice.
+        base-url: https://api.adviceslip.com
+        timeout: PT12S
+        max-response-bytes: 8192
+      dummyjson-quotes:
+        base-url: https://dummyjson.com/quotes
+        max-response-bytes: 4096
+
   agent:
     # 40 messages is ~3 turns worst case with 6 tool round trips, and ~10 turns of
     # chatty traffic. A message window rather than a token window: the prompt cost is
