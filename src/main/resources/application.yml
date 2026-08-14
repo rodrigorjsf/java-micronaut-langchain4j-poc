@@ -366,6 +366,35 @@ agentic:
         base-url: https://api.openbrewerydb.org/v1
         max-response-bytes: 8192
 
+      # --- Network and identity ----------------------------------------------
+      #
+      # ip-api.com is deliberately ABSENT. It is the richer geolocation source and
+      # it is HTTPS-only on the paid tier: measured 2026-08-14, https answered 403
+      # and http answered 200. Sending a user-supplied IP address in clear text to
+      # buy a slightly larger record is not a trade this project makes, and ipwho.is
+      # answers the same question over TLS. check-tool-catalogue.py enforces it.
+      ipwhois:
+        base-url: https://ipwho.is
+        max-response-bytes: 4096
+      genderize:
+        # 100 names/day/IP, and the quota is SHARED across genderize, agify and
+        # nationalize. A retry spends a second name from a budget of a hundred.
+        base-url: https://api.genderize.io
+        max-response-bytes: 4096
+        max-retries: 0
+      agify:
+        base-url: https://api.agify.io
+        max-response-bytes: 4096
+        max-retries: 0
+      nationalize:
+        # The one of the three that needs the retry it costs. Measured 2026-08-14:
+        # the cold call did not answer inside 20 s, the next took 4.43 s and the
+        # one after 0.85 s. At the PT6S default with no retry, the first lookup of
+        # the day fails.
+        base-url: https://api.nationalize.io
+        timeout: PT8S
+        max-response-bytes: 4096
+
   agent:
     # 40 messages is ~3 turns worst case with 6 tool round trips, and ~10 turns of
     # chatty traffic. A message window rather than a token window: the prompt cost is
