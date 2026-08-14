@@ -1,6 +1,8 @@
 micronaut:
   application:
     name: agenticchat
+  server:
+    port: 8080
   metrics:
     enabled: true
     export:
@@ -8,3 +10,12 @@ micronaut:
         enabled: true
         descriptions: true
         step: PT1M
+
+endpoints:
+  health:
+    enabled: true
+    sensitive: false
+    details-visible: ANONYMOUS
+  prometheus:
+    enabled: true
+    sensitive: false

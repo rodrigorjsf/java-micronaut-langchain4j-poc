@@ -1,0 +1,12 @@
+target/
+.git/
+.idea/
+.claude/
+.codegraph/
+docs/
+*.md
+.env
+.env.*
+!.env.example
+compose.yaml
+Dockerfile

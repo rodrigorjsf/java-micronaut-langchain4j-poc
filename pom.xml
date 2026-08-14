@@ -31,7 +31,34 @@
     <langchain4j.version>1.18.1</langchain4j.version>
 
     <archunit.version>1.4.1</archunit.version>
+
+    <!-- Overridden by the `it` and `evals` profiles below. -->
+    <test.excluded.groups>integration,evals</test.excluded.groups>
   </properties>
+
+  <profiles>
+    <!-- ./mvnw verify -Pit    — needs a running Docker daemon -->
+    <profile>
+      <id>it</id>
+      <properties>
+        <test.excluded.groups>evals</test.excluded.groups>
+      </properties>
+    </profile>
+    <!-- ./mvnw verify -Pevals — needs GOOGLE_API_KEY / OPENAI_API_KEY, spends money -->
+    <profile>
+      <id>evals</id>
+      <properties>
+        <test.excluded.groups>integration</test.excluded.groups>
+      </properties>
+    </profile>
+    <!-- ./mvnw verify -Pall   — everything -->
+    <profile>
+      <id>all</id>
+      <properties>
+        <test.excluded.groups></test.excluded.groups>
+      </properties>
+    </profile>
+  </profiles>
 
   <repositories>
     <repository>
@@ -167,13 +194,30 @@
     </dependency>
 
     <!-- ==================== AWS (against floci locally) ==================== -->
+    <!--
+      apache-client is excluded from both service clients so exactly one sync
+      HTTP implementation (url-connection-client) is on the classpath. With two,
+      the SDK's auto-discovery throws at client-build time.
+    -->
     <dependency>
       <groupId>software.amazon.awssdk</groupId>
-      <artifactId>dynamodb-enhanced</artifactId>
+      <artifactId>dynamodb</artifactId>
+      <exclusions>
+        <exclusion>
+          <groupId>software.amazon.awssdk</groupId>
+          <artifactId>apache-client</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>software.amazon.awssdk</groupId>
       <artifactId>elasticache</artifactId>
+      <exclusions>
+        <exclusion>
+          <groupId>software.amazon.awssdk</groupId>
+          <artifactId>apache-client</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>software.amazon.awssdk</groupId>
@@ -276,6 +320,19 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-enforcer-plugin</artifactId>
+      </plugin>
+
+      <!--
+        Tests that need Docker (floci, Valkey) or a live LLM are tagged and stay
+        out of the default `./mvnw test`, so the ordinary build needs neither a
+        Docker daemon nor an API key. Run them with -Pit / -Pevals.
+      -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <excludedGroups>${test.excluded.groups}</excludedGroups>
+        </configuration>
       </plugin>
 
       <plugin>
