@@ -1,0 +1,6 @@
+applicationType: default
+defaultPackage: io.github.rodrigorjsf
+testFramework: junit
+sourceLanguage: java
+buildTool: maven
+features: [app-name, assertj, awaitility, cache-caffeine, http-client, java, java-application, junit, junit-params, logback, management, maven, maven-enforcer-plugin, micrometer, micrometer-prometheus, micronaut-aot, micronaut-configuration-validation-gradle-plugin, micronaut-http-validation, micronaut-processing-compiler-args, mockito, netty-server, openapi, reactor, reactor-http-client, readme, serialization-jackson, shade, static-resources, swagger-ui, validation, yaml, yaml-build]

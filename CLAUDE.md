@@ -80,6 +80,14 @@ When something fails repeatedly, when User has to re-explain, or when a workarou
 
 - Agents fail silently on wrong paths. Always verify hardcoded paths.
 - Before creating a new project artifact, check if an existing one can be extended or merged.
+- Java text block `\` continuation keeps extra indent; prompts get stray spaces.
+- Micronaut `@ConfigurationProperties` interface needs `@AccessorsStyle(readPrefixes = "")`.
+- `@EachProperty` + `@Parameter` needs a class, not an interface.
+- Micronaut `@Cacheable` is proxy-based: self-invocation never caches.
+- `@EachProperty` entries in application.yml merge into every test context.
+- Reordering `@Factory` methods leaves stale `Bean1`/`Bean2` definitions; run `mvnw clean`.
+- `git checkout -- <file>` discards unstaged edits; copy the file first.
+- `ToolJson.project` on a container path keeps it whole; use `projectList`.
 
 
 

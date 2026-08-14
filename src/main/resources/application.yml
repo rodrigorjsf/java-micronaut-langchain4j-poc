@@ -1,0 +1,504 @@
+micronaut:
+  application:
+    name: agenticchat
+  server:
+    port: 8080
+
+  caches:
+    # Triage verdicts are cacheable because the judge is stateless at temperature 0:
+    # the same text always yields the same verdict. Repeated and adversarial traffic
+    # hits this hardest, which is exactly when the saving matters. The TTL bounds how
+    # long a prompt change takes to take effect.
+    triage-verdicts:
+      maximum-size: 5000
+      expire-after-write: 30m
+
+  metrics:
+    enabled: true
+    export:
+      prometheus:
+        enabled: true
+        descriptions: true
+        step: PT1M
+
+endpoints:
+  health:
+    enabled: true
+    sensitive: false
+    details-visible: ANONYMOUS
+  prometheus:
+    enabled: true
+    sensitive: false
+
+agentic:
+
+  # ---------------------------------------------------------------------------
+  # LLM roles.
+  #
+  # Nothing in the code names a model: it asks ChatModelRegistry for a role. That
+  # keeps model choice a deployment decision and makes per-role cost and latency
+  # separately measurable.
+  #
+  # judge  — runs on EVERY request before the agent, so latency is the budget.
+  #          gemini-2.5-flash-lite with thinking-budget 0 measured a 0.91 s median
+  #          on an 84-token triage prompt from this machine.
+  # agent  — the conversational model. Quality matters more than latency here, so
+  #          a Gemini 3.x model with thinking-level: low is the right trade.
+  #
+  # thinking-budget is a Gemini 2.x knob and thinking-level a Gemini 3.x one.
+  # Mixing them is rejected at startup by ModelRoleValidator, because sending
+  # thinking-budget to a 3.x model does not disable thinking — it just makes the
+  # call ~6.5x slower (median 5.93 s vs 0.91 s in the measurement above).
+  # ---------------------------------------------------------------------------
+  llm:
+    credentials:
+      # Placeholders resolve straight from the environment, so the untracked .env
+      # that Docker Compose loads is the only place a key ever lives.
+      google-api-key: ${GOOGLE_API_KEY:``}
+      openai-api-key: ${OPENAI_API_KEY:``}
+
+    models:
+      judge:
+        provider: GOOGLE
+        model-name: gemini-2.5-flash-lite
+        temperature: 0.0
+        max-output-tokens: 320
+        thinking-budget: 0
+        timeout: PT8S
+        max-retries: 1
+
+      # Second provider for the judge. It exists because Google's free tier returns
+      # RESOURCE_EXHAUSTED at roughly 10-20 requests per minute (measured), and the
+      # judge runs before every request. Failover fires only on rate limiting;
+      # anything else fails open.
+      judge-fallback:
+        provider: OPENAI
+        model-name: gpt-4o-mini
+        temperature: 0.0
+        max-output-tokens: 320
+        timeout: PT8S
+        max-retries: 1
+
+      agent:
+        provider: GOOGLE
+        model-name: gemini-3.1-flash-lite
+        temperature: 0.3
+        max-output-tokens: 2048
+        thinking-level: low
+        timeout: PT60S
+        max-retries: 2
+
+    # -------------------------------------------------------------------------
+    # USD per million tokens. In configuration, not in code: prices change without
+    # asking, and a stale constant produces a cost report that is confidently
+    # wrong — worse than no report at all. A model with no entry here is reported
+    # at zero cost and counted in agentic.llm.unpriced_calls, so "not priced" is
+    # visible rather than silently free.
+    #
+    # Keys use hyphens because a Micronaut property segment cannot contain a dot:
+    # gemini-2.5-flash-lite is written gemini-2-5-flash-lite.
+    #
+    # Sources, both read 2026-08-14:
+    #   https://ai.google.dev/gemini-api/docs/pricing
+    #   https://developers.openai.com/api/docs/pricing
+    # Gemini's free tier is $0 for all of these; the paid-tier rates are recorded
+    # so the accounting is honest the moment billing is enabled.
+    # -------------------------------------------------------------------------
+    pricing:
+      gemini-2-5-flash-lite:
+        input-per-million: 0.10
+        cached-input-per-million: 0.01
+        output-per-million: 0.40
+      gemini-3-1-flash-lite:
+        input-per-million: 0.25
+        cached-input-per-million: 0.025
+        output-per-million: 1.50
+      gpt-4o-mini:
+        input-per-million: 0.15
+        cached-input-per-million: 0.075
+        output-per-million: 0.60
+
+  aws:
+    endpoint: ${AWS_ENDPOINT_URL:`http://localhost:4566`}
+    region: ${AWS_REGION:`us-east-1`}
+    access-key-id: ${AWS_ACCESS_KEY_ID:`test`}
+    secret-access-key: ${AWS_SECRET_ACCESS_KEY:`test`}
+
+  valkey:
+    host: ${VALKEY_HOST:`localhost`}
+    port: ${VALKEY_PORT:6379}
+    replication-group-id: agentic-chat-cache
+    command-timeout: PT10S
+
+  persistence:
+    # write-through = Valkey in front of DynamoDB (the real thing).
+    # in-memory     = process-local, for running without Docker. Never selected
+    #                 automatically: degrading silently would lose every conversation
+    #                 on a restart while the health check stayed green.
+    memory-backend: write-through
+    table-name: agentic_chat
+    conversation-ttl: PT24H
+    # Off by default; the local and docker environments below turn it on because
+    # floci is a disposable emulator.
+    bootstrap-enabled: false
+
+  # ---------------------------------------------------------------------------
+  # Tool API catalogue.
+  #
+  # This list IS the SSRF control: no tool takes a URL, only a key from this map
+  # plus a path. A host that is not here cannot be reached, whatever the model
+  # asks for. max-response-bytes is a context budget, not a safety limit — these
+  # APIs return fat JSON and 32 KB is already ~8k tokens.
+  # ---------------------------------------------------------------------------
+  tools:
+    # The User-Agent every tool sends. Several hosts require an identifying one:
+    # Wikimedia answers 403 without it, and Nominatim, Crossref, crates.io and
+    # Open Library all ask for one in their policies.
+    #
+    # This exact string was probed against Wikimedia and returned 200 on every
+    # call, while two near-identical siblings were reproducibly rejected with 403
+    # on the same URL. No token rule explains it; the working string is pinned
+    # rather than theorised about. Override with TOOL_USER_AGENT.
+    user-agent: ${TOOL_USER_AGENT:`micronaut-l4j-poc/0.1 (rodrigo_rjsf@hotmail.com)`}
+
+    apis:
+      # --- Brazil -----------------------------------------------------------
+      brasilapi:
+        base-url: https://brasilapi.com.br/api
+        max-response-bytes: 16384
+      brasilapi-ncm:
+        base-url: https://brasilapi.com.br/api/ncm
+        # Measured at 4.69 s in probing — the slowest endpoint in the catalogue.
+        timeout: PT9S
+        max-response-bytes: 262144   # transport ceiling, above the raw body: 2.3 MB for a one-letter search; 33 KB for a real term
+      brasilapi-fipe:
+        base-url: https://brasilapi.com.br/api/fipe
+        max-response-bytes: 131072   # transport ceiling, above the raw body: 35 KB measured for the largest model list
+      viacep:
+        base-url: https://viacep.com.br/ws
+        max-response-bytes: 65536   # transport ceiling, above the raw body: 17 KB measured for a street search
+      ibge-servicodados:
+        base-url: https://servicodados.ibge.gov.br/api
+        max-response-bytes: 65536   # transport ceiling, above the raw body: 32 KB measured for aggregate metadata
+      ibge-localidades:
+        # 284 KB raw for one state's municipalities: the byte budget is a backstop,
+        # and the tool projects to names before the model ever sees it.
+        base-url: https://servicodados.ibge.gov.br/api/v1/localidades
+        max-response-bytes: 524288   # transport ceiling, above the raw body: 381 KB measured for one state's municipalities
+      bcb-sgs:
+        base-url: https://api.bcb.gov.br/dados/serie
+        max-response-bytes: 8192
+      bcb-olinda-ptax:
+        base-url: https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata
+        max-response-bytes: 8192
+      awesomeapi-economia:
+        base-url: https://economia.awesomeapi.com.br
+        max-response-bytes: 12288
+
+      # --- Geography and weather -------------------------------------------
+      open-meteo-geocoding:
+        base-url: https://geocoding-api.open-meteo.com
+        max-response-bytes: 8192
+      open-meteo-forecast:
+        base-url: https://api.open-meteo.com
+        max-response-bytes: 12288
+      open-meteo-archive:
+        base-url: https://archive-api.open-meteo.com
+        max-response-bytes: 12288
+      open-meteo-air-quality:
+        base-url: https://air-quality-api.open-meteo.com
+        max-response-bytes: 8192
+      open-meteo-marine:
+        base-url: https://marine-api.open-meteo.com
+        max-response-bytes: 8192
+      nominatim:
+        # OSM policy: identifying User-Agent and at most 1 request per second.
+        base-url: https://nominatim.openstreetmap.org
+        max-response-bytes: 12288
+      sunrise-sunset:
+        base-url: https://api.sunrise-sunset.org
+        max-response-bytes: 4096
+      zippopotam:
+        base-url: https://api.zippopotam.us
+        max-response-bytes: 8192
+
+      # --- Countries and economy -------------------------------------------
+      restcountries:
+        base-url: https://restcountries.com
+        max-response-bytes: 16384
+      worldbank:
+        base-url: https://api.worldbank.org/v2
+        max-response-bytes: 16384
+      frankfurter:
+        base-url: https://api.frankfurter.dev/v1
+        max-response-bytes: 8192
+      exchangerate-api:
+        base-url: https://open.er-api.com/v6
+        max-response-bytes: 16384
+      # --- Science and space -----------------------------------------------
+      wheretheiss:
+        base-url: https://api.wheretheiss.at
+        max-response-bytes: 4096
+      launch-library:
+        base-url: https://ll.thespacedevs.com
+        # 19 KB for two launches; the tool projects hard before the model sees it.
+        max-response-bytes: 65536   # transport ceiling, above the raw body: 19 KB measured for two launches
+      nasa:
+        # DEMO_KEY works without registration at a low hourly limit, which is the
+        # right trade for a demo: no signup, and a 429 the tool already handles.
+        base-url: https://api.nasa.gov
+        max-response-bytes: 8192
+      usgs-earthquake:
+        base-url: https://earthquake.usgs.gov
+        max-response-bytes: 16384
+
+      # --- Knowledge and research -------------------------------------------
+      wikipedia-pt:
+        base-url: https://pt.wikipedia.org
+        max-response-bytes: 8192
+      wikipedia-en:
+        base-url: https://en.wikipedia.org
+        max-response-bytes: 8192
+      wikidata:
+        base-url: https://www.wikidata.org
+        max-response-bytes: 12288
+      crossref:
+        base-url: https://api.crossref.org
+        max-response-bytes: 16384
+      openalex:
+        # 36 KB for two results — one of the fattest in the catalogue.
+        base-url: https://api.openalex.org
+        max-response-bytes: 65536   # transport ceiling, above the raw body: 36 KB measured for two results
+      ncbi-eutils:
+        base-url: https://eutils.ncbi.nlm.nih.gov/entrez/eutils
+        max-response-bytes: 12288
+
+      # --- Books -------------------------------------------------------------
+      openlibrary:
+        # /isbn/{isbn}.json answers 302 to the work record; the client follows it.
+        base-url: https://openlibrary.org
+        max-response-bytes: 12288
+
+      # --- Developer tools ---------------------------------------------------
+      github:
+        # 60 requests per hour per IP unauthenticated. The skill tells the model to
+        # use it sparingly and what to say once the budget is gone.
+        base-url: https://api.github.com
+        max-response-bytes: 16384
+      stackexchange:
+        base-url: https://api.stackexchange.com/2.3
+        max-response-bytes: 16384
+      hackernews:
+        base-url: https://hacker-news.firebaseio.com/v0
+        max-response-bytes: 8192
+      hn-search:
+        base-url: https://hn.algolia.com/api/v1
+        max-response-bytes: 16384
+      maven-central:
+        base-url: https://central.sonatype.com
+        max-response-bytes: 12288
+      npm-registry:
+        base-url: https://registry.npmjs.org
+        max-response-bytes: 12288
+      pypi:
+        # 193 KB for one package. The byte cap is a backstop; the projection is what
+        # actually keeps this out of the conversation.
+        base-url: https://pypi.org/pypi
+        max-response-bytes: 262144   # transport ceiling, above the raw body: 193 KB measured for one package
+      cratesio:
+        # 432 KB for one crate — the fattest response measured anywhere here.
+        base-url: https://crates.io/api/v1
+        max-response-bytes: 524288   # transport ceiling, above the raw body: 432 KB measured for one crate
+
+      # --- Crypto and markets ------------------------------------------------
+      coingecko:
+        # Free tier throttles aggressively; the tool must not retry into a 429.
+        base-url: https://api.coingecko.com/api/v3
+        max-retries: 0
+        max-response-bytes: 12288
+      binance:
+        # Refuses requests from some regions outright. The skill tells the model to
+        # fall back to CoinGecko rather than explain the geography to the user.
+        base-url: https://api.binance.com/api/v3
+        max-response-bytes: 8192
+
+      # --- Time and calendar -------------------------------------------------
+      nager-date:
+        base-url: https://date.nager.at/api/v3
+        max-response-bytes: 12288
+      timeapi:
+        base-url: https://timeapi.io/api
+        max-response-bytes: 4096
+
+      # --- Health and food ---------------------------------------------------
+      openfoodfacts:
+        # 10 req/min per IP, so a transport retry would walk straight into the
+        # throttle. The tool asks for a fields= whitelist, which is why 8 KB is
+        # generous for a route whose unprojected body measured 31 377 B.
+        base-url: https://world.openfoodfacts.org/api/v2
+        max-retries: 0
+        max-response-bytes: 8192
+      openfoodfacts-search:
+        # The v2 search host. Measured 2026-08-14: 3/3 200s at 1 201 B for
+        # ?q=nutella&page_size=5 with the fields whitelist. The tool always sends
+        # that whitelist because without it the same query answers 200 at 26 554 B
+        # — over this ceiling, so the answer would arrive truncated.
+        base-url: https://search.openfoodfacts.org
+        max-retries: 0
+        max-response-bytes: 8192
+      themealdb:
+        # 96 KB, and the first number here was wrong in an instructive way. It was
+        # set to 12 KB on the theory that a real dish is small and an ingredient is
+        # large, sampled from arrabiata (2 025 B), lasagne (2 987 B) and pizza
+        # (6 234 B). The distribution says otherwise — measured 2026-08-14: pie
+        # 68 935 B, cake 63 514 B, rice 59 460 B, chicken 59 786 B, bread 57 439 B,
+        # soup 54 843 B, salad 49 566 B, and pasta 2 247 B. Ten of eleven ordinary
+        # food words exceeded the old ceiling, so the tool told the user their dish
+        # name was "an ingredient" for almost every question it was asked.
+        #
+        # A byte ceiling cannot separate a dish from an ingredient. The bound that
+        # works is on the LIST, and it lives in the tool: projectList caps meals at
+        # three. This is now only the transport backstop, above the worst measured
+        # body.
+        base-url: https://www.themealdb.com/api/json/v1/1
+        max-response-bytes: 98304
+      thecocktaildb:
+        # Measured 2026-08-14: caipirinha 8 288 B, mojito 14 822 B, margarita
+        # 17 762 B. As with themealdb this is the transport backstop only — the
+        # context bound is projectList capping drinks at three and keeping the
+        # fields an answer quotes, which is what stops six margarita variants with
+        # six translations of their instructions from entering the conversation.
+        base-url: https://www.thecocktaildb.com/api/json/v1/1
+        max-response-bytes: 24576
+      openbrewerydb:
+        base-url: https://api.openbrewerydb.org/v1
+        max-response-bytes: 8192
+
+      # --- Network and identity ----------------------------------------------
+      #
+      # ip-api.com is deliberately ABSENT. It is the richer geolocation source and
+      # it is HTTPS-only on the paid tier: measured 2026-08-14, https answered 403
+      # and http answered 200. Sending a user-supplied IP address in clear text to
+      # buy a slightly larger record is not a trade this project makes, and ipwho.is
+      # answers the same question over TLS. check-tool-catalogue.py enforces it.
+      ipwhois:
+        base-url: https://ipwho.is
+        max-response-bytes: 4096
+      genderize:
+        # 100 names/day/IP, and the quota is SHARED across genderize, agify and
+        # nationalize. A retry spends a second name from a budget of a hundred.
+        base-url: https://api.genderize.io
+        max-response-bytes: 4096
+        max-retries: 0
+      agify:
+        base-url: https://api.agify.io
+        max-response-bytes: 4096
+        max-retries: 0
+      nationalize:
+        # The one of the three that keeps its retry, and the exception is deliberate
+        # rather than an oversight: measured 2026-08-14 the cold call did not answer
+        # inside 20 s, the next took 4.43 s and the one after 0.85 s. A connection
+        # that never opened spent no name from the shared quota, so retrying it is
+        # free where retrying a 429 is not — and without the retry the first lookup
+        # of the day simply fails.
+        base-url: https://api.nationalize.io
+        timeout: PT8S
+        max-response-bytes: 4096
+
+      # --- Fun and trivia ----------------------------------------------------
+      deckofcards:
+        # 2 357 B for ten cards, measured — each card carries three picture links.
+        # The count cap in the tool is the real lever; this is the backstop.
+        base-url: https://deckofcardsapi.com/api/deck
+        max-response-bytes: 8192
+      pokeapi:
+        # The largest transport ceiling in the catalogue, and the reason is worth
+        # stating: this API has no field selection, so the whole record travels.
+        # Measured 2026-08-14: eevee 233 502 B, pikachu 290 335 B, mewtwo 427 298 B,
+        # mew 664 610 B. The model never sees any of it — ToolJson projects to a
+        # handful of fields — but projection needs a COMPLETE document, so the
+        # ceiling has to clear the worst case or the biggest Pokemon become the
+        # ones that fail.
+        base-url: https://pokeapi.co/api/v2
+        max-response-bytes: 1048576
+      rickandmorty:
+        base-url: https://rickandmortyapi.com/api
+        max-response-bytes: 8192
+      dog-ceo:
+        # Returns image URLs on images.dog.ceo. LinkAllowList matches the
+        # registrable domain, so dog.ceo here covers that subdomain and the
+        # picture survives the exfiltration check.
+        base-url: https://dog.ceo/api
+        max-response-bytes: 4096
+      catfact:
+        base-url: https://catfact.ninja
+        max-response-bytes: 4096
+      chucknorris:
+        base-url: https://api.chucknorris.io
+        max-response-bytes: 4096
+      jokeapi:
+        base-url: https://v2.jokeapi.dev
+        max-response-bytes: 4096
+      uselessfacts:
+        base-url: https://uselessfacts.jsph.pl/api/v2
+        max-response-bytes: 4096
+      adviceslip:
+        # The slowest host in the catalogue: 3.00-4.36 s across four probes here
+        # and 8.28 s cold from a second machine. At the PT6S default the first call
+        # of the day times out.
+        #
+        # PT12S with the default single retry would let one call block for ~24 s on
+        # a request the user is waiting on, so the retry goes rather than the
+        # timeout: a joke that does not arrive is cheaper than a turn that stalls.
+        base-url: https://api.adviceslip.com
+        timeout: PT12S
+        max-retries: 0
+        max-response-bytes: 8192
+      dummyjson-quotes:
+        base-url: https://dummyjson.com/quotes
+        max-response-bytes: 4096
+
+  agent:
+    # 40 messages is ~3 turns worst case with 6 tool round trips, and ~10 turns of
+    # chatty traffic. A message window rather than a token window: the prompt cost is
+    # slightly less tight but the number of retained turns is the same in a test and
+    # in production, which a token window cannot promise. Tokens are counted for the
+    # COMPACTION trigger instead, where the imprecision does not matter.
+    memory-window-messages: 40
+    # activate_skill plus a couple of chained lookups fits in six. Beyond that the
+    # model is looping, and every loop pays for the whole prompt again.
+    max-tool-round-trips: 6
+    # Compaction trigger, in estimated prompt tokens. 14400 is 60% of a self-imposed
+    # 24000-token working budget — deliberately far below the model's real window,
+    # because a bigger window is more RAM on a machine with a memory leak. Recall
+    # degrades with input length on every model tested, so the budget is chosen to
+    # keep a normal turn inside the range where that degradation is small.
+    compaction-trigger-tokens: 14400
+
+  rag:
+    # minScore is a relevance score in [0,1], not raw cosine similarity. 0.6 lets
+    # capability questions through while keeping a CEP lookup — which a tool should
+    # answer — from dragging in prose about what a CEP is.
+    max-results: 3
+    # 0.72, chosen from a measurement rather than a guess. On this corpus the
+    # quantized MiniLM scores relevant questions 0.7299-0.8475 and irrelevant ones
+    # 0.6826-0.7342 — distributions that OVERLAP, which is why SkillAwareQueryRouter
+    # exists at all. 0.72 admits every relevant question in the test corpus and
+    # excludes most of the irrelevant ones; the router handles the rest.
+    min-score: 0.72
+
+  guardrails:
+    input:
+      # The gray-zone second opinion. Disabling it leaves the deterministic rules in
+      # place and lets ambiguous turns through — the same fail-open posture used
+      # everywhere else in the pipeline.
+      llm-classifier-enabled: true
+    output:
+      # EXTRA hosts the assistant may link to, on top of every host in the tool
+      # catalogue above — those are derived, not listed, so the allow-list cannot
+      # drift away from the sources the tools actually use.
+      #
+      # Anything outside the union is treated as exfiltration, because a rendered
+      # markdown image fires with no user click.
+      extra-allowed-link-hosts:
+        - gov.br

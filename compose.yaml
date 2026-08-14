@@ -1,0 +1,65 @@
+# Local ecosystem for the agentic chat PoC.
+#
+#   docker compose up --build
+#
+# floci is the whole AWS side: DynamoDB runs in-process inside it, and its
+# ElastiCache implementation launches a REAL valkey/valkey:8 container through the
+# mounted Docker socket. That child container publishes nothing to the host —
+# floci fronts it with an auth proxy on its OWN port 6379, which is why 6379 is
+# published from the floci service and not from a separate Valkey service.
+# See docs/adr/0004-floci-as-the-aws-and-cache-substrate.md.
+
+name: agentic-chat
+
+services:
+
+  floci:
+    image: floci/floci:1.6.0
+    container_name: agentic-floci
+    # Needs to be root to use the mounted Docker socket (documented by floci).
+    user: root
+    ports:
+      - "4566:4566"   # AWS control + data plane
+      - "6379:6379"   # ElastiCache RESP proxy -> the Valkey child container
+    environment:
+      # hybrid = in-memory speed with an async flush every 5 s, so DynamoDB state
+      # survives `docker compose restart` without paying per-write disk cost.
+      FLOCI_STORAGE_MODE: hybrid
+      FLOCI_STORAGE_PERSISTENT_PATH: /app/data
+      FLOCI_DEFAULT_REGION: us-east-1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - floci-data:/app/data
+    # The image ships its own HEALTHCHECK:
+    #   curl -f http://localhost:4566/_floci/health
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agentic-app
+    depends_on:
+      floci:
+        condition: service_healthy
+    # Secrets only. Everything non-secret is configured in application-docker.yml.
+    env_file:
+      - .env
+    environment:
+      MICRONAUT_ENVIRONMENTS: docker
+      # Reached over the compose network, not via the published host ports.
+      AWS_ENDPOINT_URL: http://floci:4566
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      VALKEY_HOST: floci
+      VALKEY_PORT: "6379"
+    ports:
+      - "8080:8080"
+    # 7 GB total on this machine; leave room for floci, its Valkey child and dockerd.
+    deploy:
+      resources:
+        limits:
+          memory: 3g
+
+volumes:
+  floci-data:
