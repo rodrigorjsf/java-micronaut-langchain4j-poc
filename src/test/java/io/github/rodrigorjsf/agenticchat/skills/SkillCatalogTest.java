@@ -5,6 +5,7 @@ import dev.langchain4j.agent.tool.ToolSpecifications;
 import io.micronaut.context.ApplicationContext;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
@@ -130,6 +131,39 @@ class SkillCatalogTest {
                                 .as("parameter %s of %s must document its format", param, spec.name())
                                 .isNotNull()
                                 .isNotBlank());
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("no tool parameter is named like a credential")
+    void noToolAcceptsASecret() {
+        // A @Tool parameter called apiKey or token is an invitation: the model will
+        // eventually fill it, and the value leaves the process in a query string.
+        var forbidden = java.util.regex.Pattern.compile(
+                "(?i).*(api[_-]?key|secret|token|password|passwd|credential|authorization).*");
+
+        for (SkillTools bean : ctx.getBeansOfType(SkillTools.class)) {
+            for (ToolSpecification spec : ToolSpecifications.toolSpecificationsFrom(bean)) {
+                assertThat(spec.parameters().properties().keySet())
+                        .as("tool %s", spec.name())
+                        .noneMatch(param -> forbidden.matcher(param).matches());
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("tool names are unique across every skill")
+    void toolNamesAreUniqueAcrossSkills() {
+        // Two tools with one name means the model cannot address one of them, and
+        // which one it reaches depends on map ordering.
+        var seen = new java.util.HashMap<String, String>();
+        for (SkillTools bean : ctx.getBeansOfType(SkillTools.class)) {
+            for (ToolSpecification spec : ToolSpecifications.toolSpecificationsFrom(bean)) {
+                var previous = seen.put(spec.name(), bean.skillName());
+                assertThat(previous)
+                        .as("tool '%s' is declared by both %s and %s", spec.name(), previous, bean.skillName())
+                        .isNull();
             }
         }
     }

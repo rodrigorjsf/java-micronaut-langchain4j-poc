@@ -25,7 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>Guardrails run before and after the tool loop, so nothing else in the
  * framework ever sees what a tool returned.
  */
-class ToolResultScreeningProviderTest {
+class ToolGuardProviderTest {
 
     private static final String ACTIVATED_SKILL = "activated_skill";
 
@@ -64,11 +64,34 @@ class ToolResultScreeningProviderTest {
     }
 
     private ToolExecutionResult run(String resultText, Map<String, Object> attributes) {
-        var guarded = new ToolResultScreeningProvider(
+        return runWith("{}", resultText, attributes);
+    }
+
+    private ToolExecutionResult runWith(String arguments, String resultText, Map<String, Object> attributes) {
+        var guarded = new ToolGuardProvider(
                 providerReturning(resultText, attributes), new InjectionHeuristics(), new SimpleMeterRegistry());
         var tool = guarded.provideTools(null).aiServiceTools().getFirst();
         return tool.toolExecutor().executeWithContext(
-                ToolExecutionRequest.builder().id("1").name("fetch_something").arguments("{}").build(), null);
+                ToolExecutionRequest.builder().id("1").name("fetch_something").arguments(arguments).build(), null);
+    }
+
+    @Test
+    @DisplayName("a credential in a tool argument is exfiltration, and the call never leaves the process")
+    void aCredentialShapedArgumentIsRefused() {
+        var result = runWith("{\"q\":\"sk-abcdefghijklmnopqrstuvwxyz012345\"}", "should not be reached", Map.of());
+
+        assertThat(result.isError()).isTrue();
+        assertThat(result.resultText())
+                .contains("refused")
+                .doesNotContain("sk-abcdefghijklmnopqrstuvwxyz012345");
+    }
+
+    @Test
+    void ordinaryArgumentsAreNotMistakenForCredentials() {
+        var result = runWith("{\"cep\":\"01310100\",\"q\":\"avenida paulista\"}", "{\"ok\":true}", Map.of());
+
+        assertThat(result.isError()).isFalse();
+        assertThat(result.resultText()).contains("ok");
     }
 
     @Test
@@ -122,7 +145,7 @@ class ToolResultScreeningProviderTest {
 
     @Test
     void theProviderMirrorsTheDelegatesDynamicFlag() {
-        var guarded = new ToolResultScreeningProvider(
+        var guarded = new ToolGuardProvider(
                 providerReturning("ok", Map.of()), new InjectionHeuristics(), new SimpleMeterRegistry());
 
         assertThat(guarded.isDynamic())

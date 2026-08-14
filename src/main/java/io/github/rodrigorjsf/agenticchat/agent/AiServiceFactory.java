@@ -10,7 +10,7 @@ import io.github.rodrigorjsf.agenticchat.guardrail.input.NormalizingInputGuardra
 import io.github.rodrigorjsf.agenticchat.guardrail.output.ExfiltrationGuardrail;
 import io.github.rodrigorjsf.agenticchat.guardrail.input.InjectionHeuristics;
 import io.github.rodrigorjsf.agenticchat.guardrail.output.SystemPromptLeakageGuardrail;
-import io.github.rodrigorjsf.agenticchat.guardrail.tool.ToolResultScreeningProvider;
+import io.github.rodrigorjsf.agenticchat.guardrail.tool.ToolGuardProvider;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.github.rodrigorjsf.agenticchat.llm.ChatModelRegistry;
 import io.github.rodrigorjsf.agenticchat.memory.SummarizerPrompt;
@@ -109,7 +109,7 @@ public class AiServiceFactory {
                 // RESULT is screened — guardrails run before and after the tool loop
                 // and can never see what a tool returned, which is exactly where
                 // indirect prompt injection arrives.
-                .toolProvider(new ToolResultScreeningProvider(
+                .toolProvider(new ToolGuardProvider(
                         skills.skills().toolProvider(), heuristics, meters))
 
                 // Order matters and is the annotation order: normalize first so every
