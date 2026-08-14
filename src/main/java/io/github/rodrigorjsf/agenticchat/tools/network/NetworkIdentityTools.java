@@ -58,12 +58,10 @@ import java.util.Map;
  * {@code {"name":"x","probability":0}} — a partial answer rather than an absent
  * one.
  *
- * <p>One capping limitation is accepted knowingly. {@code
- * guess_nationality_from_name} returns its countries in an array nested inside
- * an object, and {@link ToolJson#projectCapped} caps only a <em>top-level</em>
- * array, so the source catalogue's "cap 3" is not expressible with the shared
- * helper. At 260 bytes for five countries that is not a token emergency, and
- * hand-rolling a second slicing path for one tool would cost more than it saves.
+ * <p>{@code guess_nationality_from_name} returns its countries in an array nested
+ * inside an object, so it caps that list with {@link ToolJson#projectList} — at
+ * three, because the tail of the distribution is where a name is least
+ * informative and a model quoting the fifth country is over-reading the data.
  */
 @Singleton
 public class NetworkIdentityTools implements SkillTools {
@@ -73,8 +71,13 @@ public class NetworkIdentityTools implements SkillTools {
     private static final String AGIFY = "agify";
     private static final String NATIONALIZE = "nationalize";
 
-    /** A first name, in any script, without digits or punctuation beyond a hyphen or apostrophe. */
-    private static final String NAME_PATTERN = "\\p{L}[\\p{L}'\\- ]{0,39}";
+    /**
+     * ONE first name, in any script, without digits or punctuation beyond a hyphen or
+     * apostrophe. No space: every {@code @P} here says "not a full name", and a
+     * pattern that quietly admitted "maria clara" made those descriptions false —
+     * the services key on a single given name and answer for whatever they can match.
+     */
+    private static final String NAME_PATTERN = "\\p{L}[\\p{L}'\\-]{0,39}";
 
     private final ToolHttpClient http;
     private final ToolJson json;
@@ -168,9 +171,13 @@ public class NetworkIdentityTools implements SkillTools {
         if (!given.matches(NAME_PATTERN)) {
             return nameComplaint(name);
         }
-        // 260 bytes probed for five countries. The array is nested inside the object,
-        // which ToolJson cannot cap, and at this size does not need capping.
-        return orNoStatistic(http.get(NATIONALIZE, "", Map.of("name", given)), given, "country");
+        // 260 bytes probed for five countries — not a token problem, and capped at
+        // three anyway because the tail is where the signal runs out. A name spread
+        // across five countries says "common name", and a model handed the fifth
+        // country at four percent tends to name it as an origin.
+        var response = json.projectList(
+                http.get(NATIONALIZE, "", Map.of("name", given)), "country", 3, "country_id", "probability");
+        return orNoStatistic(response, given, "country");
     }
 
     // ------------------------------------------------------------------
@@ -201,8 +208,18 @@ public class NetworkIdentityTools implements SkillTools {
             if (!address.matches("[0-9a-f:]{2,45}")) {
                 return malformed(address);
             }
+            // Loopback has two spellings and the expanded one is what a log file
+            // usually holds, so both are matched. An IPv4-mapped address carries a
+            // v4 address inside a v6 shell (::ffff:10.0.0.5), which is checked as
+            // the v4 address it is rather than let through on its shape.
+            String mapped = ipv4Inside(address);
+            if (mapped != null) {
+                return complaintAbout(mapped);
+            }
             boolean reserved = address.equals("::")
+                    || address.equals("0:0:0:0:0:0:0:0")
                     || address.startsWith("::1")
+                    || address.equals("0:0:0:0:0:0:0:1")
                     || address.startsWith("fe80")
                     || address.startsWith("fc")
                     || address.startsWith("fd");
@@ -225,7 +242,24 @@ public class NetworkIdentityTools implements SkillTools {
         return isReserved(octets) ? unroutable(address) : null;
     }
 
-    /** Loopback, the private blocks of RFC 1918, carrier-grade NAT, link-local, multicast and above. */
+    /**
+     * The v4 address inside an IPv4-mapped v6 one, or {@code null}. Written as its
+     * own step because {@code ::ffff:10.0.0.5} passes every IPv6 shape check and is a
+     * private address.
+     */
+    private static String ipv4Inside(String address) {
+        int lastColon = address.lastIndexOf(':');
+        String tail = lastColon < 0 ? address : address.substring(lastColon + 1);
+        return tail.matches("\\d{1,3}(\\.\\d{1,3}){3}") ? tail : null;
+    }
+
+    /**
+     * Loopback, the private blocks of RFC 1918, carrier-grade NAT, link-local,
+     * multicast and above — and the documentation and benchmark ranges, which look
+     * ordinary and are not routable. Probed 2026-08-14: 203.0.113.1 reaches the
+     * provider and comes back {@code "success":false,"message":"Reserved range"},
+     * so without this the tool spends quota to be told what it already knew.
+     */
     private static boolean isReserved(int[] octets) {
         return octets[0] == 0
                 || octets[0] == 10
@@ -234,7 +268,11 @@ public class NetworkIdentityTools implements SkillTools {
                 || (octets[0] == 169 && octets[1] == 254)
                 || (octets[0] == 172 && octets[1] >= 16 && octets[1] <= 31)
                 || (octets[0] == 192 && octets[1] == 168)
-                || (octets[0] == 100 && octets[1] >= 64 && octets[1] <= 127);
+                || (octets[0] == 100 && octets[1] >= 64 && octets[1] <= 127)
+                || (octets[0] == 192 && octets[1] == 0 && octets[2] == 2)
+                || (octets[0] == 198 && octets[1] == 51 && octets[2] == 100)
+                || (octets[0] == 203 && octets[1] == 0 && octets[2] == 113)
+                || (octets[0] == 198 && octets[1] >= 18 && octets[1] <= 19);
     }
 
     private static String malformed(String address) {

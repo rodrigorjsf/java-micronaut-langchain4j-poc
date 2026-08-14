@@ -8,7 +8,9 @@ import io.github.rodrigorjsf.agenticchat.tools.http.ToolJson;
 import io.github.rodrigorjsf.agenticchat.tools.http.ToolResponse;
 import jakarta.inject.Singleton;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -46,14 +48,21 @@ import java.util.Map;
  * lets that move be a configuration change: the barcode route and the search route
  * can now be pointed, budgeted and retried independently.
  *
- * <p>The two recipe sources share a limitation worth stating once. Their search
- * routes accept no result limit, and their answers nest the list inside
- * {@code {"meals":[…]}} / {@code {"drinks":[…]}} — a shape {@link ToolJson} cannot
- * cap, because it caps only a top-level array. A one-word query is therefore
- * unbounded at the source: {@code search.php?s=chicken} answered ~60 KB. The byte
- * budget in configuration is the backstop, and when it fires these tools say what
- * actually went wrong — the name was too generic — instead of telling the model to
- * "narrow the query" on a route that has no narrowing knob.
+ * <p>The two recipe sources are unbounded at the source: their search routes accept
+ * no result limit, and an ordinary food word answers with everything that matches.
+ * Measured 2026-08-14: pie 68 935 B, cake 63 514 B, chicken 59 786 B, soup 54 843 B,
+ * bread 57 439 B — against pasta at 2 247 B. So the bound is applied here, with
+ * {@link ToolJson#projectList}: the nested list is capped at three and each element
+ * keeps only the fields an answer quotes.
+ *
+ * <p>That keep-list is also a security control, which is the part worth stating
+ * plainly. A recipe record carries {@code strSource}, {@code strYoutube} and
+ * {@code strMealThumb}; a cocktail carries {@code strImageSource}. Those are
+ * third-party URLs, and a response that quotes one is withheld <em>whole</em> by the
+ * output link policy — so the user asking the most ordinary question in this skill
+ * would get nothing at all, with no clue why. Enumerating what to keep removes the
+ * category; a deny-list would have to be right about every field the sources add
+ * next.
  */
 @Singleton
 public class HealthFoodTools implements SkillTools {
@@ -77,6 +86,34 @@ public class HealthFoodTools implements SkillTools {
      * between, and its {@code code} is what the barcode tool then takes.
      */
     private static final String SEARCH_FIELDS = "product_name,brands,nutriscore_grade,code";
+
+    /** Three is enough to say "there are several"; a fourth is never quoted in an answer. */
+    private static final int MAX_RECIPES = 3;
+
+    /**
+     * The fields a recipe answer quotes, built per call rather than held in a static
+     * array — a static field of array type is shared mutable state whatever it holds,
+     * and forty strings cost nothing beside an HTTP round trip.
+     */
+    private static String[] recipeFields() {
+        var fields = new ArrayList<String>(List.of("strMeal", "strCategory", "strArea", "strInstructions"));
+        for (int slot = 1; slot <= 20; slot++) {
+            fields.add("strIngredient" + slot);
+            fields.add("strMeasure" + slot);
+        }
+        return fields.toArray(String[]::new);
+    }
+
+    /** As {@link #recipeFields()}; a cocktail has fifteen ingredient slots, not twenty. */
+    private static String[] cocktailFields() {
+        var fields = new ArrayList<String>(
+                List.of("strDrink", "strCategory", "strAlcoholic", "strGlass", "strInstructions"));
+        for (int slot = 1; slot <= 15; slot++) {
+            fields.add("strIngredient" + slot);
+            fields.add("strMeasure" + slot);
+        }
+        return fields.toArray(String[]::new);
+    }
 
     private final ToolHttpClient http;
     private final ToolJson json;
@@ -200,12 +237,12 @@ public class HealthFoodTools implements SkillTools {
         }
         var raw = http.get(THEMEALDB, "/search.php", Map.of("s", clean));
         if (raw.truncated()) {
-            // Deliberately not "narrow the query": this route takes no result limit,
-            // so the only lever is a more specific name, and saying anything else
-            // sends the model back to the same call.
-            return "'" + clean + "' matched more recipes than this tool can read back. That word is "
-                    + "an ingredient or a category rather than a dish — ask the user for the exact "
-                    + "dish name, e.g. 'Chicken Handi' rather than 'chicken'. Do not answer from a "
+            // The budget clears every measured search, so reaching here means the
+            // catalogue grew past it. Say that, and do not diagnose the user's word:
+            // an earlier version of this message told them "chicken" was an ingredient
+            // rather than a dish, and then said the same of soup, pie and cake.
+            return "'" + clean + "' returned more recipe data than this tool can read back. Ask the "
+                    + "user for a more specific dish name and try once more. Do not answer from a "
                     + "partial recipe.";
         }
         return recipeText(raw, "no recipe is catalogued under '" + clean
@@ -233,19 +270,18 @@ public class HealthFoodTools implements SkillTools {
         }
         var raw = http.get(THECOCKTAILDB, "/search.php", Map.of("s", clean));
         if (raw.truncated()) {
-            return "'" + clean + "' matched more drinks than this tool can read back. Ask the user "
-                    + "for the full name of the variant they mean, e.g. 'Tommy's Margarita' rather "
-                    + "than 'margarita'. Do not answer from a partial recipe.";
+            return "'" + clean + "' returned more drink data than this tool can read back. Ask the "
+                    + "user for the full name of the variant they mean, e.g. \"Tommy's Margarita\" "
+                    + "rather than \"margarita\". Do not answer from a partial recipe.";
         }
-        var response = json.project(raw, "drinks");
-        return orNotFound(response.toModelText(),
+        return listOrNothing(json.projectList(raw, "drinks", MAX_RECIPES, cocktailFields()), "drinks",
                 "no cocktail is catalogued under '" + clean + "'. Do not invent a recipe for a drink "
                         + "the catalogue does not have.");
     }
 
     @Tool("""
-            List breweries in a city with their type, address region, country and \
-            website. Use for "breweries in X", "where is there a brewpub" and \
+            List breweries in a city with their type, the region they are in and the \
+            country. Use for "breweries in X", "where is there a brewpub" and \
             beer-tourism questions. Coverage is strongest in the United States and \
             thin elsewhere, so an empty list means nothing is catalogued for that \
             city, not that the city has no breweries.""")
@@ -269,12 +305,17 @@ public class HealthFoodTools implements SkillTools {
         params.put("by_city", clean.replaceAll("[\\s.']+", "_"));
         params.put("per_page", Integer.toString(size));
 
-        // A top-level array, so the cap applies directly and the model is told when
-        // the list was cut. state_province duplicates state on every probed record,
-        // and latitude, longitude, phone and the four address lines are not part of
-        // any answer this skill gives.
+        // A top-level array, so the cap applies directly. state_province duplicates
+        // state on every probed record, and latitude, longitude, phone and the four
+        // address lines are not part of any answer this skill gives.
+        //
+        // website_url is left out deliberately. Probed 2026-08-14, san_diego returns
+        // 10barrel.com, www.2kidsBrewing.com and 42northbrewing.com — none of them a
+        // host the tool catalogue reaches, so an answer quoting one is withheld whole
+        // by the output link policy and the user gets a blank refusal for "breweries
+        // in San Diego". A brewery's name is what the user searches for anyway.
         var response = json.projectCapped(http.get(OPEN_BREWERY_DB, "/breweries", params), size,
-                "name", "brewery_type", "city", "state", "country", "website_url");
+                "name", "brewery_type", "city", "state", "country");
         return orNotFound(response.toModelText(),
                 "no brewery is catalogued in '" + city.strip() + "'. Coverage outside the United "
                         + "States is sparse; say the directory has nothing rather than implying the "
@@ -286,11 +327,30 @@ public class HealthFoodTools implements SkillTools {
     /**
      * Both recipe routes answer the same envelope, so they share the projection and
      * the empty check. A dish the catalogue does not hold comes back as
-     * {@code {"meals":null}} rather than as a {@code 404}, and a null projects away
-     * to {@code {}}.
+     * {@code {"meals":null}} rather than as a {@code 404}.
      */
     private String recipeText(ToolResponse raw, String nothingFound) {
-        return orNotFound(json.project(raw, "meals").toModelText(), nothingFound);
+        return listOrNothing(json.projectList(raw, "meals", MAX_RECIPES, recipeFields()),
+                "meals", nothingFound);
+    }
+
+    /**
+     * Both recipe sources report "nothing found" as a {@code null} list inside a
+     * {@code 200}. {@link ToolJson#projectList} leaves a body it cannot treat as a
+     * list untouched, so that null arrives here intact — which is the point. Turning
+     * it into an empty envelope would hide it, and a model handed {@code {"meals":[]}}
+     * reaches for what it remembers about the dish.
+     */
+    private static String listOrNothing(ToolResponse response, String field, String nothingFound) {
+        if (!response.isOk()) {
+            return response.toModelText();
+        }
+        String text = response.toModelText();
+        String bare = text.replace(" ", "");
+        if (bare.contains("\"" + field + "\":null") || bare.contains("\"" + field + "\":[]")) {
+            return "No result: " + nothingFound + " Tell the user nothing was found; do not guess a value.";
+        }
+        return orNotFound(text, nothingFound);
     }
 
     private static int clamp(String raw, int min, int max, int fallback) {

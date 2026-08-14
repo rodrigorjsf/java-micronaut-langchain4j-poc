@@ -22,7 +22,7 @@ comes back with nothing, say nothing was found and offer another angle.
 | "show me a dog", or curiosity about what a breed looks like | `get_random_dog_image` |
 | "tell me something about cats" | `get_cat_fact` |
 | a Chuck Norris joke, asked for by that name | `get_chuck_norris_joke` |
-| "tell me a joke", "make me laugh", "something funny" | `get_programming_joke` |
+| "tell me a joke", "make me laugh", "something funny" | `get_joke` |
 | "a fun fact", "something random I didn't know" | `get_useless_fact` |
 | "give me some advice", "a thought for the day" | `get_random_advice` |
 | "a quote", "something inspiring to open a talk with" | `get_random_quote` |

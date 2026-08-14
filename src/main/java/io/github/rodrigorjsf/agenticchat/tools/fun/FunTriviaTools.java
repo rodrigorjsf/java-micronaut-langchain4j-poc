@@ -78,8 +78,10 @@ public class FunTriviaTools implements SkillTools {
 
     /**
      * The service's own categories, minus {@code explicit}. A comma-separated string
-     * rather than a set because a static field holding a collection is shared mutable
-     * state whatever the declared type promises; {@link #canonical} splits it.
+     * so that {@link #canonical} can match case-insensitively against one place; an
+     * immutable {@code Set.of(…)} would be equally safe to hold in a static field,
+     * since what the concurrency rule forbids is a static holding something
+     * <em>mutable</em>.
      */
     private static final String SAFE_CHUCK_CATEGORIES =
             "animal,career,celebrity,dev,fashion,food,history,money,movie,music,"
@@ -266,7 +268,7 @@ public class FunTriviaTools implements SkillTools {
             unstoppable. Use when the user asks for one by name, or wants a quick \
             silly line and this style fits the conversation. The optional category \
             steers the subject — 'dev' for programming ones, 'food', 'movie'. For an \
-            ordinary joke rather than this genre, use get_programming_joke.""")
+            ordinary joke rather than this genre, use get_joke.""")
     public String get_chuck_norris_joke(
             @P("Subject to draw from, e.g. 'dev', 'food', 'movie', 'science', 'sport'. Leave empty for any subject.")
             String category) {
@@ -287,12 +289,12 @@ public class FunTriviaTools implements SkillTools {
     }
 
     @Tool("""
-            Get a clean one-line joke, about programming by default. Use when the user \
-            asks for a joke, a laugh or something funny and there is no reason to \
+            Get a clean one-line joke. This is the general one — use it whenever the \
+            user asks for a joke, a laugh or something funny and there is no reason to \
             prefer the Chuck Norris style. The category picks the flavour: \
             'Programming' for developer humour, 'Pun' for wordplay, 'Misc' for general \
             jokes. Offensive material is filtered out and cannot be requested.""")
-    public String get_programming_joke(
+    public String get_joke(
             @P("Which flavour of joke: 'Programming', 'Pun' or 'Misc'. Defaults to 'Programming'.")
             String category) {
         String chosen = category == null || category.isBlank()

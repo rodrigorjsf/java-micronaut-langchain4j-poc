@@ -5,7 +5,7 @@ description: Nutrition facts, ingredients, allergens and Nutri-Score of packaged
 
 # Health and food
 
-Five tools over three catalogues. Open Food Facts describes food that comes in a
+Five tools over four catalogues. Open Food Facts describes food that comes in a
 package, TheMealDB and TheCocktailDB describe food and drink you make yourself,
 and Open Brewery DB is a directory of places. All four are volunteer-contributed
 and none of them is complete — a missing product or dish is the normal case, not
@@ -84,14 +84,12 @@ the method, not an opinion about whether the dish suits the person asking.
   `strArea` is the cuisine and `strCategory` the course.
 - **Several variants can come back at once.** A common name — margarita, mojito —
   returns every catalogued variant in `drinks`, and a broad word returns many
-  `meals`. Present one recipe properly and mention that other variants exist;
-  do not dump the whole list.
-- **Cocktail records are multilingual.** Alongside `strInstructions` there are
-  translated copies (`strInstructionsES`, `strInstructionsDE`, and others). Use
-  one and ignore the rest.
-- **Brewery results are capped.** If the array ends with an entry like
-  `{"_more": 4}`, four further breweries were dropped — say so instead of
-  presenting the list as complete. `brewery_type` values are terms of art:
+  `meals`. Both lists arrive capped at three, ending with an entry like
+  `{"_more": 11}` when more matched. Present one recipe properly, say how many
+  others exist, and do not dump the list.
+- **Brewery results are not marked as partial.** You asked for a number and you
+  got that number; the directory may hold many more. Say "three of the breweries
+  listed in X", never "the breweries in X". `brewery_type` values are terms of art:
   `micro`, `brewpub` (brews and serves food), `large`, `contract`, `planning`
   (not open yet), `closed`.
 
@@ -120,10 +118,10 @@ who should answer — rather than estimating.
   the entry does not exist in the database and offer to try another spelling or
   another product. Never fill the gap with a remembered nutrition table — an
   invented number about food is the worst possible output of this skill.
-- **"Matched more recipes than this tool can read"** means the word given was an
-  ingredient or a category rather than a dish. Ask the user for the exact dish or
-  drink name and call again; there is no narrower query to send, only a more
-  specific name.
+- **"Returned more recipe data than this tool can read"** is rare and means the
+  catalogue itself has grown past the budget for that word. Ask the user for a
+  more specific dish or drink name and call once more. Do not tell them their
+  word was "an ingredient" — it usually is not.
 - **Invalid arguments** tells you what was wrong — usually a barcode with the
   wrong number of digits, or a city name with a state appended. Fix it yourself
   and only ask the user when the missing detail is genuinely theirs.

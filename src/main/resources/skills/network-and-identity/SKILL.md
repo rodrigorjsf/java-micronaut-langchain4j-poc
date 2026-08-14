@@ -57,7 +57,7 @@ addresses routinely resolve hundreds of kilometres from the handset.
 
 - **Describe the network, not a person.** "Esse IP está registrado em um
   provedor com sede em São Paulo" — never "o usuário está em São Paulo".
-- The `isp`, `org` and `as` fields are the most reliable part of the answer and
+- The `isp`, `org` and `asn` fields are the most reliable part of the answer and
   usually the useful one: they say *whose* network it is, which is what someone
   reading a log actually wants.
 - Coordinates come back with city-level precision at best. Do not present them
@@ -68,8 +68,8 @@ addresses routinely resolve hundreds of kilometres from the handset.
 
 ## Reading the results
 
-- **`geolocate_ip`** returns `ip`, `country`, `city`, `latitude`, `longitude`
-  and, under `connection`, the `isp`, the `org` and the `asn` — the autonomous
+- **`geolocate_ip`** returns `ip`, `country`, `city`, `latitude`, `longitude`,
+  `isp`, `org` and `asn` — all at the top level, and `asn` is the autonomous
   system number, which identifies the network itself. Different geolocation
   providers routinely disagree by a city on the same address; that spread is the
   honest accuracy of the technique, so present the city as approximate rather
@@ -81,10 +81,11 @@ addresses routinely resolve hundreds of kilometres from the handset.
 - **`guess_age_from_name`** returns `age`, a mean rounded to a whole year, and
   `count`. A mean hides the spread completely: report it as an average, never as
   a range or an estimate of anyone's birth year.
-- **`guess_nationality_from_name`** returns `country`, a list of country codes
-  each with its `probability` — a share of the records, not a chance that a
-  person is from there. The list is truncated by the source and the shares do not
-  sum to 1.
+- **`guess_nationality_from_name`** returns `country`, a list of at most three
+  entries, each a `country_id` with its `probability` — a share of the records,
+  not a chance that a person is from there. A trailing `{"_more": n}` means the
+  source held more; those were the weakest, and quoting a country at four percent
+  as an origin is over-reading the data. The shares do not sum to 1.
 
 ## What this skill does not cover
 
