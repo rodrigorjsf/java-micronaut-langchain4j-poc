@@ -1,7 +1,12 @@
 package io.github.rodrigorjsf.agenticchat.testsupport;
 
 import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.chat.listener.ChatModelListener;
 import io.github.rodrigorjsf.agenticchat.llm.ChatModelRegistry;
+import io.github.rodrigorjsf.agenticchat.llm.config.ProviderCredentials;
+import io.github.rodrigorjsf.agenticchat.observability.CostCalculator;
+import io.github.rodrigorjsf.agenticchat.observability.TokenCostListener;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
 import jakarta.inject.Singleton;
@@ -16,32 +21,48 @@ import java.util.concurrent.ConcurrentHashMap;
  * provider, an API key or a network.
  *
  * <p>One scripted model per role, so a test can assert what the judge was asked
- * separately from what the agent was asked — which is the distinction the entire
- * triage design rests on.
+ * separately from what the agent was asked — the distinction the entire triage
+ * design rests on.
+ *
+ * <p>Each scripted model carries the same {@link TokenCostListener} the real
+ * registry attaches. Without that the double would be faithful about requests and
+ * silently unfaithful about accounting, and the cost metrics would be exercised by
+ * nothing.
  */
 @Singleton
 @Replaces(ChatModelRegistry.class)
 @Requires(property = "agentic.test.stub-models", value = "true")
 public class StubChatModelRegistry extends ChatModelRegistry {
 
+    private static final ProviderCredentials STUB_CREDENTIALS = new ProviderCredentials() {
+        @Override
+        public String googleApiKey() {
+            return "stub";
+        }
+
+        @Override
+        public String openaiApiKey() {
+            return "stub";
+        }
+    };
+
     private final Map<String, ScriptedChatModel> models = new ConcurrentHashMap<>();
+    private final MeterRegistry meters;
+    private final CostCalculator costs;
 
-    public StubChatModelRegistry() {
-        super(List.of(), new io.github.rodrigorjsf.agenticchat.llm.config.ProviderCredentials() {
-            @Override
-            public String googleApiKey() {
-                return "stub";
-            }
-
-            @Override
-            public String openaiApiKey() {
-                return "stub";
-            }
-        }, List.of());
+    public StubChatModelRegistry(MeterRegistry meters, CostCalculator costs) {
+        super(List.of(), STUB_CREDENTIALS, List.of());
+        this.meters = meters;
+        this.costs = costs;
     }
 
     public ScriptedChatModel model(String role) {
-        return models.computeIfAbsent(role, ignored -> new ScriptedChatModel());
+        return models.computeIfAbsent(role, name ->
+                new ScriptedChatModel().withListeners(listenersFor(name)));
+    }
+
+    private List<ChatModelListener> listenersFor(String role) {
+        return List.of(new TokenCostListener(role, meters, costs));
     }
 
     @Override

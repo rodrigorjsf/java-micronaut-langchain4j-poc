@@ -2,6 +2,9 @@ package io.github.rodrigorjsf.agenticchat.testsupport;
 
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.chat.listener.ChatModelListener;
+import dev.langchain4j.model.chat.listener.ChatModelRequestContext;
+import dev.langchain4j.model.chat.listener.ChatModelResponseContext;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.output.FinishReason;
@@ -27,6 +30,16 @@ public class ScriptedChatModel implements ChatModel {
     private final Deque<Function<ChatRequest, AiMessage>> script = new ArrayDeque<>();
     private final List<ChatRequest> requests = new ArrayList<>();
     private AiMessage fallback = AiMessage.from("ok");
+    private List<ChatModelListener> listeners = List.of();
+
+    /**
+     * Real provider models notify listeners around every call, so this double does
+     * too. Without it the token and cost accounting would be exercised by nothing.
+     */
+    public ScriptedChatModel withListeners(List<ChatModelListener> listeners) {
+        this.listeners = List.copyOf(listeners);
+        return this;
+    }
 
     public ScriptedChatModel replyWith(String... texts) {
         for (String text : texts) {
@@ -60,12 +73,20 @@ public class ScriptedChatModel implements ChatModel {
     @Override
     public ChatResponse chat(ChatRequest chatRequest) {
         requests.add(chatRequest);
+        var attributes = new java.util.concurrent.ConcurrentHashMap<Object, Object>();
+        listeners.forEach(listener -> listener.onRequest(
+                new ChatModelRequestContext(chatRequest, null, attributes)));
+
         var responder = script.poll();
         var message = responder == null ? fallback : responder.apply(chatRequest);
-        return ChatResponse.builder()
+        var response = ChatResponse.builder()
                 .aiMessage(message)
                 .tokenUsage(new TokenUsage(100, 20))
                 .finishReason(FinishReason.STOP)
                 .build();
+
+        listeners.forEach(listener -> listener.onResponse(
+                new ChatModelResponseContext(response, chatRequest, null, attributes)));
+        return response;
     }
 }

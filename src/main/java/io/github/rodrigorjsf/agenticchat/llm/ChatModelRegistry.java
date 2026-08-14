@@ -9,6 +9,10 @@ import io.github.rodrigorjsf.agenticchat.llm.config.ModelProvider;
 import io.github.rodrigorjsf.agenticchat.llm.config.ModelRoleProperties;
 import io.github.rodrigorjsf.agenticchat.llm.config.ModelRoleValidator;
 import io.github.rodrigorjsf.agenticchat.llm.config.ProviderCredentials;
+import io.github.rodrigorjsf.agenticchat.observability.CostCalculator;
+import io.github.rodrigorjsf.agenticchat.observability.TokenCostListener;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micronaut.core.annotation.Nullable;
 import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,13 +44,34 @@ public class ChatModelRegistry {
     public ChatModelRegistry(List<ModelRoleProperties> roles,
                              ProviderCredentials credentials,
                              List<ChatModelListener> listeners) {
+        this(roles, credentials, listeners, null, null);
+    }
+
+    /**
+     * Each role gets its own {@link TokenCostListener}, which is what puts a
+     * {@code role} tag on every token and cost metric. Without that tag the LLM bill
+     * is one number and there is no way to see that the judge is most of the calls
+     * and a small part of the cost — the fact the whole triage design rests on.
+     */
+    @jakarta.inject.Inject
+    public ChatModelRegistry(List<ModelRoleProperties> roles,
+                             ProviderCredentials credentials,
+                             List<ChatModelListener> listeners,
+                             @Nullable MeterRegistry meters,
+                             @Nullable CostCalculator costs) {
         this.configByRole = roles.stream()
                 .collect(Collectors.toUnmodifiableMap(ModelRoleProperties::name, Function.identity()));
-        this.modelsByRole = roles.stream()
-                .peek(ModelRoleValidator::validate)
-                .collect(Collectors.toUnmodifiableMap(
-                        ModelRoleProperties::name,
-                        role -> build(role, credentials, listeners)));
+
+        var models = new java.util.LinkedHashMap<String, ChatModel>();
+        for (ModelRoleProperties role : roles) {
+            ModelRoleValidator.validate(role);
+            var perRole = new java.util.ArrayList<>(listeners);
+            if (meters != null && costs != null) {
+                perRole.add(new TokenCostListener(role.name(), meters, costs));
+            }
+            models.put(role.name(), build(role, credentials, perRole));
+        }
+        this.modelsByRole = Map.copyOf(models);
 
         modelsByRole.keySet().forEach(role -> LOG.info("LLM role '{}' -> {} {}",
                 role, configByRole.get(role).provider(), configByRole.get(role).modelName()));

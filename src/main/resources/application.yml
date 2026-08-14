@@ -76,6 +76,36 @@ agentic:
         timeout: PT60S
         max-retries: 2
 
+    # -------------------------------------------------------------------------
+    # USD per million tokens. In configuration, not in code: prices change without
+    # asking, and a stale constant produces a cost report that is confidently
+    # wrong — worse than no report at all. A model with no entry here is reported
+    # at zero cost and counted in agentic.llm.unpriced_calls, so "not priced" is
+    # visible rather than silently free.
+    #
+    # Keys use hyphens because a Micronaut property segment cannot contain a dot:
+    # gemini-2.5-flash-lite is written gemini-2-5-flash-lite.
+    #
+    # Sources, both read 2026-08-14:
+    #   https://ai.google.dev/gemini-api/docs/pricing
+    #   https://developers.openai.com/api/docs/pricing
+    # Gemini's free tier is $0 for all of these; the paid-tier rates are recorded
+    # so the accounting is honest the moment billing is enabled.
+    # -------------------------------------------------------------------------
+    pricing:
+      gemini-2-5-flash-lite:
+        input-per-million: 0.10
+        cached-input-per-million: 0.01
+        output-per-million: 0.40
+      gemini-3-1-flash-lite:
+        input-per-million: 0.25
+        cached-input-per-million: 0.025
+        output-per-million: 1.50
+      gpt-4o-mini:
+        input-per-million: 0.15
+        cached-input-per-million: 0.075
+        output-per-million: 0.60
+
   aws:
     endpoint: ${AWS_ENDPOINT_URL:`http://localhost:4566`}
     region: ${AWS_REGION:`us-east-1`}

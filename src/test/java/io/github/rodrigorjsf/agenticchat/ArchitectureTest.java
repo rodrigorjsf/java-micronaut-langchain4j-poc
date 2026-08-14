@@ -114,7 +114,11 @@ class ArchitectureTest {
         // allowEmptyShould: the rule currently matches nothing, which is the desired
         // state. Without it ArchUnit treats "no matches" as a failure, so a passing
         // codebase would fail its own rule.
+        // haveNameNotMatching("\\$.*") skips compiler-synthesized fields. Eclipse's
+        // compiler emits a non-final `$SWITCH_TABLE$...` for switches over enums,
+        // and it is not code anyone wrote.
         fields().that().areStatic()
+                .and().haveNameNotMatching("\\$.*")
                 .should().beFinal()
                 .allowEmptyShould(true)
                 .because("a reassignable static is shared state with no owner and no "
