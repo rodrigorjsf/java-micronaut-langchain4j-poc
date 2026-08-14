@@ -83,6 +83,43 @@ class ToolJsonTest {
     }
 
     @Test
+    @DisplayName("a truncated body that will not parse is refused, never passed on as a fragment")
+    void aTruncatedFragmentIsNeverHandedToTheModel() {
+        // Truncation runs BEFORE projection. A 438 KB body cut at 32 KB ends
+        // mid-object, projection cannot parse it, and the string overload returns
+        // the input unchanged — so without this rule the model would receive 32 KB
+        // of mangled JSON in place of the 131 bytes it asked for.
+        var fat = new StringBuilder("[");
+        for (int i = 0; i < 3_000; i++) {
+            fat.append(i == 0 ? "" : ",")
+               .append("{\"id\":").append(i).append(",\"nome\":\"Municipio ").append(i)
+               .append("\",\"noise\":\"").append("y".repeat(100)).append("\"}");
+        }
+        fat.append("]");
+        var cut = ToolResponse.ok(fat.substring(0, 32_768), true);
+
+        var result = json.projectCapped(cut, 50, "nome");
+
+        assertThat(result.isOk()).isFalse();
+        assertThat(result.outcome()).isEqualTo(ToolResponse.Outcome.INVALID_REQUEST);
+        assertThat(result.toModelText()).contains("Narrow it");
+        assertThat(result.body()).doesNotContain("Municipio 0");
+    }
+
+    @Test
+    @DisplayName("a complete body that happens to be marked truncated still projects")
+    void aParseableTruncatedBodyIsStillProjected() {
+        // Truncation on a code-point boundary can leave valid JSON. Refusing that
+        // would throw away a usable answer.
+        var response = ToolResponse.ok("[{\"nome\":\"a\",\"noise\":\"x\"}]", true);
+
+        var result = json.projectCapped(response, 5, "nome");
+
+        assertThat(result.isOk()).isTrue();
+        assertThat(result.body()).contains("nome").doesNotContain("noise");
+    }
+
+    @Test
     void aFailedToolResponseIsLeftAlone() {
         var failure = ToolResponse.failure(ToolResponse.Outcome.NOT_FOUND, "nothing here");
 

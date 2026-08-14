@@ -34,10 +34,18 @@ public class ApiEndpointProperties {
             @Bindable(defaultValue = "PT6S") Duration timeout,
             @Bindable(defaultValue = "1") int maxRetries,
             /*
-             * Hard ceiling on what a single tool call can pull into the model's
-             * context. Public APIs return fat JSON; 32 KB of it is roughly 8k
-             * tokens, which is already more than any single tool result should
-             * cost. Truncation is reported to the model rather than hidden.
+             * TRANSPORT ceiling: how many bytes this endpoint may return to us. It
+             * is NOT the context ceiling — a tool that projects reduces the body
+             * further before the model sees it, and projection needs a complete
+             * JSON document to work on.
+             *
+             * So for a projecting endpoint this must sit ABOVE the raw body, not at
+             * the size you want the model to see. Set it below and the transport cut
+             * lands mid-object, projection cannot parse it, and the tool answers
+             * "narrow your query" for a request that would have worked.
+             *
+             * For a non-projecting tool the two ceilings coincide, and 32 KB is
+             * roughly 8k tokens — already more than any single result should cost.
              */
             @Bindable(defaultValue = "32768") int maxResponseBytes,
             /*

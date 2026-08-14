@@ -21,9 +21,22 @@ import jakarta.inject.Singleton;
  * A company record with a 60-entry shareholder array costs the same tokens on turn
  * twenty as it did on turn one, and the model needed four fields of it.
  *
- * <p>Failures degrade to the original text rather than throwing. A projection that
- * cannot parse its input is a bug in the projection, and the tool result — however
- * fat — is still more useful to the model than an error.
+ * <h2>Truncation runs BEFORE projection, and that ordering has teeth</h2>
+ *
+ * {@link ToolHttpClient} caps the transport at the endpoint's byte budget, and only
+ * then does a tool project. If the raw body exceeded that budget, what arrives here
+ * is a fragment ending mid-object — unparseable, so the string overloads return it
+ * unchanged.
+ *
+ * <p>That is correct for a String in isolation and catastrophic for a tool result:
+ * the model would receive 32 KB of mangled JSON in place of the 131 bytes it asked
+ * for, which is the exact failure this class exists to prevent. The
+ * {@link ToolResponse} overloads therefore refuse: a truncated body that will not
+ * parse becomes an explicit "narrow your query", never a fragment.
+ *
+ * <p>The other half of the fix is configuration — {@code max-response-bytes} on a
+ * projecting endpoint must sit above the RAW body, because it is a transport
+ * ceiling and the projection is the context ceiling.
  */
 @Singleton
 public class ToolJson {
@@ -129,26 +142,54 @@ public class ToolJson {
         return lastDot < 0 ? path : path.substring(lastDot + 1);
     }
 
+    /**
+     * Told to the model when a truncated body cannot be projected. Actionable on
+     * purpose: "narrow it" is something the model can actually do, unlike "error".
+     */
+    static final String TOO_MUCH_DATA =
+            "That query returned more data than this tool can read. Narrow it — a more specific "
+                    + "term, a smaller range, or fewer results — and try again.";
+
     /** Convenience for the common shape: project a {@link ToolResponse} in place. */
     public ToolResponse project(ToolResponse response, String... paths) {
-        if (!response.isOk()) {
-            return response;
-        }
-        return new ToolResponse(project(response.body(), paths), response.outcome(), response.truncated());
+        return reshape(response, body -> projectCapped(body, Integer.MAX_VALUE, paths));
     }
 
     public ToolResponse projectCapped(ToolResponse response, int max, String... paths) {
-        if (!response.isOk()) {
-            return response;
-        }
-        return new ToolResponse(projectCapped(response.body(), max, paths), response.outcome(), response.truncated());
+        return reshape(response, body -> projectCapped(body, max, paths));
     }
 
     /** Convenience: cap a {@link ToolResponse}'s top-level array in place. */
     public ToolResponse cap(ToolResponse response, int max) {
+        return reshape(response, body -> cap(body, max));
+    }
+
+    /**
+     * The one place the truncated-fragment rule lives.
+     *
+     * <p>A body that came back truncated and still will not parse is a fragment. It
+     * is never passed on: the model cannot tell a fragment from a complete answer,
+     * and it will confidently interpret one.
+     */
+    private ToolResponse reshape(ToolResponse response, java.util.function.UnaryOperator<String> shaper) {
         if (!response.isOk()) {
             return response;
         }
-        return new ToolResponse(cap(response.body(), max), response.outcome(), response.truncated());
+        if (response.truncated() && !isParseable(response.body())) {
+            return ToolResponse.failure(ToolResponse.Outcome.INVALID_REQUEST, TOO_MUCH_DATA);
+        }
+        return new ToolResponse(shaper.apply(response.body()), response.outcome(), response.truncated());
+    }
+
+    private static boolean isParseable(String json) {
+        if (json == null || json.isBlank()) {
+            return false;
+        }
+        try {
+            MAPPER.readTree(json);
+            return true;
+        } catch (Exception cannotParse) {
+            return false;
+        }
     }
 }

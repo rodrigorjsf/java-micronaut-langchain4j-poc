@@ -170,21 +170,21 @@ agentic:
         base-url: https://brasilapi.com.br/api/ncm
         # Measured at 4.69 s in probing — the slowest endpoint in the catalogue.
         timeout: PT9S
-        max-response-bytes: 8192
+        max-response-bytes: 262144   # transport ceiling, above the raw body: 2.3 MB for a one-letter search; 33 KB for a real term
       brasilapi-fipe:
         base-url: https://brasilapi.com.br/api/fipe
-        max-response-bytes: 16384
+        max-response-bytes: 131072   # transport ceiling, above the raw body: 35 KB measured for the largest model list
       viacep:
         base-url: https://viacep.com.br/ws
-        max-response-bytes: 24576
+        max-response-bytes: 65536   # transport ceiling, above the raw body: 17 KB measured for a street search
       ibge-servicodados:
         base-url: https://servicodados.ibge.gov.br/api
-        max-response-bytes: 16384
+        max-response-bytes: 65536   # transport ceiling, above the raw body: 32 KB measured for aggregate metadata
       ibge-localidades:
         # 284 KB raw for one state's municipalities: the byte budget is a backstop,
         # and the tool projects to names before the model ever sees it.
         base-url: https://servicodados.ibge.gov.br/api/v1/localidades
-        max-response-bytes: 32768
+        max-response-bytes: 524288   # transport ceiling, above the raw body: 381 KB measured for one state's municipalities
       bcb-sgs:
         base-url: https://api.bcb.gov.br/dados/serie
         max-response-bytes: 8192
@@ -242,7 +242,7 @@ agentic:
       launch-library:
         base-url: https://ll.thespacedevs.com
         # 19 KB for two launches; the tool projects hard before the model sees it.
-        max-response-bytes: 24576
+        max-response-bytes: 65536   # transport ceiling, above the raw body: 19 KB measured for two launches
       nasa:
         # DEMO_KEY works without registration at a low hourly limit, which is the
         # right trade for a demo: no signup, and a 429 the tool already handles.
@@ -268,7 +268,7 @@ agentic:
       openalex:
         # 36 KB for two results — one of the fattest in the catalogue.
         base-url: https://api.openalex.org
-        max-response-bytes: 16384
+        max-response-bytes: 65536   # transport ceiling, above the raw body: 36 KB measured for two results
       ncbi-eutils:
         base-url: https://eutils.ncbi.nlm.nih.gov/entrez/eutils
         max-response-bytes: 12288
@@ -304,11 +304,11 @@ agentic:
         # 193 KB for one package. The byte cap is a backstop; the projection is what
         # actually keeps this out of the conversation.
         base-url: https://pypi.org/pypi
-        max-response-bytes: 12288
+        max-response-bytes: 262144   # transport ceiling, above the raw body: 193 KB measured for one package
       cratesio:
         # 432 KB for one crate — the fattest response measured anywhere here.
         base-url: https://crates.io/api/v1
-        max-response-bytes: 12288
+        max-response-bytes: 524288   # transport ceiling, above the raw body: 432 KB measured for one crate
 
       # --- Crypto and markets ------------------------------------------------
       coingecko:
