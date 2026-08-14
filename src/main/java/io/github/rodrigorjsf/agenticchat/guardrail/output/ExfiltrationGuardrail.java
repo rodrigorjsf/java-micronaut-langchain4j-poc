@@ -3,7 +3,6 @@ package io.github.rodrigorjsf.agenticchat.guardrail.output;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.guardrail.OutputGuardrail;
 import dev.langchain4j.guardrail.OutputGuardrailResult;
-import io.micronaut.context.annotation.Value;
 import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,6 +27,11 @@ import java.util.regex.Pattern;
  * even once. Matching is on shape, which is the only thing available without
  * handing the guardrail the real secrets to compare against.
  *
+ * <p>The allowed hosts are <b>derived from the tool catalogue</b> rather than
+ * listed here — see {@link LinkAllowList}. A hand-written list beside a growing
+ * catalogue drifts in the direction that hurts: a new data source is added, its
+ * host is not, and the assistant starts refusing to cite the source it just used.
+ *
  * <p>Both use {@code fatalWithMessageRemoval} so the offending message is dropped
  * from chat memory rather than replayed on the next turn.
  */
@@ -50,14 +54,10 @@ public class ExfiltrationGuardrail implements OutputGuardrail {
             Pattern.compile("\\bgh[pousr]_[0-9A-Za-z]{36}"),       // GitHub
             Pattern.compile("-----BEGIN [A-Z ]*PRIVATE KEY-----"));
 
-    private final List<String> allowedHosts;
+    private final LinkAllowList allowList;
 
-    public ExfiltrationGuardrail(
-            @Value("${agentic.guardrails.output.allowed-link-hosts:}") List<String> allowedHosts) {
-        this.allowedHosts = allowedHosts == null ? List.of() : allowedHosts.stream()
-                .map(host -> host.toLowerCase(Locale.ROOT).strip())
-                .filter(host -> !host.isEmpty())
-                .toList();
+    public ExfiltrationGuardrail(LinkAllowList allowList) {
+        this.allowList = allowList;
     }
 
     @Override
@@ -116,13 +116,6 @@ public class ExfiltrationGuardrail implements OutputGuardrail {
     }
 
     private boolean isAllowed(String host) {
-        String bare = host.contains("@") ? host.substring(host.indexOf('@') + 1) : host;
-        bare = bare.split(":")[0];
-        for (String allowed : allowedHosts) {
-            if (bare.equals(allowed) || bare.endsWith("." + allowed)) {
-                return true;
-            }
-        }
-        return false;
+        return allowList.allows(host);
     }
 }

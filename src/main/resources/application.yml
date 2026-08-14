@@ -310,15 +310,25 @@ agentic:
         base-url: https://crates.io/api/v1
         max-response-bytes: 12288
 
-  guardrails:
-    output:
-      # Hosts the assistant may link to. Anything else in a response is treated as
-      # exfiltration, because a rendered markdown image fires with no user click.
-      allowed-link-hosts:
-        - brasilapi.com.br
-        - open-meteo.com
-        - wikipedia.org
-        - ibge.gov.br
+      # --- Crypto and markets ------------------------------------------------
+      coingecko:
+        # Free tier throttles aggressively; the tool must not retry into a 429.
+        base-url: https://api.coingecko.com/api/v3
+        max-retries: 0
+        max-response-bytes: 12288
+      binance:
+        # Refuses requests from some regions outright. The skill tells the model to
+        # fall back to CoinGecko rather than explain the geography to the user.
+        base-url: https://api.binance.com/api/v3
+        max-response-bytes: 8192
+
+      # --- Time and calendar -------------------------------------------------
+      nager-date:
+        base-url: https://date.nager.at/api/v3
+        max-response-bytes: 12288
+      timeapi:
+        base-url: https://timeapi.io/api
+        max-response-bytes: 4096
 
   agent:
     # 40 messages is ~3 turns worst case with 6 tool round trips, and ~10 turns of
@@ -355,3 +365,12 @@ agentic:
       # place and lets ambiguous turns through — the same fail-open posture used
       # everywhere else in the pipeline.
       llm-classifier-enabled: true
+    output:
+      # EXTRA hosts the assistant may link to, on top of every host in the tool
+      # catalogue above — those are derived, not listed, so the allow-list cannot
+      # drift away from the sources the tools actually use.
+      #
+      # Anything outside the union is treated as exfiltration, because a rendered
+      # markdown image fires with no user click.
+      extra-allowed-link-hosts:
+        - gov.br

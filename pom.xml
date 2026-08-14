@@ -332,6 +332,18 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
           <excludedGroups>${test.excluded.groups}</excludedGroups>
+          <!--
+            Surefire's default includes are *Test / Test* / *Tests / *TestCase, so a
+            class named *IT is silently never run. That is exactly how an integration
+            test can look green for weeks without executing once; the tag decides
+            whether it runs, the name must not.
+          -->
+          <includes>
+            <include>**/*Test.java</include>
+            <include>**/*Tests.java</include>
+            <include>**/*IT.java</include>
+            <include>**/*Eval.java</include>
+          </includes>
         </configuration>
       </plugin>
 

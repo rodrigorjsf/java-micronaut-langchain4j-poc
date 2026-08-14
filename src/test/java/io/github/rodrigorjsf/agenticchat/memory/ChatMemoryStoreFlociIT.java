@@ -52,7 +52,10 @@ class ChatMemoryStoreFlociIT {
                 "agentic.aws.secret-access-key", floci.getSecretKey(),
                 "agentic.valkey.host", floci.getHost(),
                 "agentic.valkey.port", floci.getMappedPort(RESP_PROXY_PORT),
-                "agentic.persistence.bootstrap-enabled", true));
+                "agentic.persistence.bootstrap-enabled", true,
+                // application-test.yml selects the in-memory backend so the ordinary
+                // suite needs no Docker. This test exists to exercise the real one.
+                "agentic.persistence.memory-backend", "write-through"));
 
         store = context.getBean(WriteThroughChatMemoryStore.class);
     }

@@ -27,7 +27,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class GuardrailChainTest {
 
-    private static final List<String> ALLOWED_HOSTS = List.of("brasilapi.com.br", "wikipedia.org");
 
     // ------------------------------------------------------------------ input
 
@@ -158,7 +157,17 @@ class GuardrailChainTest {
 
     private final SystemPromptCanary canary = new SystemPromptCanary();
     private final SystemPromptLeakageGuardrail leakage = new SystemPromptLeakageGuardrail(canary);
-    private final ExfiltrationGuardrail exfiltration = new ExfiltrationGuardrail(ALLOWED_HOSTS);
+    private final ExfiltrationGuardrail exfiltration = new ExfiltrationGuardrail(
+            new io.github.rodrigorjsf.agenticchat.guardrail.output.LinkAllowList(
+                    List.of(endpoint("brasilapi", "https://brasilapi.com.br/api"),
+                            endpoint("wikipedia-pt", "https://pt.wikipedia.org")),
+                    List.of()));
+
+    private static io.github.rodrigorjsf.agenticchat.tools.http.ApiEndpointProperties endpoint(
+            String name, String baseUrl) {
+        return new io.github.rodrigorjsf.agenticchat.tools.http.ApiEndpointProperties(
+                name, baseUrl, java.time.Duration.ofSeconds(6), 1, 32768, null);
+    }
 
     @Test
     void aResponseCarryingTheCanaryIsRemovedFromMemoryNotJustBlocked() {
