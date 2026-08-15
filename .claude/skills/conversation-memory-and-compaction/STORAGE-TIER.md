@@ -16,8 +16,10 @@ list lives*, not about what it contains.
   the correction they made two turns ago is gone.
 - **An in-process store is an explicit configuration choice, never a fallback.** The
   cache being down costs latency; the durable store being down has to fail the
-  request. Falling back holds the health check green while every conversation dies
-  at the next restart, and being per node, the loss looks intermittent, not total.
+  request. `agentic-service-composition` owns why a silent fallback is a cascading
+  failure; what is specific here is that the store is per node, so the loss arrives
+  as *some* turns remembering and some not — which reads as the model behaving
+  strangely, and gets diagnosed nowhere near storage.
 - **Validate the conversation id before it builds a storage key.** It arrives in a
   request and selects whose history is loaded, which makes it an authorization
   boundary wearing the costume of a string: a wildcard matches other conversations'

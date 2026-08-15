@@ -4,10 +4,10 @@ One block per seam, in the order of the table in `SKILL.md`. Every probe is
 written so that a small, empty or successful answer is the finding. **Record the
 actual output beside each one — a probe with no recorded output was not run.**
 
-Probes 1.3, 4.1, 6.6 and 7.3 deliberately break something to watch what happens,
-6.1 writes to the real store, and the gate flip that earns evals a 3 turns a
-required check off. Run them on a scratch branch, against a scratch conversation,
-and revert.
+Probes 1.3, 4.1, 5.3, 6.6 and 7.3 deliberately break something to watch what
+happens, 6.1 writes to the real store, and the gate flip that earns evals a 3
+turns a required check off. Run them on a scratch branch, against a scratch
+conversation, and revert.
 
 **Each numbered probe is one job, and the seam's score is the lowest of them**
 (`SKILL.md`, Step 2). A probe marked **fact-only** establishes a count, a cost or
@@ -19,6 +19,8 @@ Numbers marked *illustrative* are there to make a count meaningful, not to be
 quoted. Measure yours.
 
 ## 1. Model access
+
+Doctrine belongs to `agentic-service-composition`. These four establish facts.
 
 1. **Count the construction sites** of the provider client or chat-model object.
    More than one, or any inside a request-scoped path, is the finding. Each
@@ -34,13 +36,19 @@ quoted. Measure yours.
 3. **Boot with an identifier that does not exist.** Starting is the finding: the
    failure has moved to the first user request after the deploy. *Fix: one
    resolve-and-fail call at boot.*
-4. **Find the request timeout and the connection cap *this codebase chose*, and
-   write both numbers down.** The job is the choosing: nothing set anywhere
-   scores 0 however sane the SDK's own number turns out to be, because whatever
-   the SDK defaults to is now your bound and nobody read it. Across current SDKs
-   those defaults run from ten minutes to none. Then multiply the timeout by your
-   concurrency: that product is how many threads one hung upstream can hold. With
-   no timeout at all, load-shedding never fires, because nothing ever fails.
+4. **Find the four bounds *this codebase chose* on a model call, and write each
+   number down** — request timeout, connection cap, retry budget, and what opens
+   the circuit instead of retrying into a dependency that is already failing. The
+   job is the choosing: nothing set anywhere scores 0 however sane the SDK's own
+   number turns out to be, because whatever the SDK defaults to is now your bound
+   and nobody read it. Across current SDKs those defaults run from ten minutes to
+   none. Then multiply the timeout by your concurrency: that product is how many
+   threads one hung upstream can hold. With no timeout at all, load-shedding never
+   fires, because nothing ever fails. The last two are what **ASI08 Cascading
+   Failures** rests on at this seam: retries with nothing to stop them turn one
+   slow provider into a self-inflicted load test, and each retry is billed. *Fix:
+   choose all four at the one construction site; `agentic-tool-boundary` owns what
+   a bounded retry looks like.*
 
 ## 2. Prompt assembly
 
@@ -78,7 +86,11 @@ Doctrine belongs to `agentic-tool-boundary`. These are inventory queries.
    file path, connection string, query text, shell command. The list should be
    empty; whatever is on it is the first thing in the plan. (**ASI02 Tool Misuse
    & Exploitation**; anything that evaluates, templates, renders or shells out is
-   also **ASI05 Unexpected Code Execution (RCE)**.)
+   also **ASI05 Unexpected Code Execution (RCE)**.) For each survivor, record
+   **where it executes and what ends its blast radius** — the process the request
+   is served from, the identity it holds, what it can reach on the network. "In
+   the application process, as the application user" is the finding, and it is the
+   half of ASI05 that an allowlist of parameters does not answer.
 4. **Read the framework's *default* tool-error handler**, not yours, and record
    verbatim what the model would see. Assume nothing here.
 5. **Trigger the largest response each tool can produce and record the bytes.**
@@ -86,10 +98,22 @@ Doctrine belongs to `agentic-tool-boundary`. These are inventory queries.
    Illustrative bands for the report: over ~10 KB is a plan entry, over ~100 KB
    is the top of this section.
 6. **Table every tool against what it may reach** — network egress, the
-   credential it runs under, whether it can write. No scope column anywhere is
-   itself the finding (**ASI03 Identity & Privilege Abuse**).
+   credential it runs under, whether it can write. Ask of the credential column
+   whether it is the **caller's** authority or **one shared service identity**:
+   the second means a tool can read what the person who asked for it could not,
+   and the audit trail names the service (**ASI03 Identity & Privilege Abuse**).
+   No scope column anywhere is itself the finding.
 7. **Count tools with no test at all.** A tool is a public API with a stochastic
    caller.
+8. **Send one tool an argument its signature accepts and its contract forbids** —
+   a negative count, an id belonging to another caller, a date range spanning ten
+   years — and record **what objected, and where**. Rejected at the boundary is
+   the answer you want. Rejected inside the tool body is one tool's diligence, not
+   a boundary, and scores as the weakest path across the set. Nothing objecting
+   until the downstream system does means the model can drive that system directly
+   through the tool, one plausible-looking argument at a time (**ASI02**). What a
+   validated argument looks like belongs to `agentic-tool-boundary`; this probe
+   only records where the check is, and how many tools have none.
 
 ## 4. Discovery — tools and skills
 
@@ -111,8 +135,12 @@ Routing quality — which tool the model picks — belongs to
    constructor means entry 40 arrives by editing that constructor, and nobody
    re-counts 4.2 on the way past — fact-only scores nothing and is still the
    block every turn of every conversation pays for.
-4. **Ask where entries come from.** Anything resolved from outside the build is
-   **ASI04 Agentic Supply Chain Vulnerabilities** and needs pinning.
+4. **Ask where entries come from, and for anything resolved from outside the
+   build, write down what pins it** — a version, a digest, a lockfile line, a
+   signature. "The latest one on that endpoint" is the finding: the definition the
+   model was given last week is not the one it will be given tonight, nothing in
+   your repository changed, and no review saw the difference (**ASI04 Agentic
+   Supply Chain Vulnerabilities**).
 5. If the visible tool set is **reconstructed each turn from the conversation**,
    run probe 6.1 and confirm the activation marker survives your real store. This
    defect spans two seams and is invisible in either one alone.
@@ -121,7 +149,9 @@ Routing quality — which tool the model picks — belongs to
 
 A **census**, not a quality judgement. Detector quality belongs to
 `prompt-injection-layers`; whether this codebase should retrieve at all belongs
-to `retrieval-that-earns-its-place`. Two probes, and the seam takes the lower.
+to `retrieval-that-earns-its-place`; what a classifier does when it cannot answer
+in time belongs to `llm-triage-gate`. Three probes, and the seam takes the
+lowest.
 
 **5.1 — The inbound census.**
 Enumerate every path by which text the user did not type reaches (a) the next
@@ -161,8 +191,29 @@ c. an action with a real-world consequence — did anything ask first, and did i
 Any "no" is **ASI09 Human-Agent Trust Exploitation**: the user is being invited
 to trust output that has not earned it.
 
-*Fix, in order: the single outbound path that reaches the user, then the inbound
-path carrying the most untrusted bytes.*
+**5.3 — What the check does when it cannot answer.** Every check on 5.1's census
+is code that can throw, and most are a network call to a model that can be slow
+or rate-limited. Break each one in turn — make it raise, then make it exceed its
+timeout — and send a request it would have refused. Three outcomes, and you have
+to run it to know which one you have:
+
+- the request was served, and nothing recorded that the check did not run —
+  **fail-open and silent**, the traffic is unprotected and the graph still reads
+  green;
+- the request was served, and something recorded it — fail-open, deliberate or
+  not, and at least countable;
+- the request was refused — fail-closed, and now measure how often that happens,
+  because a detector that fails 1% of the time is a 1% outage.
+
+Nothing in any file is wrong in the first case, which is why this is the absence
+that survives code review: the handler that swallows the exception is the same
+handler a careful engineer wrote for every other dependency. Record the outcome
+and the recovery path; *whether* it should fail open is `llm-triage-gate`'s
+trade-off, and it is a different conversation from "nobody chose".
+
+*Fix, in order: the single outbound path that reaches the user, then the check
+that fails open silently, then the inbound path carrying the most untrusted
+bytes.*
 
 ## 6. Memory
 
@@ -236,6 +287,9 @@ suite — it is the difference between zero and non-zero, and
 
 ## 8. Observability
 
+Doctrine for the cost half belongs to `llm-cost-observability`; the rest of this
+seam owns no doctrine anywhere, it is plumbing. These six establish facts.
+
 1. **Take one real request id from yesterday and reconstruct the whole turn from
    telemetry alone**: every model call, every tool call and its outcome, every
    routing decision, every refusal. Whatever you cannot reconstruct is the
@@ -256,16 +310,29 @@ suite — it is the difference between zero and non-zero, and
 5. **Count the distinct values each metric label fed by model output can take.**
    "Whatever the model wrote" is unbounded: first a metrics bill, then dropped
    series, then the dashboard you were going to use during the incident.
+6. **List every way a turn can start.** An inbound request with a person waiting
+   on it is one. A schedule, a webhook, a queue message, a retry of a failed job,
+   another agent, or anything holding a standing credential is another — and each
+   one is a run that can go wrong with nobody watching. Two things come out of
+   this list. It **decides whether ASI10 Rogue Agents applies at all**: an
+   application whose every turn has a person waiting reports `n/a` with this probe
+   as the evidence, and one nightly job ends that. And for each non-human trigger,
+   record whether telemetry names **which trigger fired and on whose behalf** —
+   an unattended run you cannot attribute is one you cannot alert on, and it is
+   the run most likely to be somebody else's.
 
 ## 9. Sub-agents
 
 Doctrine belongs to `subagent-context-isolation`. These five establish facts.
 
 1. **Count the hops one request can take, and multiply.** Depth 3 with fan-out 4
-   is 4³ = 64 leaf model calls for one user turn. Then find the counter that
-   stopped it and record where it lives; a ceiling each new child receives a
-   fresh copy of is not one. The incident presents as a runaway bill rather than
-   as an error (**ASI08 Cascading Failures**).
+   is 4³ = 64 leaf model calls for one user turn. Then write down the three
+   ceilings and where each lives: **hops**, **steps per run**, **spend per run**.
+   A ceiling each new child receives a fresh copy of is not one — it has to be
+   decremented somewhere the whole run shares. Missing entirely, the incident
+   presents as a runaway bill rather than as an error (**ASI08 Cascading
+   Failures**); the fourth bound, the retry that re-enters a model call, is probe
+   1.4 at model access.
 2. **Ask whose credentials a sub-agent runs under, then diff its tool set against
    its parent's** and record what the child holds and never calls. Inheritance by
    default hands a summarising sub-agent the write tools of its parent

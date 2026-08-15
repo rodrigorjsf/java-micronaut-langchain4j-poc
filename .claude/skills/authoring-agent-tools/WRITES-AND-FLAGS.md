@@ -7,7 +7,11 @@ parameter survives the three buckets.
 
 The token the plan call mints is a value the model cannot construct, and that is
 the whole control: text injected into the conversation can talk a model into
-setting a boolean, and cannot make it produce a token the server minted.
+setting a boolean, and cannot make it produce a token the server minted. Showing
+the user the plan before the commit is also what closes **Human-Agent Trust
+Exploitation (ASI09)** of the OWASP Top 10 for Agentic Applications 2026 — an
+agent acting past what the turn authorised, because the user approved something
+described in the abstract and learned what it actually did afterwards.
 
 **A commit gets called twice.** The model retries on its own whenever a response
 is slow or a connection drops, and it retries by calling the tool again.

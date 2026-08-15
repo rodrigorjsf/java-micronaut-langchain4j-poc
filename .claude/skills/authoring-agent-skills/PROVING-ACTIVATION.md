@@ -13,12 +13,13 @@ tool — that is the uniqueness check, and it runs on the files.
 
 ## Routing: did it fire on the right turns
 
-Run the labelled set. **Fired for every must-fire turn** is reach; **did not fire for any near-miss**
-is exclusivity, and a set with no near-misses measures only the first. Score them as two numbers and
-never average them: a skill that fires on everything scores perfectly on reach.
+Run the labelled set **first**. It is the only check here that can fail *before* the skill is ever
+reached, and everything below assumes activation happened — read those results without this one and
+a routing miss gets attributed to the mount.
 
-This is the only check here that can fail *before* the skill is ever reached, which is why it runs
-first. Everything below assumes activation happened.
+Building the set and scoring the run are written down in `reviewing-agent-tools-and-skills` — read
+that file, or ask the user to run it; no skill can invoke it. What this file adds is the position:
+nothing below is diagnostic until this one is green.
 
 ## The lesson arrives, not just the tools
 
@@ -51,5 +52,5 @@ claiming traffic the body cannot serve — turns arrive, the body loads and is p
 remaining turn, and nothing in it answers them. That is the visible half of the over-firing /
 under-firing pair; the invisible half is why the labelled set exists at all.
 
-Split that share by whether a peer skill was active on the same turn. Two bodies in one window each
-carry a budget that cannot see the other, and a turn that straddles both is the turn that stalls.
+Split that share by whether a peer skill was active on the same turn: the turn that straddles two
+skills is the turn that stalls, and an unsplit share hides it inside the healthy one.

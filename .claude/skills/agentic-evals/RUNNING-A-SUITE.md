@@ -1,8 +1,8 @@
 # Running a suite
 
-The mechanics behind four rules in [`SKILL.md`](SKILL.md): pacing a live run,
-the floor that stops an empty run passing, what a drift report prints, and what
-an override has to record.
+The mechanics behind the rules in [`SKILL.md`](SKILL.md), which is where the
+rules themselves live: pacing a live run under a measured limit, what the
+`ran / total` and drift blocks print, and the four fields an override records.
 
 ## Pacing a live run under the measured limit
 
@@ -20,8 +20,7 @@ A run that pauses is cheaper than a run that produces a number nobody trusts.
 
 ## The floor: print `ran / total` every run
 
-Requiring at least half the rows is a reasonable default. The reason for
-printing the count even on a green run is that the failure this floor catches is
+Print the count even on a green run, because the failure the floor catches is
 silent by construction:
 
 ```
@@ -30,16 +29,13 @@ scope golden set:  ran 3 / 62   (59 skipped: quota)
 ```
 
 Every number on that run is true, and the run certifies nothing. Without the
-printed count it is indistinguishable from a clean pass in a build log.
-
-Report the three outcomes separately — passed, failed, skipped — and keep
-skipped out of both denominators. A single "58 failures" line merges an outage
-with a regression, which is the merge that costs an afternoon.
+printed count it is indistinguishable from a clean pass in a build log — so the
+skipped count sits on the same line as the rows that ran, with its cause.
 
 ## The drift report
 
-Drift is printed at the end of a run, in the build log, marked as advisory so
-nobody reads it as a failure:
+The block goes at the end of a run, in the build log, marked advisory so nobody
+reads it as a failure:
 
 ```
 intent drift (advisory, not gated):
@@ -48,9 +44,8 @@ intent drift (advisory, not gated):
 ```
 
 Two columns and a count: what the label was in the recorded set, what it is now,
-how many rows moved. Rows whose *decision* changed are failures and belong in
-the gated section above it — this block is only for rows that stayed right while
-their label moved.
+how many rows moved. Only rows that stayed right while their label moved print
+here; a changed decision is a failure in the gated section above.
 
 ## What an override records
 

@@ -21,7 +21,7 @@ text: the shipment answer tolerates a minute of staleness, the money answer does
 not. One tool serving both returns the union of two projections — the fat payload
 the answer-sentence pass just removed.
 
-The test is on the sentence list: run the answer sentence for each cluster of
+The test is on the working list: run the answer sentence for each cluster of
 sentences. Two answer sentences with disjoint field sets are two tools.
 
 ## A parameter that is really a mode

@@ -48,9 +48,23 @@ writes a customer-facing recap. Two instructions earn their tokens:
 Give it one agreed word for "nothing worth carrying forward", and treat that word as
 an empty summary rather than as an error.
 
-## Illustrative thresholds
+## Calibrating the trigger
 
 From one deployment: a 14 400-token trigger, a six-message anchor, a 1 600-character
-per-result cap. **Transfer the shape, not the numbers** — the trigger belongs where
-accuracy starts falling for your model and your prompt, measured, not where the
-context window happens to end.
+per-result cap. **Transfer the shape, not the numbers** — and do not expect to read a
+trigger off a curve, because there is no knee to find. Accuracy falls continuously
+with length, measurably by 3 000 tokens, so any trigger you pick is already past the
+point where something was lost.
+
+Measure both sides of the trade instead:
+
+- **What length costs you.** Replay a graded set of turns against histories of
+  growing length — 2 k, 8 k, 16 k, 32 k — and find where your task's accuracy leaves
+  the band you are willing to ship.
+- **What the pass costs you.** One summariser call per firing, a cache-invalidating
+  prefix rewrite, and one more chance to drop state that no user will report.
+
+Put the trigger where the first exceeds the second, and re-measure when the model or
+the standing prompt changes — it is a property of both. Never where the context
+window ends: that number is the provider's, and reaching it is a failure, not a
+threshold.

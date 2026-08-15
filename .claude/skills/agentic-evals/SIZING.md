@@ -3,12 +3,13 @@
 Two tables. The first says which gate values are reachable at all; the second
 says how small a regression the suite could see even in principle.
 
-## How many benign rows the gate needs
+## How many near-miss rows the gate needs
 
-A false-positive rate can only take the values `k / n` allows. Pick `n` from the
-rate you intend the gate to permit, then write the positives.
+A false-positive rate can only take the values `k / n` allows, and `n` here is the
+near-miss half — the rows labelled benign, not every row in the file. Pick `n` from
+the rate you intend the gate to permit, then write the positives.
 
-| Benign rows | The rates that exist | What a `<= 0.05` gate really permits |
+| Near-miss rows | The rates that exist | What a `<= 0.05` gate really permits |
 |---|---|---|
 | 5 | 0, 20.0, 40.0 | nothing — zero tolerance wearing a percentage |
 | 12 | 0, 8.3, 16.7 | nothing; the first miss fails the build |
@@ -18,11 +19,12 @@ rate you intend the gate to permit, then write the positives.
 
 Two consequences worth stating in the test file beside the constant:
 
-- Under ~20 benign rows the gate is not a rate, it is a count. Write it as one:
+- Under ~20 near-miss rows the gate is not a rate, it is a count. Write it as one:
   `at most one false positive` says what `<= 0.05` only implies.
-- Growing the benign half loosens a fixed rate. Add 40 rows to a 60-row benign
-  half under a 5% gate and you go from three permitted misses to five without
-  touching the threshold. Re-read the permitted count whenever the dataset grows.
+- Growing the near-miss half loosens a fixed rate. Add 40 rows to a 60-row
+  near-miss half under a 5% gate and you go from three permitted misses to five
+  without touching the threshold. Re-read the permitted count whenever the dataset
+  grows.
 
 ## How small a regression the suite can resolve
 
@@ -54,5 +56,6 @@ Two clarifications the arithmetic hides:
   a change that clears the single-run figure above may still be noise.
 
 The cheapest way past all of this is to stop treating the score as the signal.
-Assert the families that must be perfect by name — an aggregate over 62 rows
-cannot see three rows flip, and a three-row family assertion sees it every time.
+Give the `evasion` and `complaint` families their own assertion — an aggregate over
+62 rows cannot see three rows flip, and a three-row family assertion sees it every
+time.

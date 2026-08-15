@@ -15,14 +15,15 @@ Bought per item, not per layer. Both rows read the routing run.
 
 Reach and exclusivity move against each other, which is the point of scoring
 both. A description widened until it catches everything scores 2 on reach and 0
-on exclusivity, and its neighbour's reach collapses in the same run. Read them
-as a pair, and read them off the confusion table rather than off the hit rate:
-the hit rate is one number and it moves for two opposite reasons.
+on exclusivity, and its neighbour's reach collapses in the same run — so score
+the neighbour in the same run, and read both rows off the confusion table's
+cells rather than off any total the run reports.
 
 ## The bands
 
-Both tiers scored is six rows out of 12. Each band buys exactly one of the
-verdicts `SKILL.md` closes on:
+Both tiers scored is six rows out of 12. Each band buys exactly one of the six
+**item** verdicts `SKILL.md` closes on. The seventh, *capability gap*, belongs to
+the layer and is reachable from no band:
 
 | Band | Score | Verdict it buys |
 |---|---|---|
@@ -31,13 +32,17 @@ verdicts `SKILL.md` closes on:
 | Bottom | ≤5 | structural: *rewritten, not edited*, *merge into `<named item>`*, *moved behind an activation*, or *retire in two steps* |
 
 The bands assume six rows. With a row dropped as *not yet measurable*, scale
-them to the denominator you actually have before reading off a band.
+them to the denominator you actually have before reading off a band — except
+pre-launch, where both traffic-fed rows are missing at once and `SKILL.md` sends
+the whole layer to the routing run rather than to a band.
 
-**A row scores *not yet measurable* only when the measurement does not exist
-yet** — no traffic window, no log retention that reaches back far enough. A row
-you could have measured and did not scores 0. The distinction decides whether
-the item is a finding or a gap in your instrumentation, and one sweep later
-nobody remembers which it was.
+**A row scores *not yet measurable* only when its denominator does not exist** —
+no traffic window, no log retention reaching back far enough, no calls to divide
+by, or no goal attribution to correlate on, which is the usual reason First-call
+correction is unscoreable on a launched layer (`llm-cost-observability` owns the
+tagging that fixes it). A row you could have computed from data you already hold
+and did not scores 0. The distinction decides whether the item is a finding or a
+gap in your instrumentation, and one sweep later nobody remembers which it was.
 
 ## Calibrating the anchors
 
