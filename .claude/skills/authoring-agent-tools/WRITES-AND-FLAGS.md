@@ -3,15 +3,15 @@
 Reached from `SKILL.md` when the tool changes anything, or when a boolean
 parameter survives the three buckets.
 
-## The two-call contract, and the call that replays it
+## The token, and the call that replays it
 
-Above cost tier one the tool is a plan call and a commit call. The plan call
-performs nothing and returns what *would* happen plus an opaque token; the commit
-call takes only that token.
-
-The token is a value the model cannot construct, and that is the whole control:
-text injected into the conversation can talk a model into setting a boolean, and
-cannot make it produce a token the server minted.
+The token the plan call mints is a value the model cannot construct, and that is
+the whole control: text injected into the conversation can talk a model into
+setting a boolean, and cannot make it produce a token the server minted. Showing
+the user the plan before the commit is also what closes **Human-Agent Trust
+Exploitation (ASI09)** of the OWASP Top 10 for Agentic Applications 2026 — an
+agent acting past what the turn authorised, because the user approved something
+described in the abstract and learned what it actually did afterwards.
 
 **A commit gets called twice.** The model retries on its own whenever a response
 is slow or a connection drops, and it retries by calling the tool again.
@@ -29,7 +29,7 @@ is slow or a connection drops, and it retries by calling the tool again.
 
 Where an effect is irreversible, regulated, or spends money, the tool is not an
 actuator at all: it files a request a human approves, and the record is keyed to
-the authenticated caller from interview question 4, never to the model.
+the authenticated caller the system bucket supplies, never to the model.
 
 ## The flag trichotomy
 

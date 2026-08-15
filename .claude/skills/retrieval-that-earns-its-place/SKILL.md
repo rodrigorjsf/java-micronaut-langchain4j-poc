@@ -109,6 +109,7 @@ turn it off.
 
 ## Warm the model at startup
 
-An in-process embedding model can take seconds to load — measured at **5.7 s**
-for a quantized MiniLM. Load it eagerly at boot. Lazily, one unlucky user pays
-the entire cold start on a request that looked like everyone else's.
+An in-process embedding model can take seconds to load. Load it eagerly at boot;
+lazily, one unlucky user pays the entire cold start on a request that looked like
+everyone else's. `agentic-service-composition` carries the measured figure and
+the reason eager beats lazy for more than latency.
