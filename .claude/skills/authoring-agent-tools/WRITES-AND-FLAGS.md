@@ -25,7 +25,7 @@ is slow or a connection drops, and it retries by calling the tool again.
 
 Where an effect is irreversible, regulated, or spends money, the tool is not an
 actuator at all: it files a request a human approves, and the record is keyed to
-the authenticated caller from interview question 4, never to the model.
+the authenticated caller the system bucket supplies, never to the model.
 
 ## The flag trichotomy
 

@@ -1,19 +1,18 @@
 # Coverage lens — OWASP Top 10 for Agentic Applications 2026
 
-## What is confirmed, and what is not
+## Where the ten come from
 
-The ten identifiers `ASI01`–`ASI10` and the ten topics they name are confirmed:
-the OWASP GenAI Security Project published the *OWASP Top 10 for Agentic
-Applications 2026* on 9 December 2025, and independent secondary summaries agree
-on the set.
+The OWASP GenAI Security Project published the *OWASP Top 10 for Agentic
+Applications*, version 2026, on **9 December 2025**, under its Agentic Security
+Initiative: <https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/>.
+The identifiers and titles in the map below are that document's own, taken from
+its contents page and its contributor list (fetched 14 August 2026). Inside the
+document ASI02 and ASI03 appear with both "and" and "&" — that is typography, not
+a second name.
 
-The exact **titles** do not agree between sources. ASI02 appears as both "Tool
-Misuse" and "Tool Misuse & Exploitation"; ASI03 as "Identity & Privilege Abuse"
-and "Agent Identity & Privilege Abuse"; ASI04 as "Agentic Supply Chain
-Vulnerabilities" and "Agentic Supply Chain Compromise"; ASI05 sometimes carries
-"(RCE)"; ASI08 as "Cascading Failures" and "Cascading Agent Failures". Treat the
-identifiers below as exact and the wording as approximate — check a title against
-the published document before quoting it in anything anyone signs.
+Secondary summaries retitle several items — "Agentic Supply Chain Compromise",
+"Cascading Agent Failures", "Agent Identity & Privilege Abuse". Those are the
+summarisers' words, not OWASP's; quote the map.
 
 **The seam mapping, the "covered when" column and the triggers are this skill's
 own, not OWASP's.** The published document maps its items to OWASP's own threats
@@ -27,16 +26,18 @@ and mitigations taxonomy, which is a different exercise from this one.
 | **ASI02 Tool Misuse & Exploitation** | tool boundary | no parameter names a destination, arguments are validated before the call, and each tool carries its own authority rather than the union of all of them |
 | **ASI03 Identity & Privilege Abuse** | tool boundary | a call runs with the caller's authority rather than one shared service identity, so it cannot reach data the caller could not |
 | **ASI04 Agentic Supply Chain Vulnerabilities** | discovery | every tool, server and skill definition the model can reach is pinned and resolved at startup, so a changed definition cannot take effect silently |
-| **ASI05 Unexpected Code Execution** | tool boundary | no tool accepts code, a shell command, a query language or a template; where one must, it runs somewhere its blast radius ends |
+| **ASI05 Unexpected Code Execution (RCE)** | tool boundary | no tool accepts code, a shell command, a query language or a template; where one must, it runs somewhere its blast radius ends |
 | **ASI06 Memory & Context Poisoning** | memory | code decides what enters durable memory, not whatever text arrived |
 | **ASI07 Insecure Inter-Agent Communication** | sub-agents | a message from another agent is authenticated, and its content is handled as data |
 | **ASI08 Cascading Failures** | sub-agents | a hop budget, a per-run step and cost ceiling, and a breaker that opens instead of retrying into a failing dependency |
 | **ASI09 Human-Agent Trust Exploitation** | guardrails, output side | truncation is announced, an action with a consequence is confirmed against what will happen, and a refusal is distinguishable from an answer |
 | **ASI10 Rogue Agents** | observability | every run is attributable to a trigger and a principal, and a run that starts behaving differently is visible in telemetry rather than in a support ticket |
 
-Read it in **one direction only**: for each item, name the seam and read the
-score off the table. *"ASI06 is uncovered because the memory seam scored 0"* is
-the sentence this audit exists to produce.
+Read it in **one direction only**: for each item, name the seam, read the score
+off the table, and turn the score into a verdict — **uncovered** at 0 or 1,
+**covered** at 2 or 3, **n/a** plus a trigger where the seam does not exist yet.
+*"ASI06 is uncovered because the memory seam scored 0"* is the sentence this
+audit exists to produce.
 
 ## Three cautions while you fill it in
 
@@ -44,9 +45,11 @@ the sentence this audit exists to produce.
 added will not — that is a gap with a date on it rather than a gap with a
 location, and it reads as covered to anyone skimming.
 
-**An absent seam covers nothing silently.** A codebase with no sub-agents leaves
-ASI07 *not applicable*, never *covered*. Write `n/a — no sub-agents` plus its
-trigger, so the next auditor reads a decision instead of a blank.
+**`absent` and `n/a` answer differently.** A seam that applies and does nothing —
+`absent`, score 0 — leaves its items **uncovered**, and they belong in the plan. A
+seam the architecture does not have yet is `n/a`: a codebase with no sub-agents
+leaves ASI07 *not applicable*, never *covered*. Write `n/a — no sub-agents` plus
+its trigger, so the next auditor reads a decision instead of a blank.
 
 **One item, one seam is a simplification.** The table gives each item its primary
 seam; several have a second:

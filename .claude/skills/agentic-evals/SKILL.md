@@ -1,6 +1,6 @@
 ---
 name: agentic-evals
-description: Prove a prompt, classifier or tool-description change safe before it ships. Use when a prompt changes and someone has to show nothing regressed, when building a labelled dataset for a guardrail or classifier, when deciding what a build gates on versus what it only reports, when a reworded tool description might steal traffic from a sibling tool, or when a case fails and the case may be the thing that is wrong.
+description: Prove a prompt, classifier or guardrail change safe before it ships. Use when a prompt changes and someone has to show nothing regressed, when building a labelled dataset for a guardrail or classifier, when deciding what a build gates on versus what it only reports, when an LLM judge is scoring another model's output, or when a case fails and the case may be the thing that is wrong.
 ---
 
 # Evals that gate a change
@@ -34,86 +34,101 @@ evals:
 | Deterministic assertion | The regression it catches |
 |---|---|
 | every refusal offers an alternative and stays under a character cap | a prompt edit that turns refusals into lectures |
-| compaction preserves the state that gates behaviour | a summarised-away capability marker, so the agent silently loses its tools |
+| compaction preserves the state that gates behaviour | a summarised-away capability marker, and the agent silently loses a tool nobody removed |
 | the standing prompt is byte-identical across turns | an interpolated timestamp that ends every prompt-cache hit |
+| every few-shot example in the prompt is one the component's own stated rules label the same way | a policy edit that rewrites the rules and leaves the examples teaching the rule they replaced — and a model follows the examples |
 
-The compaction row is what *keeps* **Memory & Context Poisoning (ASI06)** in the
-OWASP Top 10 for Agentic Applications 2026 closed: the compaction rule is the
-control, and without the assertion it holds only until the next person edits the
-summariser.
-
-**A failing gate names the row, not only the number.** `expected >= 0.90, got
-0.87` costs a re-run with logging turned on before anyone can start work. Print
-every miss with its id and family.
+**A failing gate names the row, not only the number**, because `expected >= 0.90,
+got 0.87` costs a re-run with logging turned on before anyone can start work.
 
 ## Building the near-miss half
 
-The dataset is a file in the repository, reviewed like code, **rows in a stable
-order — never generated, never shuffled**; several rules below are enforced by
-reading a diff.
-
-A row is `{id, family, label, reason, text}`. `id` is stable, so a failure names a
-row you can open; `family` groups rows by the mechanism they exercise, so a
-failure names what to look at; `reason` is one line written when the row is
-created, and is the only defence you have the day the row fails.
-
-The positive half writes itself. **The benign half decides whether the component
-stays switched on**, and it is usually an afterthought — obviously normal
-messages no rule would fire on, proving nothing.
-
-**Derive the candidates from your own rules, then pair each one.** Walk the list
-of patterns, keywords and thresholds the component fires on; for each, write the
-sentence a real user would send that contains it, and keep it beside the positive
-it neighbours — same words, different intent.
+The dataset is a file in the repository with **rows in a stable order — never
+generated, never shuffled**, because several rules below are enforced by reading a
+diff. A row is `{id, family, label, reason, text}`: `id` stable, so a failure names
+a row you can open; `family` grouping rows by the mechanism they exercise, so a
+failure names what to look at; `reason` written when the row is created, and the
+only defence you have the day the row fails.
 
 ```
-BAD    benign rows written as "normal traffic"
+{ id: "near-miss-014", family: "delete-verb", label: "benign",
+  text: "what happens to my data if I delete my account?",
+  reason: "reported false positive, 2025-03 — the verb is in a question about
+           consequences, not in a request to act" }
+```
+
+The positive half writes itself. The **near-miss half** is where the work is: rows
+the component must label benign, each built to look like the thing being caught.
+
+**Derive the candidates from your own rules, then pair each one.** Walk the list
+of patterns, keywords and thresholds the component fires on, and for each write
+the sentence a real user would send that contains it. A mechanical walk with a
+definite end.
+
+```
+BAD    near-misses written as "normal traffic"
        "hi"   "thanks!"   "where is my order"
 
 GOOD   walking a destructive-intent detector's list (delete/cancel/reset/remove)
        positive   "delete my account"
        near-miss  "what happens to my data if I delete my account?"
-
        positive   "cancel everything on this account"
        near-miss  "how do I cancel my subscription at the end of the term?"
 ```
 
-A **minimal pair** differing in one clause tells you which clause your rule keys
-on. A positive lifted from a security write-up and a benign row lifted from a
-product FAQ differ in a hundred ways, and a failure on either tells you nothing.
+Keep each one beside the positive it neighbours. A **minimal pair** — same words,
+different intent — tells you which clause your rule keys on; a positive lifted
+from a security write-up and a near-miss lifted from a product FAQ differ in a
+hundred ways, and a failure on either tells you nothing.
 
 **Every false positive anyone reports becomes a permanent row, before the fix
-lands.** The dataset is a regression log, not a sample of traffic; a complaint
-fixed without a row comes back.
+lands** — the dataset is a regression log, not a sample of traffic, and a
+complaint fixed without a row comes back.
 
-**Choose the benign count before writing the positives.** A rate can only take
-the values its denominator allows: on 28 benign rows a `<= 0.05` gate permits
-exactly one miss and fails on the second, and on 5 rows it permits none at all
-while reading as tolerant. Size sets resolution too — 62 rows scoring 0.90 put
-the true rate within roughly ±7.5 points, so a two-point regression is invisible
-there and resolving one takes about a thousand rows. Before fixing a count, read
-[`sizing.md`](sizing.md).
+**Choose the near-miss count before writing the positives.** A rate can only take
+the values its denominator allows: on 28 near-miss rows a `<= 0.05` gate permits
+exactly one miss and fails on the second. The count also sets how small a
+regression the suite can see at all. Before fixing a count, read
+[`SIZING.md`](SIZING.md).
 
-**Assert the two families that must be perfect, individually.** An aggregate
+**The rule walk sets the floor, the gate sets the target.** Nine rules yield nine
+near-misses; gate on a rate that needs 28 and you owe nineteen more, as reported
+false positives plus minimal pairs on the rules that misfire most often. A
+component with too few rules to reach the count is not padded up to it: it gates
+on a count rather than a rate, which is `SIZING.md`'s own rule.
+
+**Assert two families by name rather than through the aggregate.** An aggregate
 hides a regression by design — one new false positive in twenty-eight sits inside
-a 5% gate and is still a bug you shipped. The **evasion set**, rewrites of a
-positive you already catch (encoding variants, spacing, padding), where one slip
-means the normalising step regressed and the aggregate barely moves. And the
-**tricky benign set**, near-misses that were once real complaints, each asserted
-by name.
+a 5% gate and is still a bug you shipped. Both families exist in any component:
 
-For a guardrail this dataset is what keeps **Agent Goal Hijack (ASI01)** from
-reopening. The dataset is not the control — the guardrail is. It stops the
-control being narrowed away one reasonable-looking commit at a time.
+- the **evasion family** — rows differing from one you already handle only by a
+  transformation the component is meant to be blind to: encoding, spacing and
+  padding for a detector, a misspelling or a synonym for a retrieval query, a
+  rephrasing for a classifier. One slip there means the shared normalising step
+  regressed, and the aggregate barely moves.
+- the **complaint family** — every row that came from a real reported failure.
+  Each one has already cost somebody a support thread, so a regression there is a
+  repeat, and the user reporting it the second time stops reporting.
 
-**The procedure generalises past detectors.** For a retrieval layer each row pairs
-a question with the document that should come back — **including rows whose
-expected result is nothing at all**. Those expected-misses are the benign half;
-without them the layer passes every test it has while answering unrelated
-questions anyway.
+For a guardrail, this dataset is what stops **Agent Goal Hijack (ASI01)**
+reopening: the guardrail is the control, the dataset is what keeps it from being
+narrowed away one reasonable-looking commit at a time.
+
+**Rows generalise past detectors.** For a retrieval layer each row pairs a
+question with the document that should come back — **including rows whose expected
+result is nothing at all**. Those expected-misses are that component's near-miss
+half; without them the layer answers unrelated questions while passing every test
+it has.
+
+**With no suite at all and a change to ship today, the first pass is three rows,
+not a dataset:** the rule the change actually touches, one evasion row against it,
+and one complaint row — or, before anyone has complained, the near-miss that pairs
+that rule. Each is asserted by name in the file the change lives in. Three
+rows that fail by name beat a sixty-row set next quarter, and every rule above is
+a way to grow them.
 
 **The dataset is finished when** every rule in the component's list has at least
-one benign row, every positive has a paired near-miss, and every false positive
+one near-miss row, every positive has a paired near-miss, and every false positive
 anyone has reported has a row. Short of that, the score measures the rows someone
 found easy to write.
 
@@ -123,11 +138,10 @@ A **level-2 eval** runs the real component against a real model on labelled rows
 Tag it to run on demand and before a release, and keep it out of the commit gate:
 it needs a key, it costs money, it depends on someone else's rate limit.
 
-**Build it around the boundary.** Straightforward rows catch a catastrophic
-regression and nothing else. The rows that earn their place are the ones a careful
-colleague could argue about — the request that is vague but servable, the hostile
-message that also carries a genuine question, the plausible request that nothing
-you built actually serves.
+**Build it around the boundary** — the request that is vague but servable, the
+hostile message that also carries a genuine question, the plausible request
+nothing you built serves. Straightforward rows catch a catastrophic regression
+and nothing else.
 
 **Ask where each label came from.** A label written by the author of the prompt
 under test, or generated by the model under test, measures agreement with the
@@ -135,29 +149,40 @@ thing being tested, and the row passes by construction. Have two people label a
 sample independently, and **set no gate above the rate at which they agreed** — a
 threshold above your own labelling agreement measures the labellers.
 
+**When they agreed on only 0.70 of the sample, the labels are the defect and the
+gate is not where you absorb it.** Read the rows they split on — usually two rules
+of the component's own policy collide there. Rewrite the rule until a third person
+reproduces the labels and measure agreement again; rows still ambiguous after that
+are not gate material. A 0.70 gate over a set nobody can label twice is a number
+that moves when the labellers do.
+
 **Keep the golden rows disjoint from the prompt's few-shot examples**, for the
 same reason. Diff the two files; the intersection should be empty.
 
 **A judge is an unevaluated classifier.** When the scorer is itself a model —
 grading an answer for helpfulness, faithfulness or tone — it carries every defect
 you are gating against, and none of them have been measured. Before one of its
-verdicts gates anything, give it its own small human-labelled set and score it
-exactly as above. Then ask it for a **pairwise** verdict against a baseline
-answer — which of these two is better — rather than an absolute 1–5 score it
-cannot hold steady between runs. Present each pair in both orders and count a win
-only when it survives the swap: that one move removes position bias and most of
-the judge's preference for whichever answer is longer.
+verdicts gates anything, give it its own human-labelled set — illustratively 50
+rows, sized off [`SIZING.md`](SIZING.md) like any other — and score it exactly as
+above, agreement ceiling and low-agreement remedy included. Then ask it for a
+**pairwise** verdict against a baseline answer — which of these two is better —
+rather than an absolute 1–5 score it cannot hold steady between runs, and present
+each pair in both orders, counting a win only when it survives the swap: that
+removes position bias and most of the judge's preference for the longer answer.
 
-**A tool-description change is provable here and nowhere else:** a set of user
-turns, each labelled with the tool that should be selected. A rewording that
-steals traffic from a sibling tool changes no code and breaks no functional test.
+**A tool-description change is a level-2 change**, proved by a set of user turns
+each labelled with the item that should fire: no code changes, so no functional
+test can break. This skill owns how a dataset is built and sized;
+[`../reviewing-agent-tools-and-skills/ROUTING-SET.md`](../reviewing-agent-tools-and-skills/ROUTING-SET.md)
+owns that set and the before/after run it feeds. What follows applies to it as to
+any live set.
 
-**One run is one sample — here, not at level 1.** A deterministic suite
-reproduces its own number exactly; a live one does not, so a gate set at the
-number you measured once will flap. Measure **five runs**, set the gate below the
-worst of them, and treat *re-running until green* exactly as you treat editing a
-case until green. If the spread across five runs is wider than the regression you
-want to catch, the gate cannot see it at all.
+**One run is one sample — here, not at level 1.** A deterministic suite reproduces
+its own number exactly; a live one does not, so a gate set at the number you
+measured once will flap. Measure **five runs**, set the gate below the worst, and
+treat *re-running until green* exactly as you treat editing a case until green. If
+the spread across five runs is wider than the regression you want to catch, the
+gate cannot see it at all.
 
 ## Asymmetric gates: two numbers, two denominators
 
@@ -187,47 +212,39 @@ or cannot undo, is expensive.**
 | confirmation before a destructive tool | one extra confirmation | an irreversible action nobody approved |
 | an extractor filling a record from a message | one clarifying question you did not need | a wrong value written where nobody re-reads it |
 
-**Every threshold constant carries three things** — the expensive error it is
-named after, how many failures it actually permits, and the smallest change the
-suite can resolve. A bare `0.05` is a number nobody defends when it fails.
-`MAX_FALSE_REFUSAL_RATE = 0.05`, annotated *a real user turned away; 2 of the 40
-servable rows; below ±7 points this suite cannot tell a change from noise*, is a
-number someone argues about before lowering it.
+**Every threshold constant carries three things** — the expensive error it is named
+after, how many failures it actually permits, and the smallest change the suite can
+resolve. `MAX_FALSE_REFUSAL_RATE = 0.05`, annotated *a real user turned away; 2 of
+the 40 servable rows; on 40 rows nothing finer than about 9 points is visible
+(`SIZING.md`)*, is a number someone argues about before lowering it. A bare `0.05`
+is not.
 
-## Drift: report what you cannot act on
+Read that third figure off the denominator the rate actually divides by, not off
+the size of the set: a false-refusal rate is estimated from the servable rows
+alone, and there are always fewer of those than there are rows.
 
-Gate the outputs that change what the user gets. **Print** the outputs that only
-change a dimension — a secondary label, a confidence band, a chosen template:
+## Drift and skipped: two things a run reports without failing on
 
-```
-intent drift (advisory, not gated):
-  address  -> company     3
-  greeting -> smalltalk   1
-```
+A build going red for something that is not a regression teaches the team to
+ignore red, which costs you the gate itself. Two cases earn a report instead.
 
-A secondary label moves on every model version for reasons unrelated to your
-change, and a build going red for a reason nobody acts on teaches the team to
-ignore red. Drift is still a regression: a decision that stayed right while its
-label moved breaks whatever keys on that label — a metric dimension, a template
-lookup, a routing hint. Promote a pair to a gate the moment one of those exists.
+**Labels that moved are drift: print them, do not gate them.** Gate the outputs
+that change what the user gets; a secondary label, a confidence band or a chosen
+template moves on every model version for reasons unrelated to your change. Drift
+is still a regression waiting for a consumer — a decision that stayed right while
+its label moved breaks whatever keys on that label. Promote a pair into the gate,
+and out of the drift report, the moment a metric dimension, a template lookup or a
+routing hint reads it.
 
-## A skipped case is not a failure
+**A skipped case is not a failure.** A quota error, a provider 5xx and a timeout
+are not wrong answers. Count them **skipped** and exclude them from both
+denominators. Scoring an infrastructure error as a classification error breaks the
+number in the most expensive direction: it looks like a quality regression, so
+someone spends an afternoon changing a prompt that was fine.
 
-A quota error, a provider 5xx and a timeout are not wrong answers. Count them
-**skipped** and exclude them from both denominators. Scoring an infrastructure
-error as a classification error breaks the number in the most expensive
-direction: it looks like a quality regression, so someone spends an afternoon
-changing a prompt that was fine.
-
-**Pace the runner under the measured limit.** Free tiers cut off far lower than
-the paid documentation suggests — one measured at roughly 10–20 requests per
-minute, so the runner waits ten seconds between rows. Measure yours rather than
-reading it off a pricing page.
-
-**Fail the run if too few rows ran.** Without this floor the skip rule degenerates
-into its own worst failure: every row rate-limited means zero rows ran, accuracy
-over zero rows offends no threshold, and the suite is green while measuring
-nothing. Require at least half the rows, and print `ran / total` every run.
+**Then fail the run if too few rows ran.** Without that floor the skip rule
+degenerates into its own worst failure: every row rate-limited means zero rows
+ran, and accuracy over zero rows offends no threshold.
 
 ## When the case is the thing that is wrong
 
@@ -235,26 +252,25 @@ Sometimes the component is right and the label was wrong. This is the moment the
 suite is most likely to be quietly destroyed, so it gets a bar.
 
 **Change a row only when you can state the rule it now violates without
-mentioning the build.** "The scope document puts questions about the assistant in
-scope, and this row is labelled out" is a reason; "it fails now" is not. The
-discriminator: would you have labelled it this way *before* seeing the failure? If
-you cannot answer that without reading the diff, the row stands and the change
-under test is the thing that is wrong.
+mentioning the build.** The discriminator: would you have labelled it this way
+*before* seeing the failure? If you cannot answer without reading the diff, the
+row stands and the change under test is the thing that is wrong.
 
-**When the row was genuinely ambiguous, splitting beats editing.** Replace it with
-two rows that are each unarguable, or move it to the advisory drift set. A row two
-people read differently measures the reader.
+**When the row was genuinely ambiguous, splitting beats editing** — two rows that
+are each unarguable, or one moved to the advisory drift set. A row two people read
+differently measures the reader.
 
-**Change the row in its own commit,** separate from the change that made it fail,
-with the reason in the message. A golden set edited quietly to make a build green
-is worse than no golden set: it still prints a number, and the number no longer
-means anything.
+**Change the row in its own commit,** with the reason in the message. A golden set
+edited quietly to make a build green still prints a number, and the number no
+longer means anything.
 
-**When the gate fails and the change ships anyway, override it by name** — one
-documented switch recording who overrode which gate and when the override
-expires. The move people reach for instead is lowering the constant, which is
-permanent, silent, and afterwards indistinguishable from a threshold someone
-reasoned about.
+**When the gate fails and the change ships anyway, override it by name** rather
+than lowering the constant until the run is green.
+
+When a run comes back red for a reason nobody can act on, green on a handful of
+rows, or red on the day the change must ship, read
+[`RUNNING-A-SUITE.md`](RUNNING-A-SUITE.md) — pacing, the `ran / total` floor, the
+drift printout, and what an override records.
 
 ## Reviewing an eval suite
 
@@ -267,5 +283,5 @@ Ask, in order:
    denominator.
 3. Where did the labels come from, and do any of the rows also appear in the
    prompt?
-4. In the dataset's history, does every edited label carry a reason, in its own
+4. Does every edited label in the dataset's history carry a reason, in its own
    commit?

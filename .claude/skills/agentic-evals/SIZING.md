@@ -32,6 +32,7 @@ band around it is roughly `±1.96 · sqrt(p(1-p)/n)` — at `p = 0.90`:
 | Rows scored | Band around a 0.90 score | A regression smaller than this is invisible |
 |---|---|---|
 | 30 | ±10.7 points | 11 points — a collapse, and nothing finer |
+| 40 | ±9.3 points | 10 points |
 | 62 | ±7.5 points | 8 points |
 | 100 | ±5.9 points | 6 points |
 | 250 | ±3.7 points | 4 points |

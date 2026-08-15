@@ -46,9 +46,6 @@ label is what it is — "reads like a delivery question; the answer is in the
 return window" — because a boundary turn with no stated reason gets relabelled
 by whoever disagrees with the result.
 
-Orphan turns are what keep a widened description honest. Without them, the
-cheapest way to raise every reach score is to make every description broader.
-
 ## Writing a sequence case
 
 A sequence case labels a turn with an ordered pair, and it exists because the
