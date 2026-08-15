@@ -10,9 +10,7 @@ A **seam** is where the system meets something it does not control: the model
 provider, a tool, retrieved text, a stored conversation, another agent. Agentic
 systems fail at seams, and they fail mostly by **absence** — the thing that would
 have caught it was never written, so no diff is wrong and there is no line to
-point at.
-
-Four absences, none of which looks like a bug in any single file:
+point at. Four absences, none of which looks like a bug in any single file:
 
 - a provider client constructed inside the request path — nothing is *wrong*, and
   the connection count now tracks traffic instead of capacity;
@@ -40,7 +38,7 @@ GOOD  "Searched the client package for a timeout setting: 0 hits. The SDK
        default applies — look it up and write the number down."
 ```
 
-The GOOD form produces evidence you can paste. The BAD form produces an opinion,
+The GOOD form produces evidence you can paste; the BAD form produces an opinion,
 and an opinion loses the argument with whoever wrote the code.
 
 This audit names **checks, not rules**. Where your catalogue already has a skill
@@ -74,13 +72,21 @@ the working part of this skill.
 ## Run it in this order
 
 **Step 1 — Locate.** Work the shape column, seam by seam. Output is nine rows,
-each naming a `file:symbol` or the word `absent`.
+each naming a `file:symbol`, or `absent`, or `not yet probed`.
 
-A blank cell is a seam you forgot. `absent` is your loudest finding and it stays
-in the report — deleting the row is how a codebase with no evals and no hop
-budget gets a clean audit. **Every `absent` carries the trigger** that will make
-it applicable: the first fan-out, the first uploaded document, the second tenant.
-An absence without a trigger decays into "we forgot" inside two quarters.
+A blank cell is a seam you forgot. `absent` and `not yet probed` are opposite
+claims — the seam does not exist, versus you ran out of budget — and they never
+share a cell.
+
+`absent` is your loudest finding and it stays in the report; deleting the row is
+how a codebase with no evals and no hop budget gets a clean audit. **Every
+`absent` carries the trigger** that will make it applicable: the first fan-out,
+the first uploaded document, the second tenant. An absence with no trigger decays
+into "we forgot" inside two quarters.
+
+→ `OUTPUT-SHAPES.md` — the nine-row table, one finding block and a worked
+ranking, all filled in. Open it before writing the first row; it is the shape of
+everything this audit produces.
 
 **Step 2 — Probe, and score what you find.**
 
@@ -96,27 +102,16 @@ reading for it: **delete the control locally and run the suite.** If nothing goe
 red the score is 2, whatever the code looks like. Restore it, and record which
 test you expected to fail.
 
-Which is also why 2 is not the finish line. A control at 2 decays to 1 quietly:
-nobody deletes it — someone adds the twelfth tool that does not route through the
+Which is why 2 is not the finish line. A control at 2 decays to 1 quietly: nobody
+deletes it — someone adds the twelfth tool that does not route through the
 registration point the other eleven share, and the layer now has eleven enforced
 paths and one that is not.
 
-Four probes and the score measurement deliberately break the system to watch what
-it does. Run them on a scratch branch and revert. "Report first, fix second"
-governs findings, not probes — a probe that mutates and reverts is measurement.
-
-The nine rows are the artefact. Three of them, filled:
-
-```
-Seam            Where                          Score  Evidence
-model access    agent/ClientFactory:41         1      one construction site, inside the request
-                                                      handler; 0 hits for a timeout setting
-guardrails      absent on the outbound side    0      12 inbound checks; 0 on any path back to
-                                                      the user. Trigger: already applicable
-sub-agents      not yet probed                 —      two-hour run; step 1 found no fan-out
-```
-
-`not yet probed` and `absent` are opposite claims. They never share a cell.
+Some probes, and the score measurement itself, deliberately break the system to
+watch what it does. Run those on a scratch branch and revert. "Report first, fix
+second" governs findings, not probes — a probe that mutates and reverts is
+measurement. Skip them and you report those seams as healthy when they are not,
+because the code looks correct and only executing it disagrees.
 
 **Step 3 — Apply the coverage lens.**
 
@@ -125,20 +120,16 @@ Applications 2026, each mapped to the seam that would hold its control. Open it
 once every seam carries a score: the map reads scores, so running it earlier
 produces guesses.
 
-**Step 4 — Rank by what each finding costs if it is left.** Below.
-
-**Step 5 — Write the plan.** Below.
-
-## Blast radius
+## Step 4 — Blast radius
 
 Severity labels do not rank. Two axes do, both answerable from probe output.
 
-**Reach** — can something an attacker controls get to this seam? Their text, or
-an identifier they supply. Uploaded documents, retrieved pages, tool responses
+**Reach** — can something an attacker controls get to this seam: their text, or
+an identifier they supply? Uploaded documents, retrieved pages, tool responses
 and sub-agent replies are attacker-writable in some deployment; name which.
 
-**Reversibility** — of the **incident the gap permits**, not of the gap itself.
-A missing error taxonomy is not "irreversible"; the wasted retries it causes are
+**Reversibility** — of the **incident the gap permits**, not of the gap itself. A
+missing error taxonomy is not "irreversible"; the wasted retries it causes are
 reversible, and the cross-tenant read a missing partition key permits is not.
 Classify the incident, or two auditors score the same finding differently.
 
@@ -150,33 +141,15 @@ Classify the incident, or two auditors score the same finding differently.
 Inside a rank, in this order: **silent before loud**, then every-request before
 rare-path, then cheapest fix first. Silence is the tie-break that matters — a
 seam that fails loudly gets fixed by whoever is on call; a seam that fails
-silently is still failing a year later and the first person to notice is a
+silently is still failing a year later, and the first person to notice is a
 customer.
 
-## The plan
+## Step 5 — The plan
 
-One block per finding, ranked. A block missing a field is not ready to hand to
-anyone:
-
-```
-FINDING 1 — Conversation memory has no tenant partition
-Seam             memory
-Score            0 → target 3
-Evidence         the key is "chat:" + conversationId; 0 hits for a caller or
-                 tenant id anywhere in the store package
-Reach            attacker-reachable — the conversation id arrives in the request
-Reversibility    irreversible — a conversation read by the wrong person cannot
-                 be unread
-Silence          silent — a cross-tenant read returns a valid conversation and
-                 raises nothing
-Cost if left     one identifier bug, or one enumeration, hands a customer another
-                 customer's conversation, and you hear about it from them
-Smallest change  put the caller id in the key, and refuse a read whose key does
-                 not match the caller — 1 file
-Proved by        a test that writes as caller A, reads as caller B, and asserts
-                 the read fails
-Coverage         ASI06, with ASI03 at the second seam
-```
+Every finding names its seam, its score and target, the probe output it came
+from, its two rank inputs and whether it fails silently, what it costs if it is
+left, the **smallest change** that closes it, the test that **proves** it closed,
+and the coverage items it moves.
 
 **Smallest change is a constraint, not a courtesy.** An audit that recommends a
 rewrite gets filed, and the seam stays at 0 for another year. Size it in files
@@ -195,11 +168,9 @@ remembers.
 
 ## When you have two hours, not two days
 
-A partial audit is a deliverable. An all-or-nothing procedure on a large
-codebase produces nothing at all.
-
-Probe these four first. They need no running system, and they are where absence
-is both most common and most expensive:
+A partial audit is a deliverable; an all-or-nothing procedure on a large codebase
+produces nothing at all. Probe these four first — they need no running system,
+and they are where absence is both most common and most expensive:
 
 1. **Guardrails**, the census half — every path carrying text the user did not
    type, and which of them has a check.
@@ -217,12 +188,9 @@ capped plan under it. Committed, because an audit compounds only if the next one
 can `diff` against the last — a seam that went from 2 to 1 is the cheapest
 finding you will ever get, and it is invisible without the previous table.
 
-Re-run on a trigger, not when someone remembers:
-
-- a tool is added, or an existing tool's authority widens;
-- a framework or provider SDK major version;
-- a new model or a new provider;
-- the first agent-to-agent hop, or the first unattended run.
+Re-run on a trigger, not when someone remembers: a tool is added or an existing
+tool's authority widens; a framework or provider SDK major version; a new model
+or a new provider; the first agent-to-agent hop, or the first unattended run.
 
 ## Done when
 

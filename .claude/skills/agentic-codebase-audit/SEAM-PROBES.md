@@ -4,8 +4,9 @@ One block per seam, in the order of the table in `SKILL.md`. Every probe is
 written so that a small, empty or successful answer is the finding. **Record the
 actual output beside each one — a probe with no recorded output was not run.**
 
-Probes 1.3, 2.3, 4.1 and 7.3 deliberately break something to watch what happens.
-Run them on a scratch branch and revert.
+Probes 1.3, 4.1 and 7.3 deliberately break the configuration to watch what
+happens, and 6.1 writes to the real store. Run them on a scratch branch, against
+a scratch conversation, and revert.
 
 Numbers marked *illustrative* are there to make a count meaningful, not to be
 quoted. Measure yours.

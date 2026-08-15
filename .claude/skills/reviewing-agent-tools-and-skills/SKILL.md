@@ -49,9 +49,10 @@ it changes nothing, both read perfectly in source. Then **compare only items who
 subjects share a noun** — all pairs in a forty-item layer is 780 comparisons, the subject index
 cuts it to a handful, and that is what makes the free tier affordable across the whole set.
 
-**A layer that has not launched has no window.** Passes 1–4 and the routing run still work.
-Pass 5, the zero-call fork and the 20-turn merge test need traffic: defer them and score their
-rubric rows *not yet measurable*, never 0.
+**A layer that has not launched has no window.** Passes 1–4 run on text alone, and the routing
+run still runs against a set written from whatever real phrasing exists — support tickets,
+search queries, the questions your docs get. Pass 5, the zero-call fork and the 20-turn merge
+test need traffic: defer them and score their rubric rows *not yet measurable*, never 0.
 
 **Pass 2 in full.** Keep every description the layer exposes, and the labelled routing set
 beside it, in checked-in snapshot files, and diff both at the start of each sweep. Text you do
@@ -67,9 +68,9 @@ single-item review and this sweep does not repeat it. What only the population s
 neighbours disagreeing — one concept spelled `state: "resolved"` here, `status: "CLOSED"` next
 door and `incident_state: "done"` in a third tool, so a value read out of one result is an
 argument error in the next call; a parameter documented with an example in one entry and blank
-in its neighbour; two entries that truncate, one announcing it and one not. That last beats a
-lone silent truncation for damage: a model that has learned *these results say when they were
-cut* reads a missing notice as completeness.
+in its neighbour; two entries that truncate, one announcing it and one not. That last is worse
+than a lone silent truncation: a model that has learned *these results say when they were cut*
+reads a missing notice as completeness.
 
 ## The rubric
 
@@ -85,9 +86,10 @@ from your own distribution and freeze them, or scores stop comparing across swee
 
 **8/8 ships unchanged**, recorded as *reviewed, no change*. Not editing is a result of the
 work, not an omission from it — every rewrite is a routing risk you chose to buy. Under 8, buy
-the routing run, which adds **Reach** and **Exclusivity** for 12 in total: **10–12** reviewed,
-no change; **6–9** one targeted edit, gated; **≤5** it is not an editing problem — rewrite the
-description from scratch, merge the item into a neighbour, or retire it.
+the routing run, which adds **Reach** (turns labelled for it that it missed) and
+**Exclusivity** (turns labelled for a neighbour that it took) for 12 in total: **10–12**
+reviewed, no change; **6–9** one targeted edit, gated; **≤5** it is not an editing problem —
+rewrite the description from scratch, merge the item into a neighbour, or retire it.
 
 **Record the denominator.** An unmeasurable row scores *not yet measurable* and leaves both
 numerator and total, so a pre-launch layer scores out of 4 and ships unchanged at 4/4. A 0 and
@@ -145,7 +147,7 @@ A turn about incidents always says which kind, so the split buys nothing and put
 item into every incident routing decision. The corollary is the line to hold while merging:
 **the merged tool takes the union of the parameters, not a mode flag.** A parameter that
 selects which of the two old behaviours you wanted is a decision, not a value the turn
-supplies — that pair was answering two questions, and the fix is two sharper descriptions.
+supplies — that pair answers two different questions, and the fix is two sharper descriptions.
 
 | Disposition | When | What you do |
 |---|---|---|
@@ -194,7 +196,8 @@ Detection is free — write each skill's primary subject out in three words. **S
 subject** → they are one skill, so merge them. **Different subjects, one shared trigger
 phrase** → the phrase lives in exactly one description, and goes to whichever skill owns the
 *outcome* the user asked for, not to the one that says the noun more often. Both of these pass
-a single-item review, and still collide on one word:
+a single-item review and still collide on one word; the repair is one clause each, first
+sentence unchanged:
 
 ```
 BAD   order-tracking: "Where a shipment is and when it arrives. Use when the user

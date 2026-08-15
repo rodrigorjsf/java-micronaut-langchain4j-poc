@@ -25,11 +25,13 @@ the hit rate is one number and it moves for two opposite reasons.
 |---|---|---|---|
 | free tier only (4 rows, /8) | 8 | — | under 8, buy the routing run |
 | free + paid (6 rows, /12) | 10–12 | 6–9 | ≤5 |
-| pre-launch free tier (2 rows, /4) | 4 | — | under 4, buy the routing run |
+| any tier with unmeasurable rows dropped | full marks | — | anything less, buy the routing run |
 
-The pre-launch row is not a discount. It is the same bar over a smaller
-denominator, and it is why the denominator is recorded next to the score:
-`6/8` and `6/12` and `4/4` are three different verdicts.
+**The free tier has one threshold: full marks.** Whatever the denominator, an
+item that does not take every measurable point buys the routing run, which is
+why a pre-launch layer scores out of 4 and a zero-traffic item out of 6 without
+either being a discount. The denominator rides beside the score because `6/8`,
+`6/12` and `4/4` are three different verdicts.
 
 **A row scores *not yet measurable* only when the measurement does not exist
 yet** — no traffic window, no log retention that reaches back far enough. A row
