@@ -3,6 +3,7 @@ package io.github.rodrigorjsf.agenticchat.triage;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import dev.langchain4j.model.output.structured.Description;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -147,7 +148,7 @@ public record TriageVerdict(
      * the catalogue rather than a pattern: the hint is interpolated into the agent's
      * prompt, and the only safe values are ones the application already publishes.
      */
-    public TriageVerdict withSkillHintIn(java.util.Collection<String> knownSkills) {
+    public TriageVerdict withSkillHintIn(Collection<String> knownSkills) {
         return knownSkills.contains(skillHint)
                 ? this
                 : new TriageVerdict(decision, confidence, intent, language, "", riskFlags);
