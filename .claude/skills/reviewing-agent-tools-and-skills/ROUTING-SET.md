@@ -115,10 +115,15 @@ what the product does.
 assumes a log; pre-launch you have whatever those three sources gave you, and
 padding to a quota with turns you wrote yourself puts the rigged green straight
 back. Spend what you have on **boundary** turns first — one per adjacent pair the
-subject index found — and read the result per subject group rather than per item.
+subject index found — and read the *score* per subject group rather than per item.
 Whether an item's own traffic arrives is not answerable before there is traffic;
 whether the boundary between two neighbours holds is, and it is the only thing a
 pre-launch run can tell you.
+
+The cells stay per item even so, and that is what saves the run from producing no
+verdict anybody can act on: a group whose cells all sit inside the floor scores
+both routing rows 2 for every item in it, and a cell that moved names the two
+items either side of it. `SKILL.md` turns those into per-item bands.
 
 Mark the set as pre-launch in its header, and replace its turns with recorded
 ones as soon as the window exists — the pre-launch set is scaffolding, and its

@@ -83,8 +83,11 @@ the working part of this skill.
 **Open the previous audit before you open the codebase**, at
 `docs/agentic-audit.md` — the path this skill writes to, and the only place a
 regression can come from. Nothing there means this is run 1: every **Previous**
-field reads `first run`. Commit somewhere else and the summary names the path,
-because run 2 starts here and does not go looking.
+field reads `first run`. A one-line pointer to another path instead of a table
+means the last run committed elsewhere: follow it **once**, and if what you land
+on is another pointer, stop and file that as a finding against the run that wrote
+it. This is the whole of run 2's search — it opens the default path and does not
+go looking.
 
 Then work the shape column, seam by seam. Output is nine rows, each naming a
 `file:symbol` — or one of three non-locations that are never interchangeable:
@@ -97,7 +100,9 @@ Then work the shape column, seam by seam. Output is nine rows, each naming a
   nothing to score. The trigger is the whole point: the first fan-out, the first
   uploaded document, the second tenant. `n/a` with no trigger decays into "we
   forgot" inside two quarters.
-- **`not yet probed`** — you ran out of budget, and the summary says so.
+- **`not yet probed`** — you ran out of budget, and the summary says so. This one
+  is for a seam you never located; a seam you *did* locate and could not measure
+  keeps its symbol here and scores `—`, which the two-hour section works through.
 
 A blank cell is a seam you forgot.
 
@@ -163,23 +168,35 @@ on a scratch branch and revert; "report first, fix second" governs findings, not
 probes. Skip them and you report those seams healthy, because the code looks
 correct and only executing it disagrees.
 
+**One probe a branch cannot undo.** Probe 3.8's cross-caller variant drives a live
+tool with an id belonging to somebody else, and that read has already happened by
+the time you switch branches back. Point it at a scratch tenant whose data is
+yours, or at a stubbed downstream — never a real caller's id — the way 6.1 names
+its scratch conversation. Its other two arguments are harmless: the hazard is that
+one value, not the probe, and dropping 3.8 leaves ASI02 with nothing behind it.
+
 ### Step 3 — Answer the ten coverage items
 
 Output is ten lines, one per item, each carrying four fields: the item, the seam
 holding its control, that seam's score, and the verdict — **covered**,
-**uncovered**, or **n/a** plus the trigger that ends it. An item with a blank
-verdict is not answered, and a verdict with no score behind it is an opinion.
-Where an item has a second seam, name it on the same line. Four fields and three
-verdict tokens are easy to improvise differently every run, so don't:
-`OUTPUT-SHAPES.md` carries all ten worked.
+**uncovered**, **n/a** plus the trigger that ends it, or **unmeasured** where a
+time-boxed run left that seam with no score. An item with a blank verdict is not
+answered, and a verdict with no score behind it is an opinion — `unmeasured` is
+the single exception, and it is honest exactly because it says so in the score
+field instead of putting a number there. Where an item has a second
+seam, name it on the same line. Four fields and four verdict tokens are easy to
+improvise differently every run, so don't: `OUTPUT-SHAPES.md` carries all ten
+worked.
 
 These ten lines are the second block of the committed file, between the table and
-the plan. Run them only once every seam carries a score: the map reads scores,
-so running it earlier produces guesses.
+the plan, and they are written last — once every seam carries a score, or once
+the run has stopped probing. The map reads scores, so a line written ahead of its
+seam is a guess; `unmeasured` is what you write instead of guessing, and never
+what you write for a seam you simply did not think about.
 
 → `OWASP-COVERAGE.md` — the ten items of the OWASP Top 10 for Agentic
 Applications 2026 mapped to seams, the rule that turns a score into one of the
-three verdicts, the second seam several items also lose ground at, and the
+four verdicts, the second seam several items also lose ground at, and the
 triggers for the three that do not apply to a single-agent application.
 
 ### Step 4 — Blast radius
@@ -222,6 +239,13 @@ disclosure marker the store silently drops, probe 4.5, invisible in either seam
 alone — names both in the seam field, the one that must change first in front,
 because filed against a single seam it lands on a team that cannot close it.
 
+An unscored seam still produces findings, the way a fact-only probe does: the
+score field reads `— → target 2`, and the evidence carries the fact instead of a
+rung. Probe 1.1 finding one construction site at startup, with nobody having
+measured whether a new call site reaches it, is a real plan entry whose smallest
+change is the measurement itself — one call site added the naive way, run once.
+Dropping those because the seam has no number is how a short run becomes no run.
+
 **Smallest change is a constraint, not a courtesy.** An audit that recommends a
 rewrite gets filed, and the seam stays at 0 for another year. Size it in files
 touched, and split any finding whose fix is bigger than one change into the part
@@ -240,8 +264,9 @@ remembers.
 ## When you have two hours, not two days
 
 A partial audit is a deliverable; an all-or-nothing procedure on a large codebase
-produces nothing at all. Probe these four first — they need no running system,
-and they are where absence is both most common and most expensive:
+produces nothing at all. Probe these four first — they read out of the source, so
+they need no running system, and they are where absence is both most common and
+most expensive:
 
 1. **Guardrails, probe 5.1** — the census of every path carrying text the user
    did not type, and which of them has a check.
@@ -252,7 +277,25 @@ and they are where absence is both most common and most expensive:
 4. **Model access, probes 1.1 and 1.4** — the construction sites, and the bound
    this codebase chose on the call.
 
-Mark the other five `not yet probed`, name them in the summary, and stop.
+**A pass that runs nothing writes 0 or `not yet probed`, and nothing between.** 0
+survives a paper reading because an empty answer has no rung beneath it — no bound
+chosen anywhere, no check on any row of the census, no tenant component in the
+key. Every rung above 0 is one of Step 2's two measurements, so a job that turns
+out to *exist* leaves that seam unscored: **Where** keeps the `file:symbol` you
+located, **Score** reads `—`, and the evidence records the fact you established
+and the rung nobody measured. Writing 1 because the code looks reasonable is
+exactly the reading Step 2 says decides it wrong every time. The same rule covers
+a seam whose probes you ran only some of: a 0 stands, because no unrun probe goes
+lower, and anything above 0 waits.
+
+Mark the other five seams `not yet probed`, and commit **all three blocks** — a
+short run does not get to drop one. The table is still nine rows. The coverage
+block is still ten lines: `uncovered` where the mapped seam scored 0, `unmeasured
+— <seam> not yet probed` wherever that seam carries no score — ASI04 at
+discovery, ASI07 at sub-agents and ASI10 at observability, unless Step 1
+*located* that seam as `n/a`, which is a locate result and stands whatever the
+budget was. The plan ranks what the four probes found, and the summary names
+which seams you stopped at and which probe goes first next time.
 
 ## The artefact, and when you run it again
 
@@ -266,9 +309,13 @@ Same path every run, and committed, because an audit compounds only if the next
 one can `diff` against the last: a seam that went from 2 to 1 is the cheapest
 finding you will ever get, and nothing but the previous table can show it to you.
 Another path is fine where the repository already has a home for documents — but
-then Step 1 finds nothing at the default, so **name the path in the summary and in
-the commit message**. A diff that cannot find the previous table degrades to a
-fresh one-off report, which is the whole failure this section exists to prevent.
+then Step 1 finds nothing at the default, so **commit a one-line pointer at
+`docs/agentic-audit.md` naming the real path**, in the same commit as the report.
+The stub is the mechanism and not a courtesy: run 2 opens that path and nothing
+else, so a path recorded only in a summary or a commit message is a pointer with
+no reader, and the diff degrades to a fresh one-off report — the whole failure
+this section exists to prevent. One line, pointing at a table; a stub pointing at
+a stub is the loop you get for free if nobody says otherwise.
 
 **Stamp the table with the tree it was run against** — date, branch, commit — and
 with the stamp of the run before it. A 2 that has become a 1 is only a finding if
@@ -283,9 +330,12 @@ or a new provider; the first agent-to-agent hop, or the first unattended run.
 ## Done when
 
 - every seam reads as a `file:symbol` with a score of 0–3, or `absent` with 0, or
-  `n/a` plus its trigger, or `not yet probed` — nine rows, no blank cell;
+  `n/a` plus its trigger, or `not yet probed` — and, on a time-boxed run only, a
+  `file:symbol` scored `—` because the seam was located and never measured; nine
+  rows, no blank cell;
 - every score is the **lowest scored probe** at that seam, and the evidence names
-  which probe set it;
+  which probe set it — on a time-boxed run, the lowest *observed* probe, which
+  stands as a score only at 0;
 - every 2 was earned by adding a call site the naive way and watching the control
   cover it unprompted; every 3 by deleting the control and watching a named test
   go red — at **evals**, by making the gate non-blocking and watching the merge be
@@ -294,10 +344,13 @@ or a new provider; the first agent-to-agent hop, or the first unattended run.
   code;
 - every finding names a change sized in files touched, the test that closes it,
   and this seam's score in the previous audit or `first run`;
-- all ten coverage items carry a seam, that seam's score and a verdict;
+- all ten coverage items carry a seam, that seam's score and a verdict — and on a
+  short run, `unmeasured` wherever that seam carries no score, never a blank line
+  and never a guessed one;
 - the table head carries this run's date, branch and commit and the previous
   run's, and all three blocks — table, coverage lines, capped plan — are
-  **committed** at `docs/agentic-audit.md`, or at a path the summary names.
+  **committed** at `docs/agentic-audit.md`, or at a path a one-line stub committed
+  there points to.
 
 A seam at 3 is proved by a test, not by production behaviour. Whether the control
 is tuned *right* — a threshold, a budget, a refusal rate — is the evals seam's

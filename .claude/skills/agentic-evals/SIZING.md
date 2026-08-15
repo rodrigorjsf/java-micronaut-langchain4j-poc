@@ -15,16 +15,12 @@ the rate you intend the gate to permit, then write the positives.
 | 12 | 0, 8.3, 16.7 | nothing; the first miss fails the build |
 | 28 | 0, 3.6, 7.1 | exactly one; the second fails |
 | 60 | 0, 1.7, 3.3, 5.0 | three |
-| 100 | 0, 1.0, 2.0 | five — probably more than you meant |
+| 100 | 0, 1.0, 2.0 … in steps of 1.0 | five — probably more than you meant |
 
-Two consequences worth stating in the test file beside the constant:
-
-- Under ~20 near-miss rows the gate is not a rate, it is a count. Write it as one:
-  `at most one false positive` says what `<= 0.05` only implies.
-- Growing the near-miss half loosens a fixed rate. Add 40 rows to a 60-row
-  near-miss half under a 5% gate and you go from three permitted misses to five
-  without touching the threshold. Re-read the permitted count whenever the dataset
-  grows.
+One consequence of the table worth stating in the test file beside the constant:
+growing the near-miss half loosens a fixed rate. Add 40 rows to a 60-row near-miss
+half under a 5% gate and you go from three permitted misses to five without
+touching the threshold. Re-read the permitted count whenever the dataset grows.
 
 ## How small a regression the suite can resolve
 
@@ -41,6 +37,13 @@ band around it is roughly `±1.96 · sqrt(p(1-p)/n)` — at `p = 0.90`:
 | 400 | ±2.9 points | 3 points |
 | 1000 | ±1.9 points | 2 points |
 
+**Every cell above is the `p = 0.90` case, and 0.90 is where the band is widest.**
+A rate near 0 or 1 has a *narrower* band at the same `n`, so annotate a low-rate
+constant from the formula at the rate it gates rather than from this table: a 5%
+false-refusal gate on 40 rows is `1.96 · sqrt(0.05 · 0.95 / 40)` = ±6.8 points, not
+the ±9.3 the 40-row row prints. Reusing the cell overstates the blind spot by a
+third and writes off a regression the suite can in fact see.
+
 Read it as a limit on claims, not on the suite: a 62-row suite is worth running,
 it simply cannot certify "no regression" at two points, so do not write a gate
 that implies it can.
@@ -55,7 +58,7 @@ Two clarifications the arithmetic hides:
   scores each carrying a band overlap until the gap is roughly 1.4× the band, so
   a change that clears the single-run figure above may still be noise.
 
-The cheapest way past all of this is to stop treating the score as the signal.
-Give the `evasion` and `complaint` families their own assertion — an aggregate over
-62 rows cannot see three rows flip, and a three-row family assertion sees it every
-time.
+The cheapest way past all of this is to stop treating the score as the signal,
+which is why the `evasion` and `complaint` families in [`SKILL.md`](SKILL.md) are
+asserted individually rather than averaged in: an aggregate over 62 rows cannot see
+three rows flip, and a three-row family assertion sees it every time.

@@ -16,33 +16,49 @@ Bought per item, not per layer. Both rows read the routing run.
 Reach and exclusivity move against each other, which is the point of scoring
 both. A description widened until it catches everything scores 2 on reach and 0
 on exclusivity, and its neighbour's reach collapses in the same run — so score
-the neighbour in the same run, and read both rows off the confusion table's
-cells rather than off any total the run reports.
+the neighbour in that same run, off the same table.
 
 ## The bands
 
-Both tiers scored is six rows out of 12. Each band buys exactly one of the six
-**item** verdicts `SKILL.md` closes on. The seventh, *capability gap*, belongs to
-the layer and is reachable from no band:
+**Read the band off the rows, never off a total.** Items lose rows routinely —
+First-call correction is unmeasurable on most launched layers, both traffic-fed
+rows are gone pre-launch — and a total scaled to a shrinking denominator drops
+strong items into the gaps between bands. An item two points short of full on
+five rows lands between bands whenever those bands were written for six, and an
+item two points short of full is exactly what the sweep exists to certify. Rows
+do not scale, so read those.
 
-| Band | Score | Verdict it buys |
+Each band buys exactly one of the six **item** verdicts `SKILL.md` closes on.
+The seventh, *capability gap*, belongs to the layer and is reachable from no
+band:
+
+| Band | The rows read like this | Verdict it buys |
 |---|---|---|
-| Top | 10–12 | *reviewed, no change* |
-| Middle | 6–9 | *edit queued behind the gate* |
-| Bottom | ≤5 | structural: *rewritten, not edited*, *merge into `<named item>`*, *moved behind an activation*, or *retire in two steps* |
+| Top | no row at 0, at most one row at 1 | *reviewed, no change* |
+| Middle | no row at 0, or Contract consistency alone at 0; two or more rows at 1 | *edit queued behind the gate* |
+| Bottom | any row at 0 other than Contract consistency alone | structural: *rewritten, not edited*, *merge into `<named item>`*, *moved behind an activation*, or *retire in two steps* |
 
-The bands assume six rows. With a row dropped as *not yet measurable*, scale
-them to the denominator you actually have before reading off a band — except
-pre-launch, where both traffic-fed rows are missing at once and `SKILL.md` sends
-the whole layer to the routing run rather than to a band.
+**Contract consistency is the one 0 that is not structural**, which is why it is
+carved out of the Bottom row. It means a neighbour spells a shared concept
+differently, and a rename or a documented parameter fixes that with no boundary
+moving. Every other row's 0 already names a structure: Traffic 0 goes to the
+zero-call fork, Overlap 0 to the merge test, and a 0 on correction, reach or
+exclusivity is a description the turns do not match.
+
+The verdict carries its row count with it. *Reviewed, no change (4 rows)* is a
+weaker claim than the same words over six, and nothing else in a summary says
+so. Pre-launch no free-tier reading buys a verdict at all — `SKILL.md` sends the
+whole layer to the routing run first — but the band is read the same way
+afterwards, over the four rows that layer has.
 
 **A row scores *not yet measurable* only when its denominator does not exist** —
 no traffic window, no log retention reaching back far enough, no calls to divide
-by, or no goal attribution to correlate on, which is the usual reason First-call
-correction is unscoreable on a launched layer (`llm-cost-observability` owns the
-tagging that fixes it). A row you could have computed from data you already hold
-and did not scores 0. The distinction decides whether the item is a finding or a
-gap in your instrumentation, and one sweep later nobody remembers which it was.
+by, or no turn id on each tool call to correlate two calls into one goal, which is
+the usual reason First-call correction is unscoreable on a launched layer (a role
+tag is not that field — `SKILL.md`'s pass 5 says what is, and files the gap).
+A row you could have computed from data you already hold and did not scores 0.
+The distinction decides whether the item is a finding or a gap in your
+instrumentation, and one sweep later nobody remembers which it was.
 
 ## Calibrating the anchors
 
@@ -78,19 +94,21 @@ layer, then freeze them:
 | Contract consistency | takes `from`/`to` as ISO dates; two neighbours take `since_days` | 0 | disagrees with neighbours on a shared concept |
 | First-call correction | no calls | *not yet measurable* | denominator is zero, so the rate does not exist |
 
-Score **1/6**, denominator 6. That is under threshold, so the routing run is
-bought — and it comes back reach 2, exclusivity 2: the turn it exists for routes
-straight to it, and it steals nothing. Zero traffic plus perfect reach is the
-third row of the zero-call fork in `SKILL.md`: rare but load-bearing. Verdict
-***moved behind an activation*** — put the tool inside a skill so its schema
-reaches the model only after that skill activates, which is the fork's third row
-in full and `progressive-tool-disclosure`'s subject; then fix the date parameter
-so it agrees with its neighbours.
+Three rows scored, one not measurable, and two of the three are at 0 — Bottom on
+the free tier alone, so the routing run is bought. It comes back reach 2,
+exclusivity 2: the turn it exists for routes straight to it, and it steals
+nothing. Five rows now, still Bottom, because Traffic's 0 stands. Contract
+consistency's 0 would have been a rename on its own; Traffic's never is, and the
+zero-call fork is what picks which structural verdict. Zero traffic plus perfect
+reach is that fork's third row: rare but load-bearing. Verdict ***moved behind
+an activation*** — put the tool inside a skill so its schema reaches the model
+only after that skill activates, which is `progressive-tool-disclosure`'s
+subject; then fix the date parameter so it agrees with its neighbours.
 
-The lesson in that worked example is that the free-tier score is a *purchase
-decision*, not a verdict. An item scoring 1/6 that turns out to be rare and
-load-bearing is a different outcome from an item scoring 1/6 that nobody wants,
-and only the paid tier separates them.
+The lesson in that worked example is that the free-tier reading is a *purchase
+decision*, not a verdict. An item that reads Bottom and turns out to be rare and
+load-bearing is a different outcome from one that reads Bottom because nobody
+wants it, and only the paid tier separates them.
 
 ## The noise floor
 
@@ -120,10 +138,12 @@ text. Once two candidate rewrites do exist, this is how you decide between them.
    artifact labelled a winner.
 3. **Hold everything else identical**: same set, same temperature, same
    neighbours exposed, same model version, recorded in the run header.
-4. **Decide on the confusion table, not the hit rate.** A candidate that gains
-   overall by absorbing its neighbour's boundary turns has lost — it traded a
-   visible defect for an invisible one, and its neighbour's reach will fall in
-   the same run.
+4. **Decide on the cells, not the hit rate** — `ROUTING-SET.md` is how you read
+   them. The decision that reading does not make for you: a candidate that gains
+   overall by absorbing its neighbour's boundary turns has lost. It traded a
+   visible defect for an invisible one, its neighbour's reach falls in the same
+   run, and the hit rate is the one number that cannot say so, because it moves
+   for both reasons at once.
 5. **A gap inside the floor keeps the incumbent.** Shipping a tie spends a gate
    and puts text into production that nobody has watched behave.
 

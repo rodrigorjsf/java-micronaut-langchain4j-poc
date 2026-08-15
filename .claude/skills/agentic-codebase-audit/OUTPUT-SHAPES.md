@@ -9,8 +9,8 @@ contents.
 ## 1. The scored table
 
 Nine rows, always. This is the head of the committed file, at the stable path the
-next audit diffs against — `docs/agentic-audit.md` unless the summary names
-another.
+next audit diffs against — `docs/agentic-audit.md`, or wherever a one-line stub
+committed there points.
 
 ```
 audit 2026-03-14 · branch main · commit 4f2a1c9
@@ -71,7 +71,15 @@ never blank:
 ```
 discovery         not yet probed                —      out of budget; probe 4.1 goes first
                                                        next time
+model access      agent/ClientFactory:41        —      1.1: one construction site, at startup.
+                                                       Located, not scored — 1 vs 2 needs the
+                                                       call site added and run
 ```
+
+Two shapes, and the second is the one a short run gets wrong. **Where** holds the
+symbol because locating it worked; **Score** is `—` because a paper reading
+reaches 0 or nothing, and this seam's job exists. Had 1.1 found the client built
+inside the handler, the same row would read 0 with no measurement needed.
 
 Note the two rows that look alike and are not. **evals** is `absent`: the seam
 applies to every codebase and nothing here does the job, so it scores 0 and it is
@@ -96,7 +104,9 @@ Read the columns strictly:
   was covered unprompted — prompt assembly earned one that way, observability
   failed the same probe and sits at 1 — and a 3 means a named test went red when
   you deleted the control, or, at evals, that the merge was refused when you made
-  the gate non-blocking. `n/a` and `not yet probed` score `—`, never 0.
+  the gate non-blocking. `n/a` and `not yet probed` score `—`, never 0 — and so
+  does a seam a short run located and never measured, which is why the evidence,
+  not the dash, says which of the three you are looking at.
 - **Evidence** is probe output, prefixed with the probe number, and it leads with
   the probe that set the score: a count, a byte offset, a boot result, an empty
   search. Never a judgement about the code.
@@ -105,7 +115,7 @@ Read the columns strictly:
 
 The second block of the committed file, written straight off the table above —
 item, seam, that seam's score, verdict. Nothing here is judged again; every
-verdict is the score turned into one of three words by the rule in
+verdict is the score turned into one of four words by the rule in
 `OWASP-COVERAGE.md`.
 
 ```
@@ -129,7 +139,21 @@ ASI10 Rogue Agents         observability 1     uncovered — 1 is not covered; t
                                                trigger. also evals 0
 ```
 
-Four things this block gets wrong when it is improvised:
+A time-boxed run writes the same ten lines. The seams it never reached carry the
+fourth word, and the ones Step 1 located as `n/a` are unaffected by the budget:
+
+```
+ASI04 Supply Chain         discovery not yet probed  unmeasured — discovery not
+                                                     yet probed; 4.1 goes first
+                                                     next run
+ASI07 Inter-Agent Comms    sub-agents n/a            n/a — until an agent is
+                                                     addressed over a wire
+ASI06 Memory Poisoning     memory 0                  uncovered — 6.2 alone; the
+                                                     seam's other probes are
+                                                     unrun and cannot lift a 0
+```
+
+Five things this block gets wrong when it is improvised:
 
 - **Keyed on the identifier.** The words after `ASI04` are shorthand; published
   wording varies between sources, and `OWASP-COVERAGE.md` says why.
@@ -138,8 +162,12 @@ Four things this block gets wrong when it is improvised:
   its second seam is not, so the verdict comes from the second.
 - **A 1 is uncovered.** ASI10 is the row everyone marks covered because
   observability exists and the score looks non-zero.
+- **`unmeasured` is the short run's word, and its only one.** It belongs to a seam
+  the table says was `not yet probed`; a seam that scored, even off one probe,
+  takes the verdict its score earns.
 - **Ten lines, no gaps.** A missing line is not a low-severity item, it is an
-  unanswered question, and next quarter it reads as a clean bill.
+  unanswered question, and next quarter it reads as a clean bill — which is what a
+  time-boxed run produces the moment it drops the three items it did not reach.
 
 ## 3. One finding block
 

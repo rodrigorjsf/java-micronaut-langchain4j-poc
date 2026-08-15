@@ -9,6 +9,13 @@ happens, 6.1 writes to the real store, and the gate flip that earns evals a 3
 turns a required check off. Run them on a scratch branch, against a scratch
 conversation, and revert.
 
+**3.8 is the one a revert does not cover.** Its cross-caller variant makes a live
+tool read data belonging to somebody else, and that read has happened before you
+switch the branch back. Point it at a scratch tenant whose data is yours, or at a
+stubbed downstream — never a real caller's id. Its other two arguments, a negative
+count and an absurd date range, are harmless: the hazard is that one value, not
+the probe. Skip 3.8 and ASI02 loses the clause `OWASP-COVERAGE.md` keys on it.
+
 **Each numbered probe is one job, and the seam's score is the lowest of them**
 (`SKILL.md`, Step 2). A probe marked **fact-only** establishes a count, a cost or
 an offset rather than a control, so it carries no score and cannot drag a seam
@@ -86,7 +93,7 @@ Doctrine belongs to `agentic-tool-boundary`. These are inventory queries.
    file path, connection string, query text, shell command. The list should be
    empty; whatever is on it is the first thing in the plan. (**ASI02 Tool Misuse
    & Exploitation**; anything that evaluates, templates, renders or shells out is
-   also **ASI05 Unexpected Code Execution (RCE)**.) For each survivor, record
+   also **ASI05 Unexpected Code Execution**.) For each survivor, record
    **where it executes and what ends its blast radius** — the process the request
    is served from, the identity it holds, what it can reach on the network. "In
    the application process, as the application user" is the finding, and it is the
@@ -106,8 +113,9 @@ Doctrine belongs to `agentic-tool-boundary`. These are inventory queries.
 7. **Count tools with no test at all.** A tool is a public API with a stochastic
    caller.
 8. **Send one tool an argument its signature accepts and its contract forbids** —
-   a negative count, an id belonging to another caller, a date range spanning ten
-   years — and record **what objected, and where**. Rejected at the boundary is
+   a negative count, an id belonging to another caller (a scratch tenant of your
+   own, or a stubbed downstream — see the note at the top of this file), a date
+   range spanning ten years — and record **what objected, and where**. Rejected at the boundary is
    the answer you want. Rejected inside the tool body is one tool's diligence, not
    a boundary, and scores as the weakest path across the set. Nothing objecting
    until the downstream system does means the model can drive that system directly

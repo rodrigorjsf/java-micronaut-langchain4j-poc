@@ -18,24 +18,20 @@ else using the same key that day.
 
 A run that pauses is cheaper than a run that produces a number nobody trusts.
 
-## The floor: print `ran / total` every run
+## The `ran / total` block
 
-Print the count even on a green run, because the failure the floor catches is
-silent by construction:
+Printed on every run, green included, with the skipped count and its cause on the
+same line as the rows that ran:
 
 ```
 scope golden set:  ran 3 / 62   (59 skipped: quota)
   accuracy 3/3 = 1.000
 ```
 
-Every number on that run is true, and the run certifies nothing. Without the
-printed count it is indistinguishable from a clean pass in a build log — so the
-skipped count sits on the same line as the rows that ran, with its cause.
+## The drift block
 
-## The drift report
-
-The block goes at the end of a run, in the build log, marked advisory so nobody
-reads it as a failure:
+At the end of a run, in the build log, labelled advisory so nobody reads it as a
+failure:
 
 ```
 intent drift (advisory, not gated):
@@ -44,8 +40,7 @@ intent drift (advisory, not gated):
 ```
 
 Two columns and a count: what the label was in the recorded set, what it is now,
-how many rows moved. Only rows that stayed right while their label moved print
-here; a changed decision is a failure in the gated section above.
+how many rows moved.
 
 ## What an override records
 

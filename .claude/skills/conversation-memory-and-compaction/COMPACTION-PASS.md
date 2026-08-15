@@ -48,6 +48,26 @@ writes a customer-facing recap. Two instructions earn their tokens:
 Give it one agreed word for "nothing worth carrying forward", and treat that word as
 an empty summary rather than as an error.
 
+## The invariant extractor rides the same call, and emits fields
+
+The bindings come back from the summariser, not from the deterministic pass — a
+pronoun cannot be resolved by a scan — but they come back as **fields, not
+sentences**: slot, current value, the message id that set it, and the values
+rejected as of that value. Ask for a sentence and you get a summary again ("the
+user seems to want the Rio office") — hedged, unkeyed, and impossible to overwrite
+on the next pass.
+
+The shape enforces the two rules for free: one entry per slot, so a later setter
+overwrites instead of appending a second live value; and rejections recomputed
+against the current value, so a user who flips back does not end up with their own
+choice listed as rejected.
+
+**Give it a way to say it could not resolve one.** Where the referent is ambiguous —
+two candidates that read alike, a list it cannot index — the slot comes back
+unresolved and the region holding it is left uncompacted this pass. The trigger
+fires again next turn; a binding invented to fill the field is wrong for the rest of
+the conversation, and nothing downstream can tell it was invented.
+
 ## Calibrating the trigger
 
 From one deployment: a 14 400-token trigger, a six-message anchor, a 1 600-character

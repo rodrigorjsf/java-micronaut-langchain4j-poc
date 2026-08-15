@@ -1,9 +1,9 @@
 # The fan-out shapes
 
 Reference for [`subagent-context-isolation`](SKILL.md): the five arrangements
-children are wired into, what each is for, and the trap each one carries. *When*
-a child earns its cost at all, and the two rules that hold across every shape —
-combine in code, and a failed branch is a missing field — are in `SKILL.md`.
+children are wired into, what each is for, and the trap each one carries — then
+what every join owes a branch that failed. *When* a child earns its cost at all,
+and the rule that the combine happens in code, are in `SKILL.md`.
 
 Call counts below use that skill's convention — count model calls, including the
 parent's consumption call — so a child of R round trips costs R + 1 calls, and
@@ -74,3 +74,18 @@ sets. A router pays for itself when the branches differ in something other than
 tools — a different system prompt, a different model tier, a different data
 boundary — and not when the only difference is which four tools are in scope.
 That case is tool disclosure, not delegation.
+
+## The join, in all five
+
+**Decide per branch whether a failure is fatal or merely a missing field**, and
+return the missing field when the other branches answered. A join that aborts on
+the first failed branch throws away every branch that succeeded, so one flaky
+child decides the whole fan-out — a 200-record map reporting nothing because
+record 137 timed out, at the full price of the other 199.
+
+The policy is per branch because the branches differ: in a map a missing item is
+a hole the user can be shown, in a pipeline a missing stage is fatal to the ones
+after it, and in best-of-N a failed candidate is simply one fewer candidate.
+
+*Test:* fail one branch of a fan-out and assert the parent returns the others
+with the failure named, rather than an error for the whole call.

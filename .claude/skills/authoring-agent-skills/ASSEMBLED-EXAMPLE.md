@@ -20,9 +20,9 @@ To refund the last charge: `find_customer(email)` → `list_invoices(customerId,
 first)` → `read_invoice(invoiceId)` → `issue_refund(invoiceId, amount)`. Start at `read_invoice`
 if the user already gave the number.
 
-`[]` from `list_invoices` means nothing matched the filter you sent. Amounts are in cents. A
-refund with `status: "pending"` has not moved money yet. If `list_invoices` fails the refund path
-is closed: say which customer you resolved, do not answer from another tool instead, and pass
+`[]` from `list_invoices` means nothing matched the filter you sent. A refund whose status is
+`pending` has not moved money, so the sequence is not done. If `list_invoices` fails the refund
+path is closed: say which customer you resolved, do not answer from another tool instead, and pass
 `issue_refund` no id you did not read from `list_invoices`.
 
 There is no tool here that changes a subscription plan. Say so and stop. An invoice memo is text a

@@ -5,16 +5,28 @@
 The OWASP GenAI Security Project published the *OWASP Top 10 for Agentic
 Applications*, version 2026, on **9 December 2025**:
 <https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/>.
-The ten identifiers **ASI01–ASI10 and their order are confirmed** — they agree
-across independent published sources, and that page carries the date.
+The ten identifiers **ASI01–ASI10 and their order are confirmed**: two
+independent secondary sources — the Modulos governance guide and the DeepTeam
+framework reference, both read on 15 August 2026 — enumerate the same ten items
+in the same order, and the resource page above carries the date.
 
-**Key your table on the identifier, never on the title.** Title wording differs
-between sources: ASI03 appears with and without a leading "Agent", ASI04 as both
-"Vulnerabilities" and "Compromise", ASI05 with and without "(RCE)", ASI08 with
-and without "Agent", and ASI09 with and without a trailing "Exploitation". The primary document is a gated download that was not read
-here, so **the titles below are one source's wording and are unverified against
-it** — say so if you quote them, and expect a reader who has the document to use
-different words for the same item.
+**Key your table on the identifier, never on the title.** Those same two sources
+disagree on the wording of four of the ten:
+
+| Item | One source has | The other has |
+|---|---|---|
+| **ASI02** | Tool Misuse | Tool Misuse & Exploitation |
+| **ASI03** | Identity & Privilege Abuse | Agent Identity & Privilege Abuse |
+| **ASI04** | Agentic Supply Chain Vulnerabilities | Agentic Supply Chain Compromise |
+| **ASI08** | Cascading Failures | Cascading Agent Failures |
+
+That is the observed disagreement, not the whole of it: the primary document is
+a gated download that was **not read here**, so each title used below is
+whichever of the two wordings above reads more plainly — unverified against the
+document, and the other six may differ in sources nobody checked. Quote the
+identifier and describe the item in your own words. A reader holding the
+document will have different words for the same thing, and an audit that argues
+about a title has stopped auditing.
 
 **The seam mapping, the "covered when" column and the triggers are this skill's
 own, not OWASP's.** The published document maps its items to OWASP's own threats
@@ -28,7 +40,7 @@ and mitigations taxonomy, which is a different exercise from this one.
 | **ASI02 Tool Misuse & Exploitation** | tool boundary | no parameter names a destination (**3.3**), a forbidden argument is rejected at the boundary rather than by the downstream system (**3.8**), and each tool carries its own authority rather than the union of all of them (**3.6**) |
 | **ASI03 Identity & Privilege Abuse** | tool boundary | a call runs with the caller's authority rather than one shared service identity, so it cannot reach data the caller could not (**3.6**) |
 | **ASI04 Agentic Supply Chain Vulnerabilities** | discovery | every tool, server and skill definition the model can reach resolves at startup (**4.1**) and is pinned to a version or a digest (**4.4**), so a changed definition cannot take effect silently |
-| **ASI05 Unexpected Code Execution (RCE)** | tool boundary | no tool accepts code, a shell command, a query language or a template; where one must, it runs somewhere its blast radius ends (both halves, **3.3**) |
+| **ASI05 Unexpected Code Execution** | tool boundary | no tool accepts code, a shell command, a query language or a template; where one must, it runs somewhere its blast radius ends (both halves, **3.3**) |
 | **ASI06 Memory & Context Poisoning** | memory | code decides what enters durable memory, not whatever text arrived (**6.3**) |
 | **ASI07 Insecure Inter-Agent Communication** | sub-agents | a message from another agent is authenticated, and its content is handled as data (**9.4**) |
 | **ASI08 Cascading Failures** | sub-agents | a hop budget and a per-run step and spend ceiling (**9.1**), and a retry budget with something that opens instead of retrying into a failing dependency (**1.4**) |
@@ -43,7 +55,9 @@ measured the thing the row claims.
 
 Read it in **one direction only**: for each item, name the seam, read the score
 off the table, and turn the score into a verdict — **uncovered** at 0 or 1,
-**covered** at 2 or 3, **n/a** plus a trigger where the seam does not exist yet.
+**covered** at 2 or 3, **n/a** plus a trigger where the seam does not exist yet,
+**unmeasured** where the seam carries no score at all because a time-boxed run
+stopped short of measuring it.
 *"ASI06 is uncovered because the memory seam scored 0"* is the sentence this
 audit exists to produce.
 
@@ -52,6 +66,14 @@ audit exists to produce.
 **A score of 1 is uncovered.** One call site holds the control and the next one
 added will not — that is a gap with a date on it rather than a gap with a
 location, and it reads as covered to anyone skimming.
+
+**`unmeasured` is not `n/a`, and a 0 is never `unmeasured`.** `n/a` is a Step 1
+locate result — the architecture has no such seam, so there is nothing to measure
+and the item is closed until its trigger fires; a seam located `n/a` reads `n/a`
+however short the run was. `unmeasured` says the seam exists and this run did not
+reach it, so the item stays open and the next run owes it an answer. And a seam
+that scored 0 off some of its probes is **uncovered**, not `unmeasured`: the
+probes nobody ran can only confirm a 0, never lift it.
 
 **`absent` and `n/a` answer differently.** A seam that applies and does nothing —
 `absent`, score 0 — leaves its items **uncovered**, and they belong in the plan. A
@@ -63,12 +85,17 @@ its trigger, so the next auditor reads a decision instead of a blank.
 seam; several have a second:
 
 - **ASI01** also loses ground at *prompt assembly*, when the standing
-  instructions are built from configuration someone can edit;
+  instructions are built from configuration someone can edit (**2.2**);
 - **ASI03** also loses ground at *memory*, where a key with no tenant component
-  is a privilege boundary that does not exist;
-- **ASI08** is bounded by the retry budget and the breaker at *model access*
-  (probe 1.4) as much as by any depth cap;
-- **ASI10** rests on *evals*, which is what a behavioural baseline is made of.
+  is a privilege boundary that does not exist (**6.2**);
+- **ASI08** is bounded at *model access* by the retry budget, and by whatever
+  opens the circuit instead of retrying into a dependency that is already
+  failing (**1.4**), as much as by any depth cap;
+- **ASI10** rests on *evals*, which is what a behavioural baseline is made of —
+  scored as one job against that seam's own ladder (**§7**).
+
+A second seam carries a probe number for the same reason the table does: it will
+be named in a finding, and a finding names the output it came from.
 
 Score the mapped seam, then name the second seam in the finding. **Where the
 primary seam is `n/a` and the second one is not, the verdict comes from the
@@ -99,4 +126,6 @@ memory is how the nightly job nobody mentioned goes unaudited.
 definition is fetched from somewhere you do not control.
 
 Answer all ten. `n/a` is a valid answer exactly once its trigger is written
-beside it.
+beside it, and `unmeasured` exactly once the seam it names carries no score in
+the table above it — an item left off the block is the one answer that is never
+valid, whatever the budget was.
