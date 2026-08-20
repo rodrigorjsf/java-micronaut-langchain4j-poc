@@ -4,6 +4,7 @@ import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.guardrail.OutputGuardrail;
 import dev.langchain4j.guardrail.OutputGuardrailRequest;
 import dev.langchain4j.guardrail.OutputGuardrailResult;
+import dev.langchain4j.guardrail.config.OutputGuardrailsConfig;
 import dev.langchain4j.invocation.InvocationParameters;
 import io.github.rodrigorjsf.agenticchat.voice.VoiceProperties;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -13,11 +14,13 @@ import org.slf4j.LoggerFactory;
 
 import java.text.BreakIterator;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -35,10 +38,11 @@ import java.util.regex.Pattern;
  *
  * <h2>Three severities, and none of them is fatal</h2>
  * <ol>
- *   <li><b>Repaired.</b> Where the document itself states the replacement — an extra
- *       emoji, an emoji outside the allow-list, {@code todes} for {@code todos},
- *       "Banco Inter" for "Inter" — the answer is corrected in place. No model call,
- *       no latency, no chance of the retry drifting somewhere else.</li>
+ *   <li><b>Repaired.</b> Where the document itself states the replacement — an emoji
+ *       outside the allow-list, {@code todes} for {@code todos}, "Banco Inter" for
+ *       "Inter", a markdown dash where the document names {@code •} — the answer is
+ *       corrected in place. No model call, no latency, no chance of the retry
+ *       drifting somewhere else.</li>
  *   <li><b>Reprompted.</b> What cannot be rewritten mechanically — a sixth bullet,
  *       an investment verb, a regionalism — goes back to the model once, naming the
  *       clause it broke.</li>
@@ -52,16 +56,35 @@ import java.util.regex.Pattern;
  * already paid for that mistake once: a projection that kept a {@code strYoutube}
  * field made {@link ExfiltrationGuardrail} withhold the whole answer to the most
  * ordinary question in that skill. A cosmetic rule must never be able to do that —
- * exfiltration and prompt leakage are withheld, a second emoji is deleted.
+ * exfiltration and prompt leakage are withheld, a stray emoji is deleted.
  *
- * <h2>Enumerations, never morphology</h2>
+ * <h2>The failure that actually matters here is the false positive</h2>
  * <p>
- * The document forbids gender-neutral neologisms formed by replacing an ending with
- * {@code -e}, {@code @} or {@code x}. Read as a pattern that is a rule against every
- * Portuguese word ending in {@code e}: {@code você}, {@code site}, {@code e-mail},
- * {@code onde}, {@code verde}. So only the forms the document actually lists are
- * matched. A guardrail with false positives is switched off by the first person it
- * inconveniences, and then it protects nothing.
+ * A guardrail that damages a compliant answer is switched off by the first person it
+ * inconveniences, and then none of its real rules are enforced either. Three
+ * decisions below exist only because of that, each after a measurement:
+ *
+ * <ul>
+ *   <li><b>Emoji are identified by the Unicode {@code Emoji_Presentation} property,
+ *       never by code-point ranges.</b> Ranges chosen by eye put {@code ✓}, {@code ✗},
+ *       {@code ★}, {@code ❶}, {@code ➡}, {@code ⌘} and {@code ™} in the same class as
+ *       {@code 😊}. "Pagamento ✓ confirmado. 😊" then read as two emoji, and the repair
+ *       deleted the one the brand actually allows. Measured on this JDK:
+ *       {@code Emoji_Presentation} is true for every emoji in the allow-list bar one,
+ *       and false for all of those typographic symbols.</li>
+ *   <li><b>Only the enumerated neologisms, and not all of them.</b> The document's
+ *       rule is against endings replaced by {@code -e}, {@code @} or {@code x}, which
+ *       as a pattern is a rule against {@code você}, {@code site}, {@code onde} and
+ *       {@code verde}. {@code juntes} is enumerated by the document and is also the
+ *       standard tu-subjunctive of <i>juntar</i>, so "peço que tu juntes os
+ *       comprovantes" came back as "peço que tu juntos os comprovantes". The
+ *       unambiguous {@code junt@s} and {@code juntxs} are matched; the bare form is
+ *       left to the model, which still has the clause in front of it.</li>
+ *   <li><b>A list is two or more consecutive bullet lines.</b> One line beginning
+ *       with a dash is a footnote, a line of dialogue, or an amount — and rewriting
+ *       "* Valores sujeitos a alteração pelo Bacen." into a bullet, or counting it as
+ *       the sixth item of the list above it, is damage either way.</li>
+ * </ul>
  */
 @Singleton
 public class VoiceComplianceGuardrail implements OutputGuardrail {
@@ -79,58 +102,61 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
 
     /**
      * Substitutions the voice document states outright, so applying them is quoting
-     * the document rather than interpreting it.
+     * the document rather than interpreting it. Ordered, because the violation list
+     * becomes the reprompt and {@code Map.of} iterates differently on every JVM.
      */
-    private static final Map<String, String> STATED_REPLACEMENTS = Map.of(
-            "juntes", "juntos",
-            "junt@s", "juntos",
-            "juntxs", "juntos",
-            "todes", "todos",
-            "tod@s", "todos",
-            "todxs", "todos",
-            "queride", "você",
-            "obrigade", "obrigado",
-            "Banco Inter", "Inter",
-            "Inter Bank", "Inter");
+    private static final Map<String, String> STATED_REPLACEMENTS = new LinkedHashMap<>(Map.ofEntries(
+            Map.entry("junt@s", "juntos"),
+            Map.entry("juntxs", "juntos"),
+            Map.entry("todes", "todos"),
+            Map.entry("tod@s", "todos"),
+            Map.entry("todxs", "todos"),
+            Map.entry("queride", "você"),
+            Map.entry("obrigade", "obrigado"),
+            Map.entry("Banco Inter", "Inter"),
+            Map.entry("Inter Bank", "Inter")));
 
     /**
-     * Phrases the document forbids without naming a single drop-in replacement. The
-     * value is the clause the model is reminded of, in the document's own words.
+     * Terms the document forbids without naming a single drop-in replacement. The
+     * value is the clause the model is reminded of.
      */
-    private static final Map<String, String> FORBIDDEN_PHRASES = Map.of(
-            "veja mais", "ableist term: use \"saber mais\", \"acesse aqui\" or \"confira\" instead",
-            "na palma da mão", "ableist term: use \"saber mais\", \"acesse aqui\" or \"confira\" instead",
-            "seria melhor investir", "investment recommendation: never use this term",
-            "oriento o investimento", "investment recommendation: never use this term");
-
-    /**
-     * Single words, matched whole. {@code uai} inside another word is not a
-     * regionalism, and {@code recomendo} is a whole verb or nothing.
-     */
-    private static final Map<String, String> FORBIDDEN_WORDS = Map.of(
-            "oxente", "regionalism: do not use regionalisms",
-            "uai", "regionalism: do not use regionalisms",
-            "arretado", "regionalism: do not use regionalisms",
-            "recomendo", "recommendation: never use this term");
+    private static final Map<String, String> FORBIDDEN_TERMS = new LinkedHashMap<>(Map.ofEntries(
+            Map.entry("veja mais", "ableist term: use \"saber mais\", \"acesse aqui\" or \"confira\" instead"),
+            Map.entry("na palma da mão", "ableist term: use \"saber mais\", \"acesse aqui\" or \"confira\" instead"),
+            Map.entry("oxente", "regionalism: do not use regionalisms"),
+            Map.entry("uai", "regionalism: do not use regionalisms"),
+            Map.entry("arretado", "regionalism: do not use regionalisms"),
+            Map.entry("recomendo", "recommendation: never use this term"),
+            Map.entry("seria melhor investir", "investment recommendation: never use this term"),
+            Map.entry("oriento o investimento", "investment recommendation: never use this term")));
 
     /**
      * The glyph the document mandates for a bullet.
      */
     private static final String BULLET = "•";
 
-    private static final Pattern BULLET_LINE = Pattern.compile("^(\\s*)([-*+•])(\\s+\\S)");
+    /**
+     * Leading whitespace, marker, then at least one space and a non-space. The
+     * leading group is captured because indentation decides whether a line is an item
+     * of the list or a sub-item of one.
+     */
+    private static final Pattern BULLET_LINE = Pattern.compile("^([ \\t]*)([-*+•])([ \\t]+\\S)");
 
     /**
-     * A fenced code block. Its lines are not prose: a shell command starting with
-     * {@code - } is an argument, not a bullet, and rewriting it would corrupt code
-     * the user is meant to run.
+     * A markdown thematic break — {@code ***}, {@code - - -}, {@code ___}. It starts
+     * with a bullet marker and is a horizontal rule, and rewriting {@code * * *} into
+     * {@code • * *} is the sort of damage that gets a guardrail switched off.
      */
-    private static final Pattern FENCE = Pattern.compile("^\\s*(```|~~~)");
+    private static final Pattern THEMATIC_BREAK = Pattern.compile("^[ \\t]*([-*_])([ \\t]*\\1){2,}[ \\t]*$");
+
+    private static final Pattern FENCE = Pattern.compile("^[ \\t]*(```|~~~)");
 
     /**
-     * Horizontal whitespace only: collapsing {@code \s} would join the lines of a
-     * list into one paragraph, which the document also forbids.
+     * Interior runs of horizontal whitespace. Applied after a line's own indentation,
+     * never to it: collapsing the leading run reindents a four-space code block, and
+     * in Python or YAML that changes what the code means.
      */
+    private static final Pattern INDENT = Pattern.compile("^[ \\t]*");
     private static final Pattern SPACE_RUN = Pattern.compile("[ \\t]{2,}");
     private static final Pattern SPACE_BEFORE_PUNCTUATION = Pattern.compile("[ \\t]+([.,;:!?])");
 
@@ -142,20 +168,58 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
      */
     private static final Pattern SELECTORS = Pattern.compile("[︎️]");
 
+    /**
+     * Default emoji presentation, per the Unicode emoji properties the JDK exposes.
+     * A character with {@code Emoji=Yes} but {@code Emoji_Presentation=No} — {@code ✔},
+     * {@code ➡}, {@code ™}, {@code ⚠} — renders as text unless followed by U+FE0F, so
+     * it is an emoji only when the cluster carries that selector.
+     */
+    private static final Pattern EMOJI_PRESENTATION = Pattern.compile("\\p{IsEmoji_Presentation}");
+    private static final Pattern EMOJI_ELIGIBLE = Pattern.compile("\\p{IsEmoji}");
+
     private final VoiceProperties voice;
     private final MeterRegistry meters;
     private final Set<String> allowedEmoji;
+    private final List<Replacement> replacements;
+    private final List<TermRule> forbidden;
+    private final int maxReprompts;
+
+    private record Replacement(Pattern pattern, String to) { }
+
+    private record TermRule(Pattern pattern, String term, String clause) { }
 
     public VoiceComplianceGuardrail(VoiceProperties voice, MeterRegistry meters) {
         this.voice = voice;
         this.meters = meters;
+
         var allowed = new LinkedHashSet<String>();
         if (voice.allowedEmoji() != null) {
             voice.allowedEmoji().forEach(emoji -> allowed.add(normalise(emoji)));
         }
         this.allowedEmoji = Set.copyOf(allowed);
+
+        // Compiled once. Built per call this was ~35 Pattern.compile per turn, for
+        // patterns that never change.
+        this.replacements = STATED_REPLACEMENTS.entrySet().stream()
+                .map(entry -> new Replacement(whole(entry.getKey()), entry.getValue()))
+                .toList();
+        this.forbidden = FORBIDDEN_TERMS.entrySet().stream()
+                .map(entry -> new TermRule(whole(entry.getKey()), entry.getKey(), entry.getValue()))
+                .toList();
+
+        // The executor throws once ITS budget is spent, and its budget counts the
+        // first attempt. Asking for as many reprompts as it allows attempts means the
+        // last failure has nowhere to go but the exception — a word choice becoming a
+        // 5xx, which is the failure this class exists to prevent. Clamped rather than
+        // rejected: refusing to start over a cosmetic setting is its own outage.
+        int ceiling = OutputGuardrailsConfig.MAX_RETRIES_DEFAULT - 1;
+        this.maxReprompts = Math.clamp(voice.maxReprompts(), 0, ceiling);
+        if (this.maxReprompts != voice.maxReprompts()) {
+            LOG.warn("agentic.voice.max-reprompts={} exceeds what the guardrail executor allows; clamped to {}",
+                    voice.maxReprompts(), this.maxReprompts);
+        }
         LOG.info("Voice compliance guardrail active: {} allowed emoji, max {} bullets, {} reprompt(s)",
-                allowedEmoji.size(), voice.maxBulletItems(), voice.maxReprompts());
+                allowedEmoji.size(), voice.maxBulletItems(), maxReprompts);
     }
 
     @Override
@@ -202,12 +266,13 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
      */
     List<String> violations(String text) {
         var found = new ArrayList<String>();
-        String lower = text.toLowerCase(Locale.ROOT);
 
-        // Prose only. An emoji inside a fenced code block is part of the sample, and
-        // counting it would report a violation that repair is not allowed to fix —
-        // which spends the reprompt budget every turn and never converges.
-        String prose = prose(text);
+        // Prose only. An emoji or a dash inside a fenced code block is part of the
+        // sample, and reporting it would raise a violation the repair is not allowed
+        // to fix — which spends the reprompt budget every turn and never converges.
+        Lines lines = Lines.of(text);
+        String prose = lines.prose();
+
         List<String> emoji = emojiIn(prose);
         if (emoji.size() > 1) {
             found.add("emoji: use ONLY 1 emoji per response (found " + emoji.size() + ")");
@@ -221,83 +286,31 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
             found.add("emoji: the emoji goes at the end of the message, after the closing full stop");
         }
 
-        STATED_REPLACEMENTS.forEach((bad, good) -> {
-            if (whole(bad).matcher(text).find()) {
-                found.add("wording: \"" + bad + "\" must be \"" + good + "\"");
+        for (Replacement replacement : replacements) {
+            Matcher match = replacement.pattern().matcher(prose);
+            if (match.find()) {
+                found.add("wording: \"" + match.group() + "\" must be \"" + replacement.to() + "\"");
             }
-        });
-        FORBIDDEN_PHRASES.forEach((phrase, clause) -> {
-            if (lower.contains(phrase)) {
-                found.add(clause + " (\"" + phrase + "\")");
-            }
-        });
-        FORBIDDEN_WORDS.forEach((word, clause) -> {
-            if (whole(word).matcher(text).find()) {
-                found.add(clause + " (\"" + word + "\")");
-            }
-        });
-
-        int longestRun = longestBulletRun(text);
-        if (longestRun > voice.maxBulletItems()) {
-            found.add("lists: at most " + voice.maxBulletItems()
-                    + " bullet points per list (found " + longestRun + ")");
         }
-        if (usesTheWrongBulletGlyph(text)) {
-            // The clause is "use bullet points (•) for lists", and a check that
-            // enforced only its second half — the five-item cap — would ratify the
-            // wrong glyph in the same pass that measured the right count.
+        for (TermRule rule : forbidden) {
+            if (rule.pattern().matcher(prose).find()) {
+                found.add(rule.clause() + " (\"" + rule.term() + "\")");
+            }
+        }
+
+        List<List<Integer>> lists = lines.bulletLists();
+        int longest = lists.stream().mapToInt(list -> lines.itemsIn(list)).max().orElse(0);
+        if (longest > voice.maxBulletItems()) {
+            found.add("lists: at most " + voice.maxBulletItems()
+                    + " bullet points per list (found " + longest + ")");
+        }
+        if (lines.usesTheWrongGlyph(lists)) {
+            // The clause is "use bullet points (•) for lists - max. 5 items", and a
+            // check that enforced only its second half would ratify the wrong glyph
+            // in the same pass that measured the right count.
             found.add("lists: bullets are written \"" + BULLET + "\", not \"-\", \"*\" or \"+\"");
         }
         return found;
-    }
-
-    /**
-     * The longest unbroken run of bullet lines. Numbered lists are exempt: the
-     * document caps bullets and explicitly allows numbering for step-by-step
-     * instructions, which have no stated ceiling.
-     */
-    private static int longestBulletRun(String text) {
-        int longest = 0;
-        int run = 0;
-        for (String line : proseLinesOf(text)) {
-            if (line != null && BULLET_LINE.matcher(line).find()) {
-                longest = Math.max(longest, ++run);
-            } else if (line != null && !line.isBlank()) {
-                run = 0;
-            }
-        }
-        return longest;
-    }
-
-    private static boolean usesTheWrongBulletGlyph(String text) {
-        for (String line : proseLinesOf(text)) {
-            if (line == null) {
-                continue;
-            }
-            Matcher bullet = BULLET_LINE.matcher(line);
-            if (bullet.find() && !BULLET.equals(bullet.group(2))) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * The lines outside fenced code blocks, with fenced lines replaced by null so
-     * the caller keeps the original line numbering without treating code as prose.
-     */
-    private static List<String> proseLinesOf(String text) {
-        var lines = new ArrayList<String>();
-        boolean inFence = false;
-        for (String line : text.split("\\R", -1)) {
-            if (FENCE.matcher(line).find()) {
-                inFence = !inFence;
-                lines.add(null);
-            } else {
-                lines.add(inFence ? null : line);
-            }
-        }
-        return lines;
     }
 
     // ---------------------------------------------------------------------- repair
@@ -307,40 +320,16 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
      */
     String repair(String text) {
         String out = text;
-        for (var entry : STATED_REPLACEMENTS.entrySet()) {
-            out = whole(entry.getKey()).matcher(out).replaceAll(match -> matchCase(match.group(), entry.getValue()));
+        for (Replacement replacement : replacements) {
+            out = replacement.pattern().matcher(out)
+                    .replaceAll(match -> matchCase(match.group(), replacement.to()));
         }
-        return repairEmoji(repairBullets(out));
+        return repairEmoji(Lines.of(out).withBulletGlyphFixed());
     }
 
     /**
-     * Rewrites a markdown bullet marker to the glyph the document names, leaving
-     * fenced code untouched and preserving indentation so a nested list stays nested.
-     */
-    private static String repairBullets(String text) {
-        String[] lines = text.split("\\R", -1);
-        List<String> prose = proseLinesOf(text);
-        var out = new StringBuilder();
-        for (int i = 0; i < lines.length; i++) {
-            if (i > 0) {
-                out.append('\n');
-            }
-            String line = lines[i];
-            if (prose.get(i) == null) {
-                out.append(line);
-                continue;
-            }
-            Matcher bullet = BULLET_LINE.matcher(line);
-            // BULLET contains no "$" or "\", so it needs no replacement quoting, and
-            // quoting it would turn the two group references literal.
-            out.append(bullet.find() ? bullet.replaceFirst("$1" + BULLET + "$3") : line);
-        }
-        return out.toString();
-    }
-
-    /**
-     * Removes every emoji, then puts back at most one — and only when the model had
-     * already shown the judgement the document asks for.
+     * Removes every emoji from the prose, then puts back at most one — and only when
+     * the model had already shown the judgement the document asks for.
      *
      * <h3>More than one emoji means the judgement was not exercised</h3>
      * <p>
@@ -348,62 +337,31 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
      * only when the emoji adds objective meaning, and "if you are unsure, do not use
      * it". A response carrying two emoji is evidence that none of that was applied,
      * so keeping the prettier one would convert a countable violation into an
-     * unmeasurable one: a instability notice repaired from "fora do ar ⚠️ … sem
+     * unmeasurable one: an instability notice repaired from "fora do ar ⚠️ … sem
      * previsão 😊" down to a single trailing 😊 passes every check in this class and
      * is exactly the answer the document forbids. Where the count is wrong, all of
      * them go — the document's own tie-breaker is to leave it out.
      *
      * <p>A single emoji that is merely in the wrong place is a different case: the
-     * model chose one, deliberately, from the allowed set. That one is moved.
+     * model chose one, deliberately, from the allowed set. That one is moved — unless
+     * the answer ends inside a code block, where appending it would run the emoji
+     * onto the closing fence and render the rest of the message as code.
      */
     private String repairEmoji(String text) {
-        List<String> emoji = emojiIn(prose(text));
+        Lines lines = Lines.of(text);
+        List<String> emoji = emojiIn(lines.prose());
         if (emoji.isEmpty()) {
             return text;
         }
         String only = emoji.size() == 1 ? emoji.getFirst() : null;
         String keep = only != null && allowedEmoji.contains(normalise(only)) ? only : null;
-        if (keep != null && endsWithEmoji(prose(text))) {
+        if (keep != null && endsWithEmoji(lines.prose())) {
             return text;
         }
-
-        // Line by line, and only the prose lines. Collapsing runs of spaces is part
-        // of removing an emoji — "O prazo ⏰ é" would otherwise keep both of its
-        // spaces — but run over a whole answer it also reindents fenced code, which
-        // in Python or YAML changes what the code means.
-        String[] lines = text.split("\\R", -1);
-        List<String> proseLines = proseLinesOf(text);
-        var out = new StringBuilder();
-        for (int i = 0; i < lines.length; i++) {
-            if (i > 0) {
-                out.append('\n');
-            }
-            if (proseLines.get(i) == null) {
-                out.append(lines[i]);
-                continue;
-            }
-            var line = new StringBuilder();
-            forEachCluster(lines[i], cluster -> {
-                if (!isEmoji(cluster)) {
-                    line.append(cluster);
-                }
-            });
-            String cleaned = SPACE_RUN.matcher(line.toString()).replaceAll(" ");
-            out.append(SPACE_BEFORE_PUNCTUATION.matcher(cleaned).replaceAll("$1"));
+        if (!lines.endsInProse()) {
+            keep = null;
         }
-        String body = out.toString().stripTrailing();
-        return keep == null ? body : body + " " + keep;
-    }
-
-    /**
-     * The answer with fenced code blocks removed, for the checks that are about what
-     * the assistant SAYS. An emoji in a code sample is part of the sample.
-     */
-    private static String prose(String text) {
-        return proseLinesOf(text).stream()
-                .filter(line -> line != null)
-                .reduce((a, b) -> a + "\n" + b)
-                .orElse("");
+        return lines.stripEmojiFromProse(this::isEmoji) + (keep == null ? "" : " " + keep);
     }
 
     // ----------------------------------------------------------------- the reprompt
@@ -421,8 +379,7 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
 
                 Response to correct:
                 %s"""
-                .formatted(remaining.stream().map(rule -> "- " + rule).reduce((a, b) -> a + "\n" + b).orElse(""),
-                        answer);
+                .formatted(String.join("\n", remaining.stream().map(rule -> "- " + rule).toList()), answer);
     }
 
     /**
@@ -437,11 +394,182 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
             return false;
         }
         int spent = parameters.getOrDefault(ATTEMPTS_KEY, 0);
-        if (spent >= voice.maxReprompts()) {
+        if (spent >= maxReprompts) {
             return false;
         }
         parameters.put(ATTEMPTS_KEY, spent + 1);
         return true;
+    }
+
+    // -------------------------------------------------------------------- the lines
+
+    /**
+     * One answer, split into lines and classified once.
+     *
+     * <p>Every rule here is about what the assistant <em>says</em>, and a fenced code
+     * block is not something it says. Doing the classification in one place is what
+     * keeps {@code violations} and {@code repair} agreeing about which lines are
+     * prose — and where they disagree, a violation is reported that repair may not
+     * touch, the reprompt budget is spent on it every turn, and it never converges.
+     */
+    private record Lines(List<String> all, boolean[] isProse) {
+
+        static Lines of(String text) {
+            String[] split = text.split("\\R", -1);
+            int fences = 0;
+            for (String line : split) {
+                if (FENCE.matcher(line).find()) {
+                    fences++;
+                }
+            }
+            // An odd number of fence markers means one is unpaired, and honouring it
+            // would classify the whole tail as code — silently disabling every rule
+            // below it. An unbalanced answer is treated as prose throughout.
+            boolean honourFences = fences % 2 == 0;
+
+            var prose = new boolean[split.length];
+            boolean inFence = false;
+            for (int i = 0; i < split.length; i++) {
+                boolean isFenceMarker = honourFences && FENCE.matcher(split[i]).find();
+                if (isFenceMarker) {
+                    inFence = !inFence;
+                }
+                prose[i] = !isFenceMarker && !inFence;
+            }
+            return new Lines(List.of(split), prose);
+        }
+
+        String prose() {
+            var out = new StringBuilder();
+            for (int i = 0; i < all.size(); i++) {
+                if (isProse[i]) {
+                    if (!out.isEmpty()) {
+                        out.append('\n');
+                    }
+                    out.append(all.get(i));
+                }
+            }
+            return out.toString();
+        }
+
+        /**
+         * True when the last non-blank line is prose rather than code.
+         */
+        boolean endsInProse() {
+            for (int i = all.size() - 1; i >= 0; i--) {
+                if (!all.get(i).isBlank()) {
+                    return isProse[i];
+                }
+            }
+            return true;
+        }
+
+        /**
+         * The line indices of each bullet list, where a list is two or more
+         * consecutive bullet lines. A single line opening with a dash is a footnote,
+         * a line of dialogue or an amount, and treating it as a list both rewrites it
+         * and pushes the list above it over the item cap.
+         */
+        List<List<Integer>> bulletLists() {
+            var lists = new ArrayList<List<Integer>>();
+            var run = new ArrayList<Integer>();
+            for (int i = 0; i < all.size(); i++) {
+                if (isProse[i] && isBullet(all.get(i))) {
+                    run.add(i);
+                    continue;
+                }
+                // A blank line ends the run. The document mandates a blank line
+                // between lists, so reading it as continuation merges two compliant
+                // three-item lists into one six-item violation.
+                if (!run.isEmpty()) {
+                    if (run.size() > 1) {
+                        lists.add(List.copyOf(run));
+                    }
+                    run.clear();
+                }
+            }
+            if (run.size() > 1) {
+                lists.add(List.copyOf(run));
+            }
+            return lists;
+        }
+
+        /**
+         * The items of one list: the lines at its shallowest indentation. Deeper lines
+         * are sub-items of an item already counted, and the document caps items.
+         */
+        int itemsIn(List<Integer> list) {
+            int base = list.stream().mapToInt(i -> indentOf(all.get(i))).min().orElse(0);
+            return (int) list.stream().filter(i -> indentOf(all.get(i)) == base).count();
+        }
+
+        boolean usesTheWrongGlyph(List<List<Integer>> lists) {
+            return lists.stream().flatMap(List::stream)
+                    .anyMatch(i -> !BULLET.equals(markerOf(all.get(i))));
+        }
+
+        String withBulletGlyphFixed() {
+            var rewrite = new LinkedHashSet<Integer>();
+            bulletLists().forEach(rewrite::addAll);
+            var out = new StringBuilder();
+            for (int i = 0; i < all.size(); i++) {
+                if (i > 0) {
+                    out.append('\n');
+                }
+                String line = all.get(i);
+                out.append(rewrite.contains(i)
+                        ? BULLET_LINE.matcher(line).replaceFirst("$1" + BULLET + "$3")
+                        : line);
+            }
+            return out.toString();
+        }
+
+        /**
+         * Drops every emoji from the prose lines and closes the gap each one leaves,
+         * copying code lines through byte for byte.
+         */
+        String stripEmojiFromProse(java.util.function.Predicate<String> isEmoji) {
+            var out = new StringBuilder();
+            for (int i = 0; i < all.size(); i++) {
+                if (i > 0) {
+                    out.append('\n');
+                }
+                String line = all.get(i);
+                if (!isProse[i]) {
+                    out.append(line);
+                    continue;
+                }
+                var kept = new StringBuilder();
+                forEachCluster(line, cluster -> {
+                    if (!isEmoji.test(cluster)) {
+                        kept.append(cluster);
+                    }
+                });
+                // The indentation is preserved and only the interior is collapsed:
+                // "O prazo ⏰ é" must lose its double space, and a four-space code
+                // block must not lose its four.
+                Matcher indent = INDENT.matcher(kept.toString());
+                String leading = indent.find() ? indent.group() : "";
+                String body = kept.substring(leading.length());
+                body = SPACE_RUN.matcher(body).replaceAll(" ");
+                out.append(leading).append(SPACE_BEFORE_PUNCTUATION.matcher(body).replaceAll("$1"));
+            }
+            return out.toString().stripTrailing();
+        }
+
+        private static boolean isBullet(String line) {
+            return BULLET_LINE.matcher(line).find() && !THEMATIC_BREAK.matcher(line).find();
+        }
+
+        private static String markerOf(String line) {
+            Matcher bullet = BULLET_LINE.matcher(line);
+            return bullet.find() ? bullet.group(2) : "";
+        }
+
+        private static int indentOf(String line) {
+            Matcher bullet = BULLET_LINE.matcher(line);
+            return bullet.find() ? bullet.group(1).length() : 0;
+        }
     }
 
     // ------------------------------------------------------------------ text utils
@@ -450,30 +578,46 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
         meters.counter("agentic.voice.violations", "outcome", outcome).increment();
     }
 
+    /**
+     * Matches a term only when it stands alone.
+     *
+     * <p>{@code \b} is not enough twice over. It does not fire next to {@code @}, so
+     * {@code tod@s} would match only up to the sign; and it treats {@code -},
+     * {@code _} and {@code /} as boundaries, so {@code uai-minas},
+     * {@code total_uai_mensal} and {@code /docs/uai/relatorio.pdf} all counted as the
+     * regionalism. A full stop is a boundary only when a sentence ends there:
+     * {@code recomendo.} must match and {@code uai.com} must not.
+     */
     private static Pattern whole(String term) {
-        // \b does not fire next to "@": "tod@s" would match only up to the "@". The
-        // boundaries are therefore written as "not a letter, digit or @".
-        String edge = "(?<![\\p{L}\\p{N}@])%s(?![\\p{L}\\p{N}@])";
-        return Pattern.compile(edge.formatted(Pattern.quote(term)),
+        return Pattern.compile(
+                "(?<![\\p{L}\\p{N}@._/-])" + Pattern.quote(term) + "(?![\\p{L}\\p{N}@_/-])(?!\\.[\\p{L}\\p{N}])",
                 Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
     }
 
     /**
-     * Keeps the capitalisation of what was written: "Todes" becomes "Todos".
+     * Keeps the capitalisation of what was written: "Todes" becomes "Todos", and
+     * "TODES" in a heading becomes "TODOS" rather than "Todos".
      */
     private static String matchCase(String matched, String replacement) {
-        if (matched.isEmpty() || !Character.isUpperCase(matched.charAt(0))) {
+        if (matched.isEmpty()) {
             return Matcher.quoteReplacement(replacement);
         }
-        return Matcher.quoteReplacement(
-                Character.toUpperCase(replacement.charAt(0)) + replacement.substring(1));
+        if (matched.length() > 1 && matched.equals(matched.toUpperCase(Locale.ROOT))
+                && !matched.equals(matched.toLowerCase(Locale.ROOT))) {
+            return Matcher.quoteReplacement(replacement.toUpperCase(Locale.ROOT));
+        }
+        if (Character.isUpperCase(matched.charAt(0))) {
+            return Matcher.quoteReplacement(
+                    Character.toUpperCase(replacement.charAt(0)) + replacement.substring(1));
+        }
+        return Matcher.quoteReplacement(replacement);
     }
 
     private static String normalise(String emoji) {
         return SELECTORS.matcher(emoji).replaceAll("").strip();
     }
 
-    private static List<String> emojiIn(String text) {
+    private List<String> emojiIn(String text) {
         var found = new ArrayList<String>();
         forEachCluster(text, cluster -> {
             if (isEmoji(cluster)) {
@@ -483,15 +627,40 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
         return found;
     }
 
-    private static boolean endsWithEmoji(String text) {
+    private boolean endsWithEmoji(String text) {
         String trimmed = text.stripTrailing();
-        return !trimmed.isEmpty() && isEmoji(lastCluster(trimmed));
+        if (trimmed.isEmpty()) {
+            return false;
+        }
+        var last = new String[] {""};
+        forEachCluster(trimmed, cluster -> last[0] = cluster);
+        return isEmoji(last[0]);
     }
 
-    private static String lastCluster(String text) {
-        var last = new String[] {""};
-        forEachCluster(text, cluster -> last[0] = cluster);
-        return last[0];
+    /**
+     * Whether a grapheme cluster is an emoji as a reader would see it.
+     *
+     * <p>Three ways to qualify, in the order they matter: the cluster defaults to
+     * emoji presentation; or it is emoji-eligible and carries the U+FE0F selector that
+     * asks for that presentation; or it is one of the emoji this deployment allows,
+     * which catches {@code ⚠} — emoji-eligible, text by default, and on the list.
+     *
+     * <p>What this deliberately does not do is match {@code \p{IsEmoji}} alone: that
+     * property is true of {@code #}, {@code *} and every digit, because each can be
+     * the base of a keycap sequence.
+     */
+    private boolean isEmoji(String cluster) {
+        if (cluster.isEmpty()) {
+            return false;
+        }
+        String first = new String(Character.toChars(cluster.codePointAt(0)));
+        if (EMOJI_PRESENTATION.matcher(first).find()) {
+            return true;
+        }
+        if (cluster.indexOf('️') >= 0 && EMOJI_ELIGIBLE.matcher(first).find()) {
+            return true;
+        }
+        return allowedEmoji.contains(normalise(cluster));
     }
 
     /**
@@ -499,29 +668,12 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
      * modifier or a zero-width-joined sequence counts as the one emoji a reader sees
      * rather than as the two to five code points it is made of.
      */
-    private static void forEachCluster(String text, java.util.function.Consumer<String> action) {
+    private static void forEachCluster(String text, Consumer<String> action) {
         BreakIterator clusters = BreakIterator.getCharacterInstance(Locale.ROOT);
         clusters.setText(text);
         int start = clusters.first();
         for (int end = clusters.next(); end != BreakIterator.DONE; start = end, end = clusters.next()) {
             action.accept(text.substring(start, end));
         }
-    }
-
-    private static boolean isEmoji(String cluster) {
-        if (cluster.isEmpty()) {
-            return false;
-        }
-        int codePoint = cluster.codePointAt(0);
-        // Deliberately excludes U+2190-U+21FF: an arrow is punctuation in prose, and
-        // treating "->" rendered as an arrow as an emoji would strip it from an answer.
-        return (codePoint >= 0x1F000 && codePoint <= 0x1FAFF)
-                || (codePoint >= 0x2600 && codePoint <= 0x27BF)
-                || (codePoint >= 0x2300 && codePoint <= 0x23FF)
-                || (codePoint >= 0x2B00 && codePoint <= 0x2BFF)
-                || codePoint == 0x203C || codePoint == 0x2049
-                || codePoint == 0x2122 || codePoint == 0x2139 || codePoint == 0x24C2
-                || codePoint == 0x3030 || codePoint == 0x303D
-                || codePoint == 0x3297 || codePoint == 0x3299;
     }
 }

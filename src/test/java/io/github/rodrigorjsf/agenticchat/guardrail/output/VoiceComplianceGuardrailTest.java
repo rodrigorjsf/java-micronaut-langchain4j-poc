@@ -199,12 +199,14 @@ class VoiceComplianceGuardrailTest {
     @Test
     @DisplayName("a dash inside a fenced code block is an argument, not a bullet")
     void fencedCodeIsLeftAlone() {
-        String answer = "Rode:\n\n```bash\ncurl -s https://exemplo\n- nao e bullet\n```\n\n- item";
+        // Two items below the fence, because one dash on its own is a footnote and
+        // is deliberately left alone.
+        String answer = "Rode:\n\n```bash\ncurl -s https://exemplo\n- nao e bullet\n```\n\n- item\n- outro";
 
         assertThat(guardrail.repair(answer))
                 .contains("curl -s https://exemplo")
                 .contains("- nao e bullet")
-                .endsWith("• item");
+                .endsWith("• item\n• outro");
     }
 
     @Test
@@ -291,6 +293,151 @@ class VoiceComplianceGuardrailTest {
                 .build();
 
         assertThat(guardrail.validate(request).isSuccess()).isTrue();
+    }
+
+    // ------------------------------------------- symbols that are not emoji
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "Pagamento ✓ confirmado. 😊",
+            "Status ✗ pendente. 😊",
+            "Avaliação ★★★★★ do serviço. 😊",
+            "Passo ❶ do processo. 😊",
+            "Atalho ⌘K para buscar. 😊",
+            "Produto™ registrado. 😊",
+            "Início → Pix → Enviar. 😊",
+            "Temperatura de 25° hoje. 😊"})
+    @DisplayName("a typographic symbol is not the second emoji")
+    void ordinarysymbolsAreNotCountedAsEmoji(String answer) {
+        // Ranges picked by eye put ✓, ★, ❶, ⌘ and ™ in the same class as 😊, and the
+        // repair then deleted the one emoji the brand actually allows.
+        assertThat(guardrail.violations(answer)).isEmpty();
+        assertThat(guardrail.repair(answer)).isEqualTo(answer);
+    }
+
+    @Test
+    @DisplayName("a comparison table keeps its check marks")
+    void checkMarksSurviveARepair() {
+        String answer = "Comparativo 🚀:\n\n| Pix | ✓ | ✗ |\n| Cartão | ✓ | ✓ |";
+
+        // 🚀 is off the allow-list and goes; the table is not touched.
+        assertThat(guardrail.repair(answer)).isEqualTo("Comparativo:\n\n| Pix | ✓ | ✗ |\n| Cartão | ✓ | ✓ |");
+    }
+
+    @Test
+    @DisplayName("a text-presentation symbol becomes an emoji when it carries the selector")
+    void theVariationSelectorPromotesASymbol() {
+        assertThat(guardrail.violations("Concluído ✔️ e enviado 😊"))
+                .anyMatch(rule -> rule.contains("ONLY 1 emoji"));
+    }
+
+    // ------------------------------------------------------- code that is not prose
+
+    @Test
+    @DisplayName("a four-space indented block keeps its indentation")
+    void indentedCodeIsNotReflowed() {
+        String answer = "Exemplo 🚀:\n\n    chave = \"11999998888\"\n        formato = \"telefone\"";
+
+        assertThat(guardrail.repair(answer))
+                .contains("\n    chave = \"11999998888\"\n        formato = \"telefone\"");
+    }
+
+    @Test
+    @DisplayName("the kept emoji is never glued onto a closing fence")
+    void anAnswerEndingInCodeLosesTheEmojiRatherThanTheFence() {
+        String answer = "O prazo ⏰ para o estorno:\n\n```\nD+2 uteis\n```";
+
+        assertThat(guardrail.repair(answer)).isEqualTo("O prazo para o estorno:\n\n```\nD+2 uteis\n```");
+    }
+
+    @Test
+    @DisplayName("an unpaired fence does not switch the rules off for the rest of the answer")
+    void anUnbalancedFenceIsTreatedAsProse() {
+        String answer = "Veja:\n```\n• RG\n• CPF\n• CNH\n• Passaporte\n• Título\n• Carteira";
+
+        assertThat(guardrail.violations(answer))
+                .anyMatch(rule -> rule.contains("at most 5 bullet points"));
+    }
+
+    // -------------------------------------------------- lines that are not bullets
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "* * *",
+            "- - -",
+            "___",
+            "* Valores sujeitos a alteração pelo Bacen.",
+            "- Não tenho o comprovante.",
+            "- 250,00 reais de tarifa"})
+    @DisplayName("a rule, a footnote and a line of dialogue are not lists")
+    void aSingleDashLineIsNotABullet(String answer) {
+        assertThat(guardrail.violations(answer)).isEmpty();
+        assertThat(guardrail.repair(answer)).isEqualTo(answer);
+    }
+
+    @Test
+    @DisplayName("a footnote below a full list is not its sixth item")
+    void aFootnoteDoesNotOverflowTheListAboveIt() {
+        String answer = "Documentos:\n• RG\n• CPF\n• CNH\n• Passaporte\n• Título\n\n* Trazer os originais.";
+
+        assertThat(guardrail.violations(answer)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("sub-items are not items")
+    void nestedBulletsAreNotCountedAsTopLevelItems() {
+        String answer = "• Cartão\n  • Crédito\n  • Débito\n• Conta\n  • Corrente\n  • Poupança";
+
+        assertThat(guardrail.violations(answer)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("the blank line the document mandates ends the list")
+    void aBlankLineResetsTheRun() {
+        String answer = "Pessoa física:\n\n• RG\n• CPF\n• CNH\n\nPessoa jurídica:\n\n• CNPJ\n• Contrato\n• Procuração";
+
+        assertThat(guardrail.violations(answer)).isEmpty();
+    }
+
+    // ----------------------------------------------------- word boundaries
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "Acesse o portal Uai-Minas para consultar.",
+            "O endereço é uai.com.br para essa consulta.",
+            "O campo total_uai_mensal traz o acumulado.",
+            "Peço que tu juntes os comprovantes."})
+    @DisplayName("an identifier, a hostname and correct Portuguese are not violations")
+    void identifiersAndValidPortugueseDoNotFire(String answer) {
+        assertThat(guardrail.violations(answer)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("a full stop still ends a sentence")
+    void aTermAtTheEndOfASentenceStillMatches() {
+        assertThat(guardrail.violations("Não recomendo.")).anyMatch(rule -> rule.contains("recomendo"));
+    }
+
+    @Test
+    @DisplayName("an all-caps heading does not come back mixed case")
+    void capitalisationOfTheWholeMatchIsKept() {
+        assertThat(guardrail.repair("TODES PODEM ACESSAR.")).isEqualTo("TODOS PODEM ACESSAR.");
+    }
+
+    // ------------------------------------------------------------- the budget
+
+    @Test
+    @DisplayName("a reprompt budget the executor cannot honour is clamped, not obeyed")
+    void anOversizedRepromptBudgetIsClamped() {
+        // Measured: with the executor's own maxRetries at 2, asking for 2 reprompts
+        // makes the last failure throw and the answer is lost. A cosmetic rule must
+        // never be one config character away from a 5xx.
+        var generous = new VoiceComplianceGuardrail(properties(5), new SimpleMeterRegistry());
+        var parameters = new InvocationParameters();
+        var request = requestFor("Recomendo esse fundo.", parameters);
+
+        assertThat(generous.validate(request).isRetry()).isTrue();
+        assertThat(generous.validate(request).isSuccess()).isTrue();
     }
 
     // ------------------------------------------------------------------ fixtures
