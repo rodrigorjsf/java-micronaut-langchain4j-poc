@@ -78,10 +78,33 @@ Six attacks, and what stops each.
 |---|---|
 | **SSRF via a URL-taking tool** | No tool takes a URL. A catalogue key is the only way to name a destination, and one that is not configured is refused. This removes the category rather than filtering it. |
 | **Secret exfiltration via tool arguments** | Credential shapes are refused before the request leaves the process, and no tool parameter may be *named* like a credential. |
-| **Indirect injection via tool results or RAG** | `ToolGuardProvider` screens every result. RAG documents are the repository's own reviewed Markdown, not third-party text. |
+| **Indirect injection via tool results or RAG** | `ToolGuardProvider` screens every result, with its own rule set — see below. RAG documents are the repository's own reviewed Markdown, not third-party text. |
 | **Tool-name hallucination** | A non-throwing strategy returns guidance instead of a 500, telling the model to activate the right skill first. |
 | **Excessive agency / unbounded loops** | Six round trips per turn, and a bounded tool set that only widens on explicit activation. |
 | **Cost-exhaustion DoS** | Per-endpoint timeouts, no retry on 429, a triage gate that answers most refusals with a small model, and per-role cost metrics that make an anomaly visible. |
+
+### A tool result is not a sentence, and the rules cannot be the same
+
+The screen on a tool result started as the screen on a user's turn, and three of
+its structural rules turned out to measure the machine rather than the message.
+
+Compact JSON contains no whitespace, so a rule that blocks on a 400-character run
+without a space blocks on any result over 400 bytes. Measured 2026-08-20, the
+central bank's twelve-month SELIC series is 457 characters with a longest run of
+457 — and the model was told *"this source returned content that looks like an
+attempt to give you instructions"* instead of receiving the series. Most of this
+catalogue returns compact JSON, so most of it was reachable and unusable.
+
+`scoreToolResult` keeps only what is about **instructions**, which is the only
+thing indirect injection can be: role delimiters, a fence claiming a privileged
+role, a data URI, override and probe phrases, invisible characters, a decodable
+base64 blob. It drops the length rule — `max-response-bytes` is already that
+bound, at the transport, where it belongs — the long-token rule, and the
+`<s>`/`</s>` delimiter, which is a chat-template leak in a user's own sentence and
+ordinary HTML strikethrough in an article a tool fetched.
+
+The general shape: **a detector inherited from another surface is a detector that
+has not been evaluated on this one.**
 
 ### The catalogue entry that was rejected
 
