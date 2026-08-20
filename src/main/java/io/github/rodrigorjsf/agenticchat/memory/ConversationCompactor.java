@@ -80,6 +80,7 @@ public class ConversationCompactor {
     private final ChatMemoryStore store;
     private final ConversationSummarizer summarizer;
     private final MeterRegistry meters;
+    private final io.micrometer.core.instrument.DistributionSummary conversationTokens;
     private final int triggerTokens;
 
     public ConversationCompactor(ChatMemoryStore store,
@@ -89,6 +90,10 @@ public class ConversationCompactor {
         this.store = store;
         this.summarizer = summarizer;
         this.meters = meters;
+        this.conversationTokens = io.micrometer.core.instrument.DistributionSummary
+                .builder("agentic.memory.tokens")
+                .description("Estimated tokens in a conversation when compaction was considered")
+                .register(meters);
         this.triggerTokens = triggerTokens;
     }
 
@@ -100,7 +105,11 @@ public class ConversationCompactor {
         try {
             var messages = store.getMessages(conversationId.value());
             int before = estimateTokens(messages);
-            meters.gauge("agentic.memory.tokens", before);
+            // A DistributionSummary, not a gauge. Micrometer holds a gauge's source by
+            // WEAK reference and registers a given name once, so `gauge(name, boxedInt)`
+            // reports the first conversation this process ever compacted and turns NaN
+            // after the first GC. A summary records every observation.
+            conversationTokens.record(before);
             if (before < triggerTokens) {
                 return;
             }

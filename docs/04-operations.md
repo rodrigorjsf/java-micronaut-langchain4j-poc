@@ -103,6 +103,7 @@ Everything is tagged by **role**, which is the point — see
 | `agentic_triage_failovers_total` | the primary provider is rate-limiting |
 | `agentic_turn_latency_seconds{path}` | `refused` / `answered` / `blocked`, separately |
 | `agentic_memory_compactions_total` | how often conversations hit the budget |
+| `agentic_memory_tokens` | the size distribution compaction was asked to judge. A summary, not a gauge: Micrometer holds a gauge's source weakly, so a boxed count reports the first conversation the process ever saw and then `NaN` |
 | `agentic_tools_indirect_injection_blocked_total{tool}` | a data source returned something shaped like instructions |
 | `agentic_llm_errors_total{role,exception}` | provider trouble, per role |
 

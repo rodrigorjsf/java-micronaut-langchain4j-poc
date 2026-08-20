@@ -5,7 +5,9 @@ import io.lettuce.core.RedisClient;
 import io.lettuce.core.RedisURI;
 import io.lettuce.core.api.StatefulRedisConnection;
 import io.micronaut.context.annotation.Bean;
+import io.github.rodrigorjsf.agenticchat.infra.aws.LocalAwsBootstrap;
 import io.micronaut.context.annotation.Factory;
+import io.micronaut.core.annotation.Nullable;
 import jakarta.inject.Singleton;
 
 /**
@@ -24,9 +26,19 @@ import jakarta.inject.Singleton;
 @Factory
 public class ValkeyFactory {
 
+    /**
+     * @param bootstrap present only to order construction, never called.
+     *                  {@code LocalAwsBootstrap} creates the ElastiCache replication
+     *                  group this client dials, and Micronaut orders two beans only
+     *                  when one is a parameter of the other — so without this
+     *                  parameter the ordering was a claim in a javadoc and nothing
+     *                  more, and {@code connect()} could win the race and fail the
+     *                  boot intermittently. Absent unless bootstrap is enabled.
+     */
     @Singleton
     @Bean(preDestroy = "shutdown")
-    RedisClient redisClient(ValkeyProperties props) {
+    RedisClient redisClient(ValkeyProperties props,
+                            @Nullable LocalAwsBootstrap bootstrap) {
         var uri = RedisURI.builder()
                 .withHost(props.host())
                 .withPort(props.port())

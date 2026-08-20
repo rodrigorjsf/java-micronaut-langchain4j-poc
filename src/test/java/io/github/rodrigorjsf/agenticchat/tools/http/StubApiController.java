@@ -67,6 +67,15 @@ public class StubApiController {
     }
 
     /** Fails on the first call and succeeds afterwards. */
+    /** Counts its calls, so a test can prove a deterministic refusal is asked once. */
+    public static final AtomicInteger REFUSED_CALLS = new AtomicInteger();
+
+    @Get("/refused")
+    public HttpResponse<String> refused() {
+        REFUSED_CALLS.incrementAndGet();
+        return HttpResponse.status(HttpStatus.FORBIDDEN).body("forbidden");
+    }
+
     @Get("/flaky")
     public HttpResponse<String> flaky() {
         return FLAKY_CALLS.incrementAndGet() == 1
