@@ -22,8 +22,10 @@ import java.nio.charset.StandardCharsets;
  * none, and the answer simply comes back in the wrong voice.
  *
  * <p>In the system prompt the same bytes are process-constant, so they sit inside
- * the cacheable prefix and are billed as cached input on every turn after the first
- * — the rate this project already records as {@code cached-input-per-million}.
+ * the prefix a provider's automatic cache keys on — the rate this project records
+ * as {@code cached-input-per-million}. Positioned to be cached is all that is
+ * claimed here: {@code TokenCostListener} exports the provider's own cached-token
+ * count, and nobody has yet read it above zero for a prompt of this shape.
  *
  * <h2>Why it is last in the prompt</h2>
  * <p>

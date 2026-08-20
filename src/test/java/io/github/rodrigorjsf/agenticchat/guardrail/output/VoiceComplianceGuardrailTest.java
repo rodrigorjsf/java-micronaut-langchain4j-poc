@@ -440,6 +440,29 @@ class VoiceComplianceGuardrailTest {
         assertThat(generous.validate(request).isSuccess()).isTrue();
     }
 
+    @Test
+    @DisplayName("an enclitic pronoun does not hide the term it attaches to")
+    void encliticFormsStillMatch() {
+        // Closing the uai-minas hole opened a worse one: a hyphen was made an
+        // identifier character, and "Recomendo-lhe esse fundo" is both standard
+        // formal Portuguese and exactly the sentence the clause exists to catch.
+        assertThat(guardrail.violations("Recomendo-lhe esse fundo.")).anyMatch(r -> r.contains("recomendo"));
+        assertThat(guardrail.violations("Recomendo-te outro produto.")).anyMatch(r -> r.contains("recomendo"));
+        assertThat(guardrail.violations("Acesse o portal Uai-Minas.")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("a code sample is not rewritten for a violation nobody reported")
+    void replacementsDoNotReachFencedCode() {
+        // violations() reads prose; repair() used to read the whole answer. The
+        // asymmetry rewrote a code sample for a violation that was never reported
+        // and shipped it as a success.
+        String answer = "Veja 🚀:\n\n```java\nvar tod@s = lista;\n```";
+
+        assertThat(guardrail.violations(answer)).noneMatch(rule -> rule.startsWith("wording:"));
+        assertThat(guardrail.repair(answer)).contains("var tod@s = lista;");
+    }
+
     // ------------------------------------------------------------------ fixtures
 
     private OutputGuardrailRequest requestFor(String answer, InvocationParameters parameters) {

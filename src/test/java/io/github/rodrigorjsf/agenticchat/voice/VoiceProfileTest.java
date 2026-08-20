@@ -114,6 +114,19 @@ class VoiceProfileTest {
                 .hasMessageContaining("not found on the classpath");
     }
 
+    @Test
+    @DisplayName("the prompt has a size gate that would actually fire")
+    void theAssembledPromptStaysInsideItsBudget() {
+        // SystemPromptBuilder's javadoc has always said its size is "asserted by a
+        // test". No such test existed, and the prompt doubled — 7014 to ~15000 chars
+        // — without anything firing. The bound is the current size plus room for one
+        // more skill, so the next unplanned growth is a red test rather than a line
+        // in a log nobody reads.
+        assertThat(systemPrompt.prompt().length())
+                .as("system prompt characters, paid on every turn of every conversation")
+                .isLessThan(17_000);
+    }
+
     private static VoiceProperties propertiesPointingAt(String resource) {
         return new VoiceProperties() {
             @Override

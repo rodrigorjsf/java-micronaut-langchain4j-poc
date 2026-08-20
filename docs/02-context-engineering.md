@@ -44,7 +44,7 @@ first instinct is a skill. Work it through and every property inverts:
 |---|---|---|
 | when it is needed | every answer | every answer — so routing decides nothing |
 | what activation costs | nothing | an `activate_skill` round trip on the first qualifying turn |
-| where the tokens land | the constant prefix, billed at the cached rate after turn one | a tool result in chat memory, replayed at the *fresh* rate on every later turn |
+| where the tokens land | the constant prefix, so it is *positioned* to be served from cache | a tool result in chat memory, replayed on every later turn and never cacheable as a prefix |
 | what a mistake looks like | the process does not start | a fluent answer in the wrong voice, and no log line anywhere |
 
 The last row is the one that settles it. Under-firing is invisible: a turn where
@@ -56,6 +56,13 @@ the moment the answer is written, and everything above it governs the moments
 before. So it is the last section of the prompt, and one line of the per-turn
 context points back at it — a pointer costs ~15 tokens, a second copy would cost
 2000 and then be replayed out of memory for the rest of the conversation.
+
+**The measurement not made.** `TokenCostListener` reads Gemini's
+`cachedContentTokenCount()` and exports `agentic.llm.tokens{kind="cached_input"}`,
+so the accounting path exists — but nobody has yet observed that counter go above
+zero for a prompt of this shape. The prefix is *positioned* to be cached; the hit
+rate is unmeasured, and by the rule two sections above it may not be claimed until
+a live turn is read.
 
 A startup assertion checks the assembled prompt actually contains the document,
 byte for byte, and refuses to start if it does not. That is the whole activation

@@ -174,6 +174,14 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
      * {@code ➡}, {@code ™}, {@code ⚠} — renders as text unless followed by U+FE0F, so
      * it is an emoji only when the cluster carries that selector.
      */
+    /**
+     * The Portuguese enclitic pronouns, as they attach after a hyphen. Needed so the
+     * compound-word exclusion in {@link #whole(String)} does not swallow
+     * {@code Recomendo-lhe}.
+     */
+    private static final String ENCLITIC =
+            "(?:me|te|se|lhes?|nos?|nas?|los?|las?|os?|as?)(?![\\p{L}\\p{N}-])";
+
     private static final Pattern EMOJI_PRESENTATION = Pattern.compile("\\p{IsEmoji_Presentation}");
     private static final Pattern EMOJI_ELIGIBLE = Pattern.compile("\\p{IsEmoji}");
 
@@ -319,11 +327,19 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
      * Applies only the corrections the document itself spells out.
      */
     String repair(String text) {
-        String out = text;
-        for (Replacement replacement : replacements) {
-            out = replacement.pattern().matcher(out)
-                    .replaceAll(match -> matchCase(match.group(), replacement.to()));
-        }
+        // Prose lines only, and for the same reason violations() reads prose only:
+        // where the two disagree about which lines count, one of them wins silently.
+        // Running the replacements over the whole answer rewrote a code sample —
+        // "var tod@s = lista;" became "var todos = lista;" — for a violation that
+        // was never reported, and shipped it as a success.
+        String out = Lines.of(text).mapProse(line -> {
+            String replaced = line;
+            for (Replacement replacement : replacements) {
+                replaced = replacement.pattern().matcher(replaced)
+                        .replaceAll(match -> matchCase(match.group(), replacement.to()));
+            }
+            return replaced;
+        });
         return repairEmoji(Lines.of(out).withBulletGlyphFixed());
     }
 
@@ -437,6 +453,20 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
                 prose[i] = !isFenceMarker && !inFence;
             }
             return new Lines(List.of(split), prose);
+        }
+
+        /**
+         * Applies a rewrite to the prose lines and copies the code lines through.
+         */
+        String mapProse(java.util.function.UnaryOperator<String> rewrite) {
+            var out = new StringBuilder();
+            for (int i = 0; i < all.size(); i++) {
+                if (i > 0) {
+                    out.append('\n');
+                }
+                out.append(isProse[i] ? rewrite.apply(all.get(i)) : all.get(i));
+            }
+            return out.toString();
         }
 
         String prose() {
@@ -585,12 +615,22 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
      * {@code tod@s} would match only up to the sign; and it treats {@code -},
      * {@code _} and {@code /} as boundaries, so {@code uai-minas},
      * {@code total_uai_mensal} and {@code /docs/uai/relatorio.pdf} all counted as the
-     * regionalism. A full stop is a boundary only when a sentence ends there:
-     * {@code recomendo.} must match and {@code uai.com} must not.
+     * regionalism.
+     *
+     * <p>Two of the three exclusions then need an exception carved back out, because
+     * closing a hole opened a worse one. A full stop is a boundary only when a
+     * sentence ends there — {@code recomendo.} must match and {@code uai.com} must
+     * not. And a hyphen is part of a compound only when what follows is not an
+     * enclitic pronoun: {@code Uai-Minas} is a proper noun, while
+     * {@code Recomendo-lhe esse fundo} is standard formal Portuguese and is precisely
+     * the sentence this rule exists to catch.
      */
     private static Pattern whole(String term) {
         return Pattern.compile(
-                "(?<![\\p{L}\\p{N}@._/-])" + Pattern.quote(term) + "(?![\\p{L}\\p{N}@_/-])(?!\\.[\\p{L}\\p{N}])",
+                "(?<![\\p{L}\\p{N}@._/-])" + Pattern.quote(term)
+                        + "(?![\\p{L}\\p{N}@_/])"          // uai_x, uai/relatorio
+                        + "(?!\\.[\\p{L}\\p{N}])"         // uai.com, but "recomendo." still matches
+                        + "(?!-(?!" + ENCLITIC + ")[\\p{L}\\p{N}])", // Uai-Minas, but "Recomendo-lhe" matches
                 Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
     }
 
