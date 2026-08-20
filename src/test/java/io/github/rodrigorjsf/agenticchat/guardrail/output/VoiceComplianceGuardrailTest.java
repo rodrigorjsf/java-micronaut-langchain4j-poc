@@ -208,6 +208,27 @@ class VoiceComplianceGuardrailTest {
     }
 
     @Test
+    @DisplayName("removing an emoji does not reindent fenced code")
+    void repairLeavesCodeIndentationAlone() {
+        // Collapsing runs of spaces is part of removing an emoji, and run over the
+        // whole answer it silently reindents Python, YAML and Makefiles.
+        String answer = "Exemplo 😊 abaixo:\n\n```python\ndef f():\n    if x:\n        return 1\n```";
+
+        assertThat(guardrail.repair(answer))
+                .contains("\n    if x:\n        return 1")
+                .startsWith("Exemplo abaixo:");
+    }
+
+    @Test
+    @DisplayName("an emoji inside a code sample is part of the sample")
+    void emojiInsideAFenceIsNotCounted() {
+        String answer = "Assim:\n\n```python\nprint(\"😊 💡 🚀\")\n```";
+
+        assertThat(guardrail.violations(answer)).isEmpty();
+        assertThat(guardrail.repair(answer)).isEqualTo(answer);
+    }
+
+    @Test
     @DisplayName("numbered step-by-step instructions carry no cap")
     void numberedListsAreNotCapped() {
         String answer = "Passo a passo:\n1. Abra\n2. Toque\n3. Escolha\n4. Confirme\n5. Aguarde\n6. Pronto";

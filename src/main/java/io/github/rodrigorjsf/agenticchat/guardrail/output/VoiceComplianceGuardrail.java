@@ -204,7 +204,11 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
         var found = new ArrayList<String>();
         String lower = text.toLowerCase(Locale.ROOT);
 
-        List<String> emoji = emojiIn(text);
+        // Prose only. An emoji inside a fenced code block is part of the sample, and
+        // counting it would report a violation that repair is not allowed to fix —
+        // which spends the reprompt budget every turn and never converges.
+        String prose = prose(text);
+        List<String> emoji = emojiIn(prose);
         if (emoji.size() > 1) {
             found.add("emoji: use ONLY 1 emoji per response (found " + emoji.size() + ")");
         }
@@ -213,7 +217,7 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
                 .filter(e -> !allowedEmoji.contains(e))
                 .distinct()
                 .forEach(e -> found.add("emoji: \"" + e + "\" is not on the allowed list"));
-        if (emoji.size() == 1 && !endsWithEmoji(text)) {
+        if (emoji.size() == 1 && !endsWithEmoji(prose)) {
             found.add("emoji: the emoji goes at the end of the message, after the closing full stop");
         }
 
@@ -353,28 +357,53 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
      * model chose one, deliberately, from the allowed set. That one is moved.
      */
     private String repairEmoji(String text) {
-        List<String> emoji = emojiIn(text);
+        List<String> emoji = emojiIn(prose(text));
         if (emoji.isEmpty()) {
             return text;
         }
         String only = emoji.size() == 1 ? emoji.getFirst() : null;
         String keep = only != null && allowedEmoji.contains(normalise(only)) ? only : null;
-        if (keep != null && endsWithEmoji(text)) {
+        if (keep != null && endsWithEmoji(prose(text))) {
             return text;
         }
-        var stripped = new StringBuilder();
-        forEachCluster(text, cluster -> {
-            if (!isEmoji(cluster)) {
-                stripped.append(cluster);
+
+        // Line by line, and only the prose lines. Collapsing runs of spaces is part
+        // of removing an emoji — "O prazo ⏰ é" would otherwise keep both of its
+        // spaces — but run over a whole answer it also reindents fenced code, which
+        // in Python or YAML changes what the code means.
+        String[] lines = text.split("\\R", -1);
+        List<String> proseLines = proseLinesOf(text);
+        var out = new StringBuilder();
+        for (int i = 0; i < lines.length; i++) {
+            if (i > 0) {
+                out.append('\n');
             }
-        });
-        // "O prazo ⏰ é" loses the emoji and keeps both of its spaces, and "resolvido
-        // 😊." keeps the space before the full stop. Closing the gap is part of the
-        // removal, not a separate tidy-up — and it only ever runs on an answer that
-        // was already in violation.
-        String body = SPACE_RUN.matcher(stripped.toString()).replaceAll(" ");
-        body = SPACE_BEFORE_PUNCTUATION.matcher(body).replaceAll("$1").stripTrailing();
+            if (proseLines.get(i) == null) {
+                out.append(lines[i]);
+                continue;
+            }
+            var line = new StringBuilder();
+            forEachCluster(lines[i], cluster -> {
+                if (!isEmoji(cluster)) {
+                    line.append(cluster);
+                }
+            });
+            String cleaned = SPACE_RUN.matcher(line.toString()).replaceAll(" ");
+            out.append(SPACE_BEFORE_PUNCTUATION.matcher(cleaned).replaceAll("$1"));
+        }
+        String body = out.toString().stripTrailing();
         return keep == null ? body : body + " " + keep;
+    }
+
+    /**
+     * The answer with fenced code blocks removed, for the checks that are about what
+     * the assistant SAYS. An emoji in a code sample is part of the sample.
+     */
+    private static String prose(String text) {
+        return proseLinesOf(text).stream()
+                .filter(line -> line != null)
+                .reduce((a, b) -> a + "\n" + b)
+                .orElse("");
     }
 
     // ----------------------------------------------------------------- the reprompt
