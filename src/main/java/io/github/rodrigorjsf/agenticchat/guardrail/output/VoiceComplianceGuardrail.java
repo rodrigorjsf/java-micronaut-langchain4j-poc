@@ -98,8 +98,13 @@ import java.util.regex.Pattern;
  *       document explicitly says is NOT an offence, and nothing classifies offence.</li>
  *   <li><b>The two-reply escalation.</b> The model reads it off its own memory window;
  *       no counter exists, and there is deliberately no handoff channel to check.</li>
- *   <li><b>"Respecting their contexts" for emoji.</b> Membership of the allow-list is
- *       checkable and choosing 📅 for a rate is not.</li>
+ *   <li><b>"Respecting their contexts" for emoji</b>, and the ban on any emoji at all
+ *       in an answer about an earthquake, a health topic or a person. Membership of
+ *       the allow-list is checkable; the topic of the answer is not, and this class is
+ *       not told which skill was activated.</li>
+ *   <li><b>"Never restate the question before answering it."</b> The other half of
+ *       that clause, the acknowledgement opener, IS checked — it names its literals.
+ *       Restatement has none.</li>
  *   <li><b>Emoji variants that differ from the allowed form.</b> {@code normalise}
  *       strips only U+FE0E and U+FE0F, so a skin-tone or ZWJ-gendered variant misses
  *       the allow-list and is deleted. For skin tone that is the document's intent;
@@ -175,6 +180,24 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
     private static final Pattern THEMATIC_BREAK = Pattern.compile("^[ \\t]*([-*_])([ \\t]*\\1){2,}[ \\t]*$");
 
     private static final Pattern FENCE = Pattern.compile("^[ \\t]*(```|~~~)");
+
+    /**
+     * Acknowledgement openers, at the very start of an answer and only when followed
+     * by the punctuation that makes them one — "Claro! O CEP é…" is throat-clearing,
+     * "Claro que sim" is an answer to a yes-or-no question.
+     *
+     * <p>This is the clause the model drops most reliably. Opening with an
+     * acknowledgement is among the most heavily reinforced habits an instructed model
+     * has, and it comes back hardest after a round of tool calls, when the top of the
+     * prompt is a long way behind — the ordinary shape of a turn here. It is also the
+     * only clause in the document that names the exact literals to avoid, so leaving
+     * it to the prompt alone meant enforcing the hard rules and trusting the easy one.
+     */
+    private static final Pattern THROAT_CLEARING = Pattern.compile(
+            "^\\s*(claro|com certeza|certamente|sem d[úu]vida|perfeito|[óo]tima pergunta"
+                    + "|boa pergunta|sure|certainly|of course|absolutely|great question)"
+                    + "[!,]+\\s*",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
     /**
      * Interior runs of horizontal whitespace. Applied after a line's own indentation,
@@ -337,6 +360,10 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
             found.add("lists: at most " + voice.maxBulletItems()
                     + " bullet points per list (found " + longest + ")");
         }
+        Matcher opener = THROAT_CLEARING.matcher(prose);
+        if (opener.find()) {
+            found.add("opening: \"" + opener.group(1) + "\" is throat-clearing — lead with the answer");
+        }
         if (lines.usesTheWrongGlyph(lists)) {
             // The clause is "use bullet points (•) for lists - max. 5 items", and a
             // check that enforced only its second half would ratify the wrong glyph
@@ -382,7 +409,23 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
             }
             return replaced;
         });
-        return Lines.of(repairEmoji(out)).withBulletGlyphFixed();
+        return Lines.of(repairEmoji(stripThroatClearing(out))).withBulletGlyphFixed();
+    }
+
+    /**
+     * Deletes an acknowledgement opener and restores the capital the answer needs once
+     * it starts one word later.
+     */
+    private static String stripThroatClearing(String text) {
+        Matcher opener = THROAT_CLEARING.matcher(text);
+        if (!opener.find()) {
+            return text;
+        }
+        String rest = text.substring(opener.end());
+        if (rest.isEmpty()) {
+            return text;
+        }
+        return Character.toUpperCase(rest.charAt(0)) + rest.substring(1);
     }
 
     /**

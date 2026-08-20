@@ -588,6 +588,44 @@ class VoiceComplianceGuardrailTest {
                         .containsIgnoringCase(term));
     }
 
+    // ------------------------------------------------------ throat-clearing
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "Claro! O CEP da Avenida Paulista 1578 é 01310-200.",
+            "Com certeza! A SELIC está em 15% ao ano.",
+            "Certamente, o feriado cai numa segunda.",
+            "Ótima pergunta! O IPCA acumulado é 4,2%.",
+            "Sure! The postal code is 01310-200.",
+            "Of course, the rate is 15%."})
+    @DisplayName("an acknowledgement opener is reported and stripped")
+    void throatClearingIsRemoved(String answer) {
+        assertThat(guardrail.violations(answer)).anyMatch(rule -> rule.startsWith("opening:"));
+
+        String repaired = guardrail.repair(answer);
+        assertThat(guardrail.violations(repaired)).isEmpty();
+        assertThat(repaired).matches("^[A-ZÁÉÍÓÚÂÊÔÃÕÇ].*");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "Claro que sim, o feriado é nacional.",
+            "Certamente esse dado existe, mas a fonte está fora do ar.",
+            "O céu está claro, com poucas nuvens.",
+            "Perfeito para quem viaja: o feriado cai numa sexta."})
+    @DisplayName("the same word without the punctuation that makes it an opener is left alone")
+    void ordinaryUsesOfTheSameWordsAreNotOpeners(String answer) {
+        assertThat(guardrail.violations(answer)).isEmpty();
+        assertThat(guardrail.repair(answer)).isEqualTo(answer);
+    }
+
+    @Test
+    @DisplayName("stripping the opener leaves the rest of the answer alone")
+    void theAnswerAfterTheOpenerIsUntouched() {
+        assertThat(guardrail.repair("Claro! O CEP é 01310-200, na Bela Vista."))
+                .isEqualTo("O CEP é 01310-200, na Bela Vista.");
+    }
+
     // ------------------------------------------------------------------ fixtures
 
     private OutputGuardrailRequest requestFor(String answer, InvocationParameters parameters) {

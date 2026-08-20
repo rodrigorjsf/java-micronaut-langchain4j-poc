@@ -25,7 +25,7 @@ would accept.
 | Region | Budget | Paid |
 |---|---|---|
 | System prompt | ~1 500 | every turn, unchanged |
-| Voice document | ~2 730 | every turn, unchanged |
+| Voice document | ~3 020 | every turn, unchanged |
 | Skills index | ~970 at 12 skills | every turn, unchanged |
 | Retrieved content | 0–1 000 | only on routed turns |
 | Conversation | up to ~14 400 before compaction | every turn, growing |
@@ -36,7 +36,7 @@ The first three rows are the *standing* cost — the number that multiplies by e
 turn of every conversation, so it gets the most attention.
 
 The voice document is the largest single line in that block, and the interesting
-thing about it is that **moving it did not help**. A ~2700-token tone-of-voice
+thing about it is that **moving it did not help**. A ~3000-token tone-of-voice
 contract looks exactly like something progressive disclosure should own, so the
 first instinct is a skill. Work it through and every property inverts:
 
@@ -55,7 +55,7 @@ What *was* real in the concern is **position**, not presence. The document gover
 the moment the answer is written, and everything above it governs the moments
 before. So it is the last section of the prompt, and one line of the per-turn
 context points back at it — a pointer costs ~15 tokens, a second copy would cost
-~2700 and then be replayed out of memory for the rest of the conversation.
+~3000 and then be replayed out of memory for the rest of the conversation.
 
 **The measurement not made.** `TokenCostListener` reads Gemini's
 `cachedContentTokenCount()` and exports `agentic.llm.tokens{kind="cached_input"}`,

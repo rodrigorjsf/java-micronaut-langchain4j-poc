@@ -147,7 +147,7 @@ class VoiceProfileTest {
         // A translated "todes → todos" is a rule about nothing: the guardrail matches
         // these exact strings, and so does the model when it reads the document.
         assertThat(systemPrompt.prompt()).contains(
-                "juntes / junt@s / juntxs",
+                "junt@s / juntxs",
                 "todes / tod@s / todxs",
                 "queride",
                 "obrigade",
@@ -198,10 +198,12 @@ class VoiceProfileTest {
         // test". No such test existed, and the prompt doubled — 7014 to ~15000 chars
         // — without anything firing. The bound is the current size plus room for one
         // more skill, so the next unplanned growth is a red test rather than a line
-        // in a log nobody reads.
+        // in a log nobody reads. It has been raised twice since, each time in the
+        // commit that grew the document; raising it without saying why is how it
+        // stops measuring anything.
         assertThat(systemPrompt.prompt().length())
                 .as("system prompt characters, paid on every turn of every conversation")
-                .isLessThan(18_000);
+                .isLessThan(20_000);
     }
 
     private static VoiceProperties propertiesPointingAt(String resource) {
