@@ -2,6 +2,7 @@ package io.github.rodrigorjsf.agenticchat.agent;
 
 import io.github.rodrigorjsf.agenticchat.guardrail.output.SystemPromptCanary;
 import io.github.rodrigorjsf.agenticchat.skills.SkillCatalog;
+import io.github.rodrigorjsf.agenticchat.voice.VoiceProfile;
 import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,6 +16,18 @@ import org.slf4j.LoggerFactory;
  * per turn is in the user message instead. The order within the prompt then follows
  * what the model needs first: who it is, what it must never do, what it can reach,
  * and how to speak.
+ *
+ * <p><b>The voice profile is last on purpose.</b> Everything above it governs the
+ * moments before the answer is written — the role, the security rules, the skills the
+ * model may reach for. {@link VoiceProfile} governs the writing itself, so it is the
+ * final thing the model reads before the conversation starts. Being last costs
+ * nothing: the whole prompt is still one constant prefix, so the document is billed
+ * as cached input on every turn after the first rather than as fresh tokens.
+ *
+ * <p>There is no {@code # How to answer} section any more. It used to say "two or
+ * three sentences is usually right", the voice profile says "parágrafos curtos
+ * (máx. 2-3 linhas)" and "máx. 5 itens", and a prompt holding both leaves the model
+ * to pick. One document owns how the assistant speaks.
  *
  * <p>The prompt deliberately contains nothing secret. Treating a system prompt as a
  * credential is the mistake that makes prompt extraction worth attempting; treating
@@ -32,7 +45,7 @@ public class SystemPromptBuilder {
 
     private final String prompt;
 
-    public SystemPromptBuilder(SkillCatalog skills, SystemPromptCanary canary) {
+    public SystemPromptBuilder(SkillCatalog skills, SystemPromptCanary canary, VoiceProfile voice) {
         // Written with real line breaks rather than text-block "\" continuations.
         // A continuation line indented further than the block's common indent keeps
         // that extra indent, so "of \" + "   guessing" renders as "of    guessing" —
@@ -72,22 +85,31 @@ public class SystemPromptBuilder {
                 %s
                 
                 # How to answer
-                
-                - Answer in the language named by reply_language in the turn context.
-                - Lead with the answer. Context after, briefly, and only if it helps.
-                - Cite the source when a fact came from a tool, by naming the source,
-                  not by pasting a URL.
-                - Two or three sentences is usually right. Use a short list when the
-                  answer is genuinely a list. Never pad.
-                - When a tool fails, say what you could not find out and offer the next
-                  step. Do not apologise twice and do not explain internal errors.
-                - Be warm and direct. No corporate throat-clearing, no "certainly!", no
-                  restating the question before answering it.
-                
-                %s
-                """.formatted(skills.availableSkillsBlock(), canary.systemPromptFragment());
 
-        LOG.info("System prompt assembled: {} chars, ~{} tokens", prompt.length(), prompt.length() / 4);
+                How you write — tone, structure, formatting, emoji, and what you may
+                never say — is defined entirely by the <tom_e_voz_de_comunicacao> block
+                below, and it applies to every answer you give. Two rules of this
+                service sit above it and win if they ever disagree: answer in the
+                language named by reply_language in the turn context, and cite a tool's
+                source by naming it rather than by pasting a URL.
+
+                %s
+
+                %s
+                """.formatted(skills.availableSkillsBlock(), voice.document(), canary.systemPromptFragment());
+
+        // The activation guarantee. A voice document that fails to reach the model
+        // does not produce an error, a warning or an empty answer — it produces a
+        // fluent answer in the wrong voice, which nothing downstream can detect and
+        // no log line records. So the assembled prompt is checked here, once, and a
+        // process that would answer in the wrong voice does not start.
+        if (!voice.presentIn(prompt)) {
+            throw new IllegalStateException(
+                    "The voice profile is not present in the assembled system prompt");
+        }
+
+        LOG.info("System prompt assembled: {} chars, ~{} tokens ({} chars of it the voice profile)",
+                prompt.length(), prompt.length() / 4, voice.document().length());
     }
 
     public String prompt() {
