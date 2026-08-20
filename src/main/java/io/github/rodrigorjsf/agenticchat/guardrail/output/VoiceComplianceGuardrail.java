@@ -113,7 +113,19 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
             "arretado", "regionalism: do not use regionalisms",
             "recomendo", "recommendation: never use this term");
 
-    private static final Pattern BULLET_LINE = Pattern.compile("^\\s*[-*+•]\\s+\\S");
+    /**
+     * The glyph the document mandates for a bullet.
+     */
+    private static final String BULLET = "•";
+
+    private static final Pattern BULLET_LINE = Pattern.compile("^(\\s*)([-*+•])(\\s+\\S)");
+
+    /**
+     * A fenced code block. Its lines are not prose: a shell command starting with
+     * {@code - } is an argument, not a bullet, and rewriting it would corrupt code
+     * the user is meant to run.
+     */
+    private static final Pattern FENCE = Pattern.compile("^\\s*(```|~~~)");
 
     /**
      * Horizontal whitespace only: collapsing {@code \s} would join the lines of a
@@ -226,6 +238,12 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
             found.add("lists: at most " + voice.maxBulletItems()
                     + " bullet points per list (found " + longestRun + ")");
         }
+        if (usesTheWrongBulletGlyph(text)) {
+            // The clause is "use bullet points (•) for lists", and a check that
+            // enforced only its second half — the five-item cap — would ratify the
+            // wrong glyph in the same pass that measured the right count.
+            found.add("lists: bullets are written \"" + BULLET + "\", not \"-\", \"*\" or \"+\"");
+        }
         return found;
     }
 
@@ -237,14 +255,45 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
     private static int longestBulletRun(String text) {
         int longest = 0;
         int run = 0;
-        for (String line : text.split("\\R", -1)) {
-            if (BULLET_LINE.matcher(line).find()) {
+        for (String line : proseLinesOf(text)) {
+            if (line != null && BULLET_LINE.matcher(line).find()) {
                 longest = Math.max(longest, ++run);
-            } else if (!line.isBlank()) {
+            } else if (line != null && !line.isBlank()) {
                 run = 0;
             }
         }
         return longest;
+    }
+
+    private static boolean usesTheWrongBulletGlyph(String text) {
+        for (String line : proseLinesOf(text)) {
+            if (line == null) {
+                continue;
+            }
+            Matcher bullet = BULLET_LINE.matcher(line);
+            if (bullet.find() && !BULLET.equals(bullet.group(2))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The lines outside fenced code blocks, with fenced lines replaced by null so
+     * the caller keeps the original line numbering without treating code as prose.
+     */
+    private static List<String> proseLinesOf(String text) {
+        var lines = new ArrayList<String>();
+        boolean inFence = false;
+        for (String line : text.split("\\R", -1)) {
+            if (FENCE.matcher(line).find()) {
+                inFence = !inFence;
+                lines.add(null);
+            } else {
+                lines.add(inFence ? null : line);
+            }
+        }
+        return lines;
     }
 
     // ---------------------------------------------------------------------- repair
@@ -257,26 +306,60 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
         for (var entry : STATED_REPLACEMENTS.entrySet()) {
             out = whole(entry.getKey()).matcher(out).replaceAll(match -> matchCase(match.group(), entry.getValue()));
         }
-        return repairEmoji(out);
+        return repairEmoji(repairBullets(out));
     }
 
     /**
-     * Removes every emoji, then puts back at most one: the last allowed emoji the
-     * model chose. Removing and re-appending rather than deleting in place is what
-     * fixes count, allow-list and position in a single move.
+     * Rewrites a markdown bullet marker to the glyph the document names, leaving
+     * fenced code untouched and preserving indentation so a nested list stays nested.
+     */
+    private static String repairBullets(String text) {
+        String[] lines = text.split("\\R", -1);
+        List<String> prose = proseLinesOf(text);
+        var out = new StringBuilder();
+        for (int i = 0; i < lines.length; i++) {
+            if (i > 0) {
+                out.append('\n');
+            }
+            String line = lines[i];
+            if (prose.get(i) == null) {
+                out.append(line);
+                continue;
+            }
+            Matcher bullet = BULLET_LINE.matcher(line);
+            // BULLET contains no "$" or "\", so it needs no replacement quoting, and
+            // quoting it would turn the two group references literal.
+            out.append(bullet.find() ? bullet.replaceFirst("$1" + BULLET + "$3") : line);
+        }
+        return out.toString();
+    }
+
+    /**
+     * Removes every emoji, then puts back at most one — and only when the model had
+     * already shown the judgement the document asks for.
+     *
+     * <h3>More than one emoji means the judgement was not exercised</h3>
+     * <p>
+     * The document does not only cap the count. It says never in a serious message,
+     * only when the emoji adds objective meaning, and "if you are unsure, do not use
+     * it". A response carrying two emoji is evidence that none of that was applied,
+     * so keeping the prettier one would convert a countable violation into an
+     * unmeasurable one: a instability notice repaired from "fora do ar ⚠️ … sem
+     * previsão 😊" down to a single trailing 😊 passes every check in this class and
+     * is exactly the answer the document forbids. Where the count is wrong, all of
+     * them go — the document's own tie-breaker is to leave it out.
+     *
+     * <p>A single emoji that is merely in the wrong place is a different case: the
+     * model chose one, deliberately, from the allowed set. That one is moved.
      */
     private String repairEmoji(String text) {
         List<String> emoji = emojiIn(text);
         if (emoji.isEmpty()) {
             return text;
         }
-        String keep = null;
-        for (String candidate : emoji) {
-            if (allowedEmoji.contains(normalise(candidate))) {
-                keep = candidate;
-            }
-        }
-        if (emoji.size() == 1 && keep != null && endsWithEmoji(text)) {
+        String only = emoji.size() == 1 ? emoji.getFirst() : null;
+        String keep = only != null && allowedEmoji.contains(normalise(only)) ? only : null;
+        if (keep != null && endsWithEmoji(text)) {
             return text;
         }
         var stripped = new StringBuilder();

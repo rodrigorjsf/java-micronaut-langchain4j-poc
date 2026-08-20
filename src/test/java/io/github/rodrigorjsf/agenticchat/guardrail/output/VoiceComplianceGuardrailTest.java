@@ -52,13 +52,26 @@ class VoiceComplianceGuardrailTest {
     }
 
     @Test
-    void twoEmojiAreReportedAndRepairedToTheLastAllowedOne() {
+    @DisplayName("two emoji mean the judgement was not exercised, so both go")
+    void twoEmojiAreRepairedToNone() {
+        // Keeping the prettier one would turn a countable violation into an
+        // unmeasurable one: the document also says never in a serious message and
+        // "if you are unsure, do not use it", and neither is checkable here.
         String answer = "Bom dia 😊 o CEP é 01310-100. 💡";
 
         assertThat(guardrail.violations(answer))
                 .anyMatch(rule -> rule.contains("ONLY 1 emoji"));
+        assertThat(guardrail.repair(answer)).isEqualTo("Bom dia o CEP é 01310-100.");
         assertThat(guardrail.violations(guardrail.repair(answer))).isEmpty();
-        assertThat(guardrail.repair(answer)).endsWith("💡").doesNotContain("😊");
+    }
+
+    @Test
+    @DisplayName("a problem report does not come back wearing a smiley")
+    void aSeriousAnswerIsNotRepairedIntoOneEmoji() {
+        String answer = "O sistema está fora do ar ⚠️ e ainda não há previsão 😊";
+
+        assertThat(guardrail.repair(answer))
+                .isEqualTo("O sistema está fora do ar e ainda não há previsão");
     }
 
     @Test
@@ -154,7 +167,7 @@ class VoiceComplianceGuardrailTest {
 
     @Test
     void aSixthBulletIsReported() {
-        String answer = "Documentos aceitos:\n- RG\n- CPF\n- CNH\n- Passaporte\n- Título\n- Carteira";
+        String answer = "Documentos aceitos:\n• RG\n• CPF\n• CNH\n• Passaporte\n• Título\n• Carteira";
 
         assertThat(guardrail.violations(answer))
                 .anyMatch(rule -> rule.contains("at most 5 bullet points"));
@@ -162,9 +175,36 @@ class VoiceComplianceGuardrailTest {
 
     @Test
     void fiveBulletsAreFine() {
-        String answer = "Documentos aceitos:\n- RG\n- CPF\n- CNH\n- Passaporte\n- Título";
+        String answer = "Documentos aceitos:\n• RG\n• CPF\n• CNH\n• Passaporte\n• Título";
 
         assertThat(guardrail.violations(answer)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("a markdown dash is not the glyph the document names")
+    void markdownBulletsAreRewrittenToTheMandatedGlyph() {
+        String answer = "Documentos aceitos:\n- RG\n- CPF";
+
+        assertThat(guardrail.violations(answer))
+                .anyMatch(rule -> rule.contains("bullets are written"));
+        assertThat(guardrail.repair(answer)).isEqualTo("Documentos aceitos:\n• RG\n• CPF");
+    }
+
+    @Test
+    @DisplayName("indentation survives, so a nested list stays nested")
+    void nestedBulletsKeepTheirIndentation() {
+        assertThat(guardrail.repair("- RG\n  * segunda via")).isEqualTo("• RG\n  • segunda via");
+    }
+
+    @Test
+    @DisplayName("a dash inside a fenced code block is an argument, not a bullet")
+    void fencedCodeIsLeftAlone() {
+        String answer = "Rode:\n\n```bash\ncurl -s https://exemplo\n- nao e bullet\n```\n\n- item";
+
+        assertThat(guardrail.repair(answer))
+                .contains("curl -s https://exemplo")
+                .contains("- nao e bullet")
+                .endsWith("• item");
     }
 
     @Test
@@ -184,7 +224,7 @@ class VoiceComplianceGuardrailTest {
         var result = guardrail.validate(requestFor("Todes podem acessar. 😊 💡", parameters));
 
         assertThat(result.isSuccess()).isTrue();
-        assertThat(result.successfulText()).isEqualTo("Todos podem acessar. 💡");
+        assertThat(result.successfulText()).isEqualTo("Todos podem acessar.");
         assertThat(parameters.containsKey("voice.reprompt.attempts")).isFalse();
     }
 
