@@ -17,19 +17,28 @@ check that runs against one item sitting alone belongs to a **single-item review
 `authoring-agent-skills`'s *Reviewing a skill document* for a skill. Every deferral below goes to
 one of those two.
 
-## A description change is a behaviour change
+## A description change is a behaviour change — and so is a rename
 
 Editing a description ships new behaviour with no code diff to review. Illustrative: widening a
 search tool's description to also mention "documents" pulled support turns off the ticket
 lookup and into search, which answered from a stale corpus in a confident voice. Nothing threw,
 ticket-lookup volume fell ~40%, and nobody read that graph for weeks.
 
-So every description edit passes a **routing gate**: run the **routing set** — recorded user turns,
+**A name is a routing signal too, and it is read before the description.** `utils` claims no
+territory and no description repairs it (`authoring-agent-skills`); renaming `search_incidents` to
+`find_incidents` moves turns whether or not a word of prose changed. So the gate's scope is **any
+change to a routing signal** — the description, the name, which items are exposed at all, and the
+order they are exposed in. Four kinds of change, one gate. The trap this closes: a rename is the
+routing change a sweep produces most often and the one it is most tempted to wave through as
+cosmetic, so a tool ships a new name with no before/after run inside a sweep that blocks a one-word
+description edit over a single unpredicted cell.
+
+So every such change passes a **routing gate**: run the **routing set** — recorded user turns,
 each labelled with the item that should have fired, held **frozen** for the duration (§ *The routing
 set*) — against the layer before the edit, run it again after, and compare the two **confusion
 tables** — rows are the labels, columns are what actually fired — cell by cell.
 
-- **The gate reads a block of the table, not the table.** Its rows and columns are the edited item,
+- **The gate reads a block of the table, not the table.** Its rows and columns are the changed item,
   the items sharing its **primary subject**, any item either description hands ground to by name,
   and the ***none*** row and column — three to six items plus *none*, so twelve to forty-two
   off-diagonal cells. **Inside the block, every cell that moved beyond the noise floor must have
@@ -73,11 +82,11 @@ carrying that label — a row that does not sum to zero is a run you cannot comp
 
 | Pass | Costs | What only this pass finds |
 |---|---|---|
-| 1. Inventory | one log query, one descriptor dump, one activation and one captured request per skill | each item's name, description text, call or activation count over the window, and its **primary subject** — the noun it is actually about, in three words |
+| 1. Inventory | two log queries, one descriptor dump, one activation and one captured request per skill | each item's name, description text, call or activation count over the window, its **primary subject** — the noun it is actually about, in three words — and, per skill, the share of activations followed by no call to any tool it discloses |
 | 2. Drift | a `diff` | a description, or a routing-set turn, that changed since the last sweep without a change of yours |
 | 3. Overlap → *The merge test*, *Two skills whose descriptions overlap* | reading, bounded by subject; 40 sampled turns and a domain reader per merge test | two items competing for the same turns |
 | 4. Contract consistency | reading the shipped schema, bounded by subject | neighbours that disagree about a concept they share |
-| 5. Correction rate | one log query — only if every call carries the id of the user turn it belongs to | items whose first call gets abandoned more often than the rest |
+| 5. Correction rate, **tools only** | one log query — only if every call carries the id of the user turn it belongs to | tools whose first call gets abandoned more often than the rest |
 | 6. Routing run → *The routing set* | a model call per single-label turn, per candidate — and two or more, plus a stub fixture, per sequence turn | reach and exclusivity, measured instead of argued |
 | 7. Blind A/B → *Blind A/B* | the routing run again, once per candidate | which of two rewrites is actually better |
 | 8. Body sweep → *Skill bodies* | reading, one grep | a body naming a tool this sweep just merged away or retired |
@@ -149,18 +158,19 @@ they were cut* reads a missing notice as completeness.
 subjects is not caught by reading schemas anyway: that is what pass 6's sequence cases exercise,
 where the invented argument shows up as behaviour instead of as a spelling you happened to notice.
 
-**Pass 5 in full.** One query per item: calls of it that were followed by a *different* item being
+**Pass 5 in full — and it is about tools.** The skill half of First-call correction is pass 1's
+second query, not this one; pass 5's precondition does not travel to skills. One query per tool: calls of it that were followed by a *different* item being
 called for the same user goal. That rate indicts this item's description — it attracted a turn it
 could not serve. **A retry of the same item with corrected arguments is not this row.** That is an
 argument-contract defect belonging to a single-item review (`agentic-tool-boundary` again), and
 scoring the two together sends you off to rewrite a description that was right. The same query is
 also the cheapest source of new routing-set turns (`ROUTING-SET.md`).
 
-**Most layers cannot run it.** "The same user goal" is not a field. It exists only when every tool
+**Most layers cannot run it — for tools.** "The same user goal" is not a field. It exists only when every tool
 call carries the id of the user turn that started it, propagated down the whole call chain, so two
 calls can be shown to serve one goal. A role tag on the model call is a different object — which
 model made the call, not which turn it serves — so a layer with full cost attribution can still be
-missing this. Without it First-call correction has no denominator, scores *not yet measurable*, and
+missing this. Without it the **tool** First-call correction row has no denominator, scores *not yet measurable*, and
 the finding is against your instrumentation rather than the item: name the missing field in the run
 header as work, or the next sweep rediscovers it and defers it again. Scored 0 instead it reads
 *this item attracts turns it cannot serve*, and you rewrite a description nobody has measured.
@@ -168,8 +178,8 @@ header as work, or the next sweep rediscovers it and defers it again. Scored 0 i
 **A layer that has not launched has no window.** Passes 1, 2 and 4 need no traffic — pass 1 minus
 its call counts, attachment check included, since activating a skill needs a running layer and not
 a user — and so does pass 3's detection, since subjects and shared trigger phrases are in the text.
-What defers whole is everything reading traffic: pass 3's merge test, pass 5, and the zero-call
-fork. Traffic and First-call correction score *not yet measurable*, never 0, so the free tier is
+What defers whole is everything reading traffic: pass 3's merge test, both correction queries, and
+the zero-call fork. Traffic and First-call correction score *not yet measurable*, never 0, so the free tier is
 two rows here rather than four.
 
 **Pre-launch the free tier buys no verdict at all, however it scores.** The two rows you are missing
@@ -216,9 +226,12 @@ is unchanged, since subjects and trigger phrases are text and a skill has both. 
 
 The hand-off round trip in that first 0 is the one defect no per-skill review can reach, because
 each description reads fine alone — `authoring-agent-skills`'s *Reviewing a skill document* asks
-for the hand-off one pair at a time, and this row is the scored, population-wide version of it. The
-skill's correction row is the cheaper of the two: an activation and its calls are one turn, so it
-needs none of pass 5's goal attribution.
+for the hand-off one pair at a time, and this row is the scored, population-wide version of it. 
+**The skill's correction row comes from pass 1, and it is measurable on layers where the tool row is
+not.** An activation and the calls that follow it are one turn, so the row needs no goal attribution
+and no turn ids — only the activation log pass 1 is already standing in front of. Marking it *not
+yet measurable* because pass 5 could not run is the mistake that leaves every skill in the catalogue
+a row light, on the one row that sees an activation nothing followed.
 
 **On a launched layer, full marks ships unchanged**, recorded as *reviewed, no change*. Not
 editing is a result of the work, not an omission from it — every rewrite is a routing risk you

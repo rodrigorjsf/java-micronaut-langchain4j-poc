@@ -40,8 +40,11 @@ band:
 
 **Contract consistency is the one 0 that is not structural**, which is why it is
 carved out of the Bottom row. It means a neighbour spells a shared concept
-differently, and a rename or a documented parameter fixes that with no boundary
-moving. Every other row's 0 already names a structure: Traffic 0 goes to the
+differently, and a documented parameter or an aligned enum value fixes that
+without redrawing a boundary. **If the fix you reach for is a rename, it stops
+being the cheap case**: a name is a routing signal read before the description,
+so the rename goes through the gate in `SKILL.md` like any other routing
+change. Every other row's 0 already names a structure: Traffic 0 goes to the
 zero-call fork, Overlap 0 to the merge test, and a 0 on correction, reach or
 exclusivity is a description the turns do not match.
 

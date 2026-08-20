@@ -162,9 +162,13 @@ Five things this block gets wrong when it is improvised:
   its second seam is not, so the verdict comes from the second.
 - **A 1 is uncovered.** ASI10 is the row everyone marks covered because
   observability exists and the score looks non-zero.
-- **`unmeasured` is the short run's word, and its only one.** It belongs to a seam
-  the table says was `not yet probed`; a seam that scored, even off one probe,
-  takes the verdict its score earns.
+- **`unmeasured` is the short run's word, and its only one.** It belongs to any
+  seam whose **Score** cell reads `—` — whether the table says `not yet probed` or
+  names the `file:symbol` Step 1 located and Step 2 never reached. Say which:
+  `unmeasured — model access located at agent/ClientFactory:41, not measured`
+  reads differently from `not yet probed`, and only one of them is true of a run
+  that located every seam. A seam that scored, even off one probe, takes the
+  verdict its score earns.
 - **Ten lines, no gaps.** A missing line is not a low-severity item, it is an
   unanswered question, and next quarter it reads as a clean bill — which is what a
   time-boxed run produces the moment it drops the three items it did not reach.
