@@ -51,6 +51,7 @@ public class ExfiltrationGuardrail implements OutputGuardrail {
      * Provider key shapes. Deliberately narrow: a broad rule would eat ordinary base64.
      */
     private static final List<Pattern> SECRET_SHAPES = List.of(
+            //TODO ADD GITLAB, BADROCK, ANTHROPIC
             Pattern.compile("\\bsk-[A-Za-z0-9_-]{20,}"),          // OpenAI
             Pattern.compile("\\bAIza[0-9A-Za-z_-]{35}"),           // Google
             Pattern.compile("\\bAKIA[0-9A-Z]{16}\\b"),             // AWS access key id

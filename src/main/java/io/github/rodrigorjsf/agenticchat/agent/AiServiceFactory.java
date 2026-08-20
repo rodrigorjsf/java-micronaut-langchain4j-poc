@@ -1,5 +1,6 @@
 package io.github.rodrigorjsf.agenticchat.agent;
 
+import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.rag.RetrievalAugmentor;
 import dev.langchain4j.service.AiServices;
@@ -137,7 +138,7 @@ public class AiServiceFactory {
                 // Without this the default is to throw, which turns a model typo into a
                 // 500. Returning the text lets the model correct its own call.
                 .hallucinatedToolNameStrategy(request ->
-                        dev.langchain4j.data.message.ToolExecutionResultMessage.from(request,
+                        ToolExecutionResultMessage.from(request,
                                 "There is no tool called '" + request.name()
                                         + "'. Activate the right skill first, then use the tools it lists."))
 
