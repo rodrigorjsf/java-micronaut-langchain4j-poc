@@ -70,6 +70,17 @@ result's payload if you must; keep the message.
 with `ChatMessageSerializer`, never a hand-rolled format that keeps only
 `message.text()` — see `ChatMemoryStoreFlociIT`.
 
+**An output guardrail that keeps failing is a 5xx.**
+`OutputGuardrailExecutor` throws `OutputGuardrailException` once its own
+`maxRetries` is spent, so `reprompt` must be bounded by the guardrail itself —
+count attempts in `InvocationParameters`, which the executor carries unchanged
+across its retries, and return success past the budget. A cosmetic rule that can
+withhold an answer is the `strYoutube` failure again in another costume.
+
+**A guardrail matching morphology matches ordinary Portuguese.** "Endings
+replaced by -e" is a rule against `você`, `site`, `onde` and `verde`. Match the
+enumerated forms the document lists, never the pattern it describes.
+
 **Model listeners are swallowed.** An exception in a `ChatModelListener` is a
 silent hole in the accounting, not an error. Catch and log inside the listener.
 
