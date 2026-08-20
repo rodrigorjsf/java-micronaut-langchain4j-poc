@@ -1,6 +1,6 @@
 ---
 name: agentic-evals
-description: Prove a prompt, classifier or guardrail change safe before it ships. Use when a prompt, a tool description or a rule changes and someone has to show nothing regressed, when building a labelled dataset for a guardrail or classifier, when deciding what a build gates on versus what it only reports, when choosing how many rows a gate needs and where its threshold goes, when the same suite scores differently on two runs, when an LLM judge is scoring another model's output, or when a row fails and the row may be the thing that is wrong.
+description: Prove a prompt, classifier or guardrail change safe before it ships. Use when a prompt, a tool description or a rule changes and someone has to show nothing regressed, when building a labelled dataset for a guardrail or classifier, when deciding what a build gates on versus what it only reports, when choosing how many rows a gate needs and where its threshold goes, when the same suite scores differently on two runs, when an LLM judge is scoring another model's output, or when a row fails and the row may be the thing that is wrong. For driving work toward a bar rather than measuring the judge that grades it, use gauntlet-loop.
 ---
 
 # Evals that gate a change
