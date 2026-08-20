@@ -495,26 +495,30 @@ agentic:
   voice:
     document: voice/VOICE.md
 
-    # The document's emoji table, transcribed. In configuration rather than in Java
-    # because this is the part most likely to be transcribed wrong, and a wrong
-    # entry makes the guardrail delete an emoji the brand explicitly allows. Written
-    # without the U+FE0F variation selector; the guardrail strips it from both sides
-    # before comparing, so either spelling matches.
+    # The document's emoji table. In configuration rather than in Java because it is
+    # the half of the document most likely to be got wrong, and a wrong entry makes
+    # the guardrail delete an emoji the document explicitly allows. Written without
+    # the U+FE0F variation selector; the guardrail strips it from both sides before
+    # comparing, so either spelling matches.
+    #
+    # Every context here is reachable by a skill this assistant actually has. That
+    # is deliberate: voice/VOICE_EXAMPLE.md, the contract this mechanism was first
+    # built against, reserves emoji for an app, for Pix keys and for a global
+    # account, none of which exist here — three of its fourteen entries can never
+    # fire. See issue #8.
     allowed-emoji:
       - "❗"   # point of attention
-      - "💡"   # ideas or suggestions
-      - "📱"   # something in the app, with a deeplink
-      - "💻"   # something done on a computer
+      - "💡"   # a suggestion or a next step
+      - "⏰"   # a time, a local time, a business-hours limit
+      - "📅"   # a date, a holiday, a long weekend
+      - "📈"   # a rate, an index, a quotation
+      - "🧭"   # a place, an address, a postal code
+      - "🌎"   # a country, a world figure
+      - "📚"   # a book, an article, a paper
+      - "🔎"   # nothing found, or a result to narrow
+      - "🚀"   # space, orbit, a launch
+      - "⚠"    # an approximate figure, an unstable source
       - "😊"   # a question successfully resolved
-      - "⏰"   # deadlines and times
-      - "📅"   # dates
-      - "⚠"    # instabilities and important points
-      - "💛"   # sign-off
-      - "🔑"   # Pix keys
-      - "🌎"   # global account scripts
-      - "🙋"   # yellow figures
-      - "😀"
-      - "🙌"
 
     max-bullet-items: 5
 

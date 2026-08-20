@@ -21,8 +21,10 @@ import org.slf4j.LoggerFactory;
  * moments before the answer is written — the role, the security rules, the skills the
  * model may reach for. {@link VoiceProfile} governs the writing itself, so it is the
  * final thing the model reads before the conversation starts. Being last costs
- * nothing: the whole prompt is still one constant prefix, so the document is billed
- * as cached input on every turn after the first rather than as fresh tokens.
+ * nothing: the whole prompt is still one constant prefix, so the document stays
+ * inside the region a provider's automatic cache keys on. Whether that cache is
+ * actually hit for a prompt of this shape is unmeasured — see the note in
+ * {@link VoiceProfile}.
  *
  * <p>There is no {@code # How to answer} section any more. It used to say "two or
  * three sentences is usually right", the voice profile says short paragraphs and at
@@ -86,12 +88,13 @@ public class SystemPromptBuilder {
                 
                 # How to answer
 
-                How you write — tone, structure, formatting, emoji, and what you may
-                never say — is defined entirely by the <tone_of_voice> block below, and
-                it applies to every answer you give. Two rules of this service sit above
-                it and win if they ever disagree: answer in the language named by
-                reply_language in the turn context, and cite a tool's source by naming
-                it rather than by pasting a URL.
+                How you write — tone, structure, formatting, emoji, what you may
+                never say, and how you decline — is defined entirely by the
+                <tone_of_voice> block below, and it applies to every answer you give.
+
+                reply_language in the turn context is this service's best guess at the
+                user's language, made before the message was read. Treat it as a hint:
+                where it and the message disagree, the message wins.
 
                 %s
 
