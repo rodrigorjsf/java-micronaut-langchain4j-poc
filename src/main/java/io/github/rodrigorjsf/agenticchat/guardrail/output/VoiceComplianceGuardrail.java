@@ -104,6 +104,12 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
      * Substitutions the voice document states outright, so applying them is quoting
      * the document rather than interpreting it. Ordered, because the violation list
      * becomes the reprompt and {@code Map.of} iterates differently on every JVM.
+     *
+     * <p>Every term here and in {@link #FORBIDDEN_TERMS} must appear in the shipped
+     * document, and a test asserts it. A term the document does not carry is a rule
+     * the model was never told about, enforced on its output — which is how
+     * "Banco Inter" survived here after the brand left the document, ready to rewrite
+     * the name of a real company returned by a CNPJ lookup.
      */
     private static final Map<String, String> STATED_REPLACEMENTS = new LinkedHashMap<>(Map.ofEntries(
             Map.entry("junt@s", "juntos"),
@@ -112,9 +118,7 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
             Map.entry("tod@s", "todos"),
             Map.entry("todxs", "todos"),
             Map.entry("queride", "você"),
-            Map.entry("obrigade", "obrigado"),
-            Map.entry("Banco Inter", "Inter"),
-            Map.entry("Inter Bank", "Inter")));
+            Map.entry("obrigade", "obrigado")));
 
     /**
      * Terms the document forbids without naming a single drop-in replacement. The
@@ -332,6 +336,23 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
         // Running the replacements over the whole answer rewrote a code sample —
         // "var tod@s = lista;" became "var todos = lista;" — for a violation that
         // was never reported, and shipped it as a success.
+        String out = text;
+        // Repairs interact: removing "😀 " from the head of "😀 - item um" turns a line
+        // the glyph fixer had already walked past into a bullet, so one pass left a
+        // list with mixed markers and a violation the model was then asked to fix.
+        // Iterating to a fixed point is what makes repair(repair(x)) == repair(x),
+        // and that identity is what keeps the reprompt for real violations only.
+        for (int pass = 0; pass < 3; pass++) {
+            String next = repairOnce(out);
+            if (next.equals(out)) {
+                return out;
+            }
+            out = next;
+        }
+        return out;
+    }
+
+    private String repairOnce(String text) {
         String out = Lines.of(text).mapProse(line -> {
             String replaced = line;
             for (Replacement replacement : replacements) {
@@ -340,7 +361,7 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
             }
             return replaced;
         });
-        return repairEmoji(Lines.of(out).withBulletGlyphFixed());
+        return Lines.of(repairEmoji(out)).withBulletGlyphFixed();
     }
 
     /**
@@ -374,7 +395,7 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
         if (keep != null && endsWithEmoji(lines.prose())) {
             return text;
         }
-        if (!lines.endsInProse()) {
+        if (!lines.endsInAppendableProse()) {
             keep = null;
         }
         return lines.stripEmojiFromProse(this::isEmoji) + (keep == null ? "" : " " + keep);
@@ -452,6 +473,42 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
                 }
                 prose[i] = !isFenceMarker && !inFence;
             }
+
+            // The other markdown code block: four spaces of indent after a blank
+            // line. Fences were handled and this form was not, so a YAML or Python
+            // sample written this way had its dashes rewritten into bullets, its
+            // "tod@s" rewritten into "todos", and its six lines counted against the
+            // five-item cap — a violation repair could not clear, spending a reprompt
+            // on every turn that carried one.
+            //
+            // A block only opens after a blank line and never under a bullet, because
+            // four spaces below a bullet is that item's continuation, not code.
+            boolean inIndentedCode = false;
+            boolean previousWasBlank = true;
+            boolean previousWasBullet = false;
+            for (int i = 0; i < split.length; i++) {
+                if (!prose[i]) {
+                    inIndentedCode = false;
+                    continue;
+                }
+                String line = split[i];
+                if (line.isBlank()) {
+                    previousWasBlank = true;
+                    continue;
+                }
+                boolean deep = indentWidthOf(line) >= 4;
+                if (inIndentedCode && deep) {
+                    prose[i] = false;
+                    previousWasBlank = false;
+                    continue;
+                }
+                inIndentedCode = deep && previousWasBlank && !previousWasBullet;
+                if (inIndentedCode) {
+                    prose[i] = false;
+                }
+                previousWasBlank = false;
+                previousWasBullet = isBullet(line);
+            }
             return new Lines(List.of(split), prose);
         }
 
@@ -483,13 +540,25 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
         }
 
         /**
-         * True when the last non-blank line is prose rather than code.
+         * True when the answer ends on a line an emoji can be appended to.
+         *
+         * <p>Not merely "ends in prose": a closing fence, a table row, a bullet and a
+         * heading are all places where " 😊" lands inside a structure rather than at
+         * the end of a sentence. The closing fence was the visible one — it destroyed
+         * the fence and rendered the rest of the answer as code — and a table row is
+         * the same defect one step quieter.
          */
-        boolean endsInProse() {
+        boolean endsInAppendableProse() {
             for (int i = all.size() - 1; i >= 0; i--) {
-                if (!all.get(i).isBlank()) {
-                    return isProse[i];
+                String line = all.get(i);
+                if (line.isBlank()) {
+                    continue;
                 }
+                return isProse[i]
+                        && !isBullet(line)
+                        && !line.stripLeading().startsWith("|")
+                        && !line.stripLeading().startsWith("#")
+                        && indentWidthOf(line) < 4;
             }
             return true;
         }
@@ -503,25 +572,57 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
         List<List<Integer>> bulletLists() {
             var lists = new ArrayList<List<Integer>>();
             var run = new ArrayList<Integer>();
+            int blanks = 0;
             for (int i = 0; i < all.size(); i++) {
-                if (isProse[i] && isBullet(all.get(i))) {
-                    run.add(i);
+                if (!isProse[i]) {
+                    blanks = flush(lists, run, blanks);
                     continue;
                 }
-                // A blank line ends the run. The document mandates a blank line
-                // between lists, so reading it as continuation merges two compliant
-                // three-item lists into one six-item violation.
-                if (!run.isEmpty()) {
-                    if (run.size() > 1) {
-                        lists.add(List.copyOf(run));
-                    }
-                    run.clear();
+                String line = all.get(i);
+                if (line.isBlank()) {
+                    blanks++;
+                    continue;
                 }
+                if (isBullet(line)) {
+                    // ONE blank line between items is a loose list — the shape this
+                    // document pushes the model toward, since it mandates a blank line
+                    // "between paragraphs, lists, headings and content". Reading it as
+                    // the end of the list let ten dash items past both bullet rules.
+                    // TWO ends it, and so does any paragraph in between.
+                    //
+                    // Across a blank line the marker also has to match, which is
+                    // markdown's own rule and the one that keeps "* Trazer os
+                    // originais." below a "•" list a footnote rather than its sixth
+                    // item. Adjacent lines are matched marker-blind on purpose: that
+                    // is where a genuinely mixed-glyph list shows up, and it should be
+                    // reported.
+                    boolean newList = blanks >= 2
+                            || (blanks == 1 && !run.isEmpty()
+                                && !markerOf(all.get(run.getFirst())).equals(markerOf(line)));
+                    if (newList) {
+                        flush(lists, run, blanks);
+                    }
+                    run.add(i);
+                    blanks = 0;
+                    continue;
+                }
+                // An indented line straight after an item is that item wrapping, not
+                // the end of the list.
+                if (!run.isEmpty() && blanks == 0 && indentWidthOf(line) > 0) {
+                    continue;
+                }
+                blanks = flush(lists, run, blanks);
             }
+            flush(lists, run, blanks);
+            return lists;
+        }
+
+        private static int flush(List<List<Integer>> lists, List<Integer> run, int blanks) {
             if (run.size() > 1) {
                 lists.add(List.copyOf(run));
             }
-            return lists;
+            run.clear();
+            return 0;
         }
 
         /**
@@ -575,9 +676,17 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
                         kept.append(cluster);
                     }
                 });
+                // Closing the gap is part of REMOVING an emoji, so it runs only on the
+                // lines that lost one. Applied to every prose line it reflowed the
+                // padding of markdown tables and aligned text that had no emoji in it
+                // at all.
+                if (kept.length() == line.length()) {
+                    out.append(line);
+                    continue;
+                }
                 // The indentation is preserved and only the interior is collapsed:
-                // "O prazo ⏰ é" must lose its double space, and a four-space code
-                // block must not lose its four.
+                // "O prazo ⏰ é" must lose its double space, and a four-space block
+                // must not lose its four.
                 Matcher indent = INDENT.matcher(kept.toString());
                 String leading = indent.find() ? indent.group() : "";
                 String body = kept.substring(leading.length());
@@ -596,10 +705,34 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
             return bullet.find() ? bullet.group(2) : "";
         }
 
+        private static int indentWidthOf(String line) {
+            Matcher indent = INDENT.matcher(line);
+            if (!indent.find()) {
+                return 0;
+            }
+            int width = 0;
+            for (char c : indent.group().toCharArray()) {
+                width += c == '\t' ? 4 : 1;
+            }
+            return width;
+        }
+
         private static int indentOf(String line) {
             Matcher bullet = BULLET_LINE.matcher(line);
             return bullet.find() ? bullet.group(1).length() : 0;
         }
+    }
+
+    /**
+     * Every Portuguese term this class matches on. Exposed so a test can assert the
+     * catalogue runs in both directions: a term here that the document does not carry
+     * is a rule the model was never told about, enforced on its output.
+     */
+    static Set<String> enforcedTerms() {
+        var terms = new LinkedHashSet<>(STATED_REPLACEMENTS.keySet());
+        terms.addAll(STATED_REPLACEMENTS.values());
+        terms.addAll(FORBIDDEN_TERMS.keySet());
+        return Set.copyOf(terms);
     }
 
     // ------------------------------------------------------------------ text utils
@@ -624,11 +757,19 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
      * enclitic pronoun: {@code Uai-Minas} is a proper noun, while
      * {@code Recomendo-lhe esse fundo} is standard formal Portuguese and is precisely
      * the sentence this rule exists to catch.
+     *
+     * <p>The third exclusion was withdrawn outright. Treating {@code _} and a trailing
+     * {@code /} as identifier characters protected {@code total_uai_mensal} and cost
+     * every rule in the map: {@code _Recomendo_ esse fundo} and
+     * {@code Recomendo/sugiro} both went unmatched, and underscore emphasis is
+     * something a model emits by habit. The trade is deliberate and asymmetric — a
+     * snake_case identifier that happens to contain a listed term now costs one
+     * reprompt, where the alternative shipped investment advice.
      */
     private static Pattern whole(String term) {
         return Pattern.compile(
-                "(?<![\\p{L}\\p{N}@._/-])" + Pattern.quote(term)
-                        + "(?![\\p{L}\\p{N}@_/])"          // uai_x, uai/relatorio
+                "(?<![\\p{L}\\p{N}@./-])" + Pattern.quote(term)
+                        + "(?![\\p{L}\\p{N}@])"             // recomendos, tod@s
                         + "(?!\\.[\\p{L}\\p{N}])"         // uai.com, but "recomendo." still matches
                         + "(?!-(?!" + ENCLITIC + ")[\\p{L}\\p{N}])", // Uai-Minas, but "Recomendo-lhe" matches
                 Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);

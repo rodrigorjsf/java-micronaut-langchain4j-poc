@@ -8,6 +8,7 @@ import dev.langchain4j.guardrail.OutputGuardrailRequest;
 import dev.langchain4j.invocation.InvocationContext;
 import dev.langchain4j.invocation.InvocationParameters;
 import dev.langchain4j.model.chat.response.ChatResponse;
+import io.github.rodrigorjsf.agenticchat.voice.VoiceProfile;
 import io.github.rodrigorjsf.agenticchat.voice.VoiceProperties;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.DisplayName;
@@ -132,11 +133,12 @@ class VoiceComplianceGuardrailTest {
     // ------------------------------------------------------------ forbidden terms
 
     @Test
-    void theBrandNameIsCorrectedRatherThanReported() {
-        assertThat(guardrail.repair("O Banco Inter oferece esse produto."))
-                .isEqualTo("O Inter oferece esse produto.");
-        assertThat(guardrail.repair("Você encontra no Inter Bank."))
-                .isEqualTo("Você encontra no Inter.");
+    @DisplayName("a term the document no longer carries is not enforced on the model")
+    void theBrandRuleLeftWithTheDocumentThatStatedIt() {
+        // "Banco Inter" -> "Inter" belongs to voice/VOICE_EXAMPLE.md. Left behind here
+        // it would rewrite the name of a real company returned by a CNPJ lookup.
+        assertThat(guardrail.repair("O Banco Inter S.A. está ativo desde 1994."))
+                .isEqualTo("O Banco Inter S.A. está ativo desde 1994.");
     }
 
     @Test
@@ -405,11 +407,22 @@ class VoiceComplianceGuardrailTest {
     @ValueSource(strings = {
             "Acesse o portal Uai-Minas para consultar.",
             "O endereço é uai.com.br para essa consulta.",
-            "O campo total_uai_mensal traz o acumulado.",
             "Peço que tu juntes os comprovantes."})
-    @DisplayName("an identifier, a hostname and correct Portuguese are not violations")
+    @DisplayName("a compound, a hostname and correct Portuguese are not violations")
     void identifiersAndValidPortugueseDoNotFire(String answer) {
         assertThat(guardrail.violations(answer)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("a snake_case identifier carrying a listed term costs one reprompt, deliberately")
+    void theUnderscoreTradeIsDeliberate() {
+        // Treating "_" as an identifier character protected total_uai_mensal and cost
+        // every rule in the map: _Recomendo_ and __Recomendo__ went unmatched, and
+        // underscore emphasis is something a model emits by habit. The trade is
+        // asymmetric — this costs a reprompt, the alternative shipped investment
+        // advice — so it is asserted rather than left to be rediscovered.
+        assertThat(guardrail.violations("O campo total_uai_mensal traz o acumulado."))
+                .anyMatch(rule -> rule.contains("regionalism"));
     }
 
     @Test
@@ -461,6 +474,118 @@ class VoiceComplianceGuardrailTest {
 
         assertThat(guardrail.violations(answer)).noneMatch(rule -> rule.startsWith("wording:"));
         assertThat(guardrail.repair(answer)).contains("var tod@s = lista;");
+    }
+
+    // ------------------------------------------------- evasion, not damage
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "_Recomendo_ esse fundo.",
+            "__Recomendo__ esse fundo.",
+            "**Recomendo** esse fundo.",
+            "Recomendo/sugiro esse fundo.",
+            "Seria melhor investir/aplicar no CDB.",
+            "_veja mais_ no aplicativo."})
+    @DisplayName("markdown emphasis and a slash do not hide a forbidden term")
+    void emphasisDoesNotDefeatTheRule(String answer) {
+        assertThat(guardrail.violations(answer)).isNotEmpty();
+    }
+
+    @Test
+    @DisplayName("a loose list is still a list")
+    void blankLinesBetweenItemsDoNotDisableTheCap() {
+        // The document mandates a blank line between lists AND between content, so
+        // this is the shape it pushes the model toward. Reading one blank line as the
+        // end of the list let ten items past both bullet rules.
+        String answer = "Documentos:\n\n- a\n\n- b\n\n- c\n\n- d\n\n- e\n\n- f";
+
+        assertThat(guardrail.violations(answer))
+                .anyMatch(rule -> rule.contains("at most 5 bullet points"))
+                .anyMatch(rule -> rule.contains("bullets are written"));
+    }
+
+    @Test
+    @DisplayName("two blank lines, or a paragraph, do end it")
+    void separatedListsAreStillSeparate() {
+        String answer = "Física:\n\n• RG\n• CPF\n• CNH\n\nJurídica:\n\n• CNPJ\n• Contrato\n• Procuração";
+
+        assertThat(guardrail.violations(answer)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("an item that wraps onto the next line is still one item")
+    void aWrappedItemDoesNotSplitTheRun() {
+        String answer = "• Selic acumulada\n  nos últimos 90 dias\n• CDI\n• IPCA\n• IGP-M\n• INPC\n• TR";
+
+        assertThat(guardrail.violations(answer))
+                .anyMatch(rule -> rule.contains("at most 5 bullet points"));
+    }
+
+    // ----------------------------------------- indented code, and fixed points
+
+    @Test
+    @DisplayName("a four-space code block is code, not a list and not prose")
+    void indentedCodeIsNotProse() {
+        String answer = "Exemplo de YAML:\n\n    itens:\n    - um\n    - dois\n    - tres\n\nPronto.";
+
+        assertThat(guardrail.violations(answer)).isEmpty();
+        assertThat(guardrail.repair(answer)).isEqualTo(answer);
+    }
+
+    @Test
+    @DisplayName("a replacement does not reach a four-space code block either")
+    void replacementsDoNotReachIndentedCode() {
+        String answer = "Exemplo:\n\n    var tod@s = lista;\n\nPronto.";
+
+        assertThat(guardrail.violations(answer)).noneMatch(rule -> rule.startsWith("wording:"));
+        assertThat(guardrail.repair(answer)).contains("var tod@s = lista;");
+    }
+
+    @Test
+    @DisplayName("four spaces under a bullet is that item continuing, not code")
+    void deepIndentUnderABulletIsStillAList() {
+        String answer = "• Cartão\n    • Crédito\n    • Débito\n• Conta\n• Pix\n• Boleto\n• TED\n• DOC";
+
+        assertThat(guardrail.violations(answer))
+                .anyMatch(rule -> rule.contains("at most 5 bullet points"));
+    }
+
+    @Test
+    @DisplayName("repairing twice changes nothing more than repairing once")
+    void repairIsAFixedPoint() {
+        // Removing "😀 " from the head of a line turns something the glyph fixer had
+        // already walked past into a bullet. One pass shipped a list with mixed
+        // markers and asked the model to fix a glyph the guardrail could fix.
+        String answer = "Resumo:\n\n😀 - item um\n- item dois\n- item tres";
+        String once = guardrail.repair(answer);
+
+        assertThat(guardrail.repair(once)).isEqualTo(once);
+        assertThat(once).doesNotContain("- item").contains("• item");
+        assertThat(guardrail.violations(once)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("a table is not reflowed, and the emoji does not land inside a row")
+    void tablesSurviveIntact() {
+        String answer = "Compare ⏰:\n\n| Canal  | Prazo    |\n|--------|----------|\n| Pix    | imediato |";
+
+        assertThat(guardrail.repair(answer))
+                .contains("| Canal  | Prazo    |")
+                .contains("| Pix    | imediato |")
+                .doesNotContain("imediato | ⏰");
+    }
+
+    @Test
+    @DisplayName("the guardrail enforces no term the document does not state")
+    void theTermCatalogueRunsInBothDirections() {
+        // How "Banco Inter" -> "Inter" survived in the guardrail after the brand left
+        // the document: nothing checked. Left there it would have rewritten the name
+        // of a real company returned by a CNPJ lookup, enforcing a rule the model was
+        // never given.
+        assertThat(VoiceComplianceGuardrail.enforcedTerms())
+                .allSatisfy(term -> assertThat(new VoiceProfile(properties(1)).document())
+                        .as("\"%s\" is enforced on the answer, so the document must state it", term)
+                        .containsIgnoringCase(term));
     }
 
     // ------------------------------------------------------------------ fixtures
