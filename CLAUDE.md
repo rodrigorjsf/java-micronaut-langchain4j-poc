@@ -91,6 +91,7 @@ When something fails repeatedly, when User has to re-explain, or when a workarou
 - Workflow `resumeFromRunId` is same-session only; make long fan-outs idempotent.
 - `git add -A` sweeps subagent scratch files into the commit.
 - Output guardrail retries exhausted = exception; bound reprompts in the guardrail.
+- Test doubles called by parallel sub-agents need concurrent collections.
 
 
 
