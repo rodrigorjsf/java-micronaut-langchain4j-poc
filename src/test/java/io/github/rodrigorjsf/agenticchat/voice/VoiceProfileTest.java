@@ -79,20 +79,66 @@ class VoiceProfileTest {
     }
 
     @Test
+    @DisplayName("the shape check rejects a refusal that offers nothing")
+    void theShapeCheckIsNotARubberStamp() {
+        // Written first, and deliberately. The obvious version of the check below —
+        // "contains posso or can somewhere" — passes on "Não posso ajudar com isso.",
+        // which offers nothing and is precisely what the document's shape forbids. A
+        // gate that cannot go red measures nothing, so these are the strings it must
+        // reject before it is allowed to grade the real ones.
+        assertThat(followsTheDeclineShape("Não posso ajudar com isso.")).isFalse();
+        assertThat(followsTheDeclineShape("I can't help with that.")).isFalse();
+        assertThat(followsTheDeclineShape("Isso está fora do escopo.")).isFalse();
+        assertThat(followsTheDeclineShape("Não posso ajudar com isso. Essa é a política do serviço."))
+                .as("two sentences, and the second one offers nothing")
+                .isFalse();
+        assertThat(followsTheDeclineShape(
+                "Desculpe, não sei. Desculpe mesmo, mas posso ajudar com dados públicos."))
+                .as("two apologies")
+                .isFalse();
+
+        assertThat(followsTheDeclineShape(
+                "Não escrevo código. Posso consultar CEP, CNPJ e feriados, se ajudar.")).isTrue();
+    }
+
+    @Test
     @DisplayName("every refusal the service does emit follows the shape the document states")
     void theShippedRefusalsSatisfyTheDocument() {
         var refusals = new RefusalTemplates();
         for (TriageVerdict.Intent intent : TriageVerdict.Intent.values()) {
             for (String language : List.of("pt-BR", "en")) {
                 String refusal = refusals.refusalFor(intent, language);
-                assertThat(refusal)
-                        .as("%s/%s offers a capability or a next step", intent, language)
-                        .containsPattern("(?i)\\b(posso|pode|can|could|would)\\b");
-                assertThat(refusal.split("(?i)desculp|sorry", -1).length - 1)
-                        .as("%s/%s apologises at most once", intent, language)
-                        .isLessThanOrEqualTo(1);
+                assertThat(followsTheDeclineShape(refusal))
+                        .as("%s/%s — \"%s\"", intent, language, refusal)
+                        .isTrue();
             }
         }
+    }
+
+    /**
+     * The document's shape, as a predicate: what could not be done, then what can be
+     * done or the one next step that would work, and at most one apology.
+     *
+     * <p>The offer has to be a separate sentence, which is what separates "Não posso
+     * ajudar com isso." from "Não escrevo código. Posso consultar CEP…" — a substring
+     * search for "posso" cannot tell those apart, and a check that cannot tell them
+     * apart is not measuring the rule.
+     */
+    private static boolean followsTheDeclineShape(String refusal) {
+        String[] sentences = refusal.split("(?<=[.?!])\\s+");
+        if (sentences.length < 2) {
+            return false;
+        }
+        // Two ways to offer, and the check needs both: a modal ("Posso consultar CEP")
+        // and an invitation ("…informações gerais, é só pedir"). Requiring only the
+        // modal rejected HARMFUL_REQUEST, which satisfies the documented shape and
+        // simply words it the other way — a predicate bug, not a template defect.
+        String offer = sentences[sentences.length - 1];
+        boolean offers = offer.matches(
+                "(?is).*(\\b(posso|pode|can|could|would)\\b|é só |just ask|se ajudar|if that helps).*");
+        long apologies = java.util.regex.Pattern.compile("(?i)desculp|sorry")
+                .matcher(refusal).results().count();
+        return offers && apologies <= 1;
     }
 
     @Test

@@ -85,6 +85,27 @@ import java.util.regex.Pattern;
  *       "* Valores sujeitos a alteração pelo Bacen." into a bullet, or counting it as
  *       the sixth item of the list above it, is damage either way.</li>
  * </ul>
+ *
+ * <h2>What this class does not check, and nothing else does either</h2>
+ * <p>
+ * Written down because the alternative is a reader assuming the document is enforced
+ * end to end. These clauses are defaults in the prompt and nothing holds them:
+ *
+ * <ul>
+ *   <li><b>The mandated reply to an offensive message.</b> The document says "reply
+ *       exactly", and there is no mandated-phrase check here. The trigger is not
+ *       available either: the triage layer classifies {@code FRUSTRATION}, which the
+ *       document explicitly says is NOT an offence, and nothing classifies offence.</li>
+ *   <li><b>The two-reply escalation.</b> The model reads it off its own memory window;
+ *       no counter exists, and there is deliberately no handoff channel to check.</li>
+ *   <li><b>"Respecting their contexts" for emoji.</b> Membership of the allow-list is
+ *       checkable and choosing 📅 for a rate is not.</li>
+ *   <li><b>Emoji variants that differ from the allowed form.</b> {@code normalise}
+ *       strips only U+FE0E and U+FE0F, so a skin-tone or ZWJ-gendered variant misses
+ *       the allow-list and is deleted. For skin tone that is the document's intent;
+ *       for gender it is not, and it is moot only because the shipped allow-list holds
+ *       no person emoji.</li>
+ * </ul>
  */
 @Singleton
 public class VoiceComplianceGuardrail implements OutputGuardrail {
