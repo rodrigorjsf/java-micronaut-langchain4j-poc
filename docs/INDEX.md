@@ -44,10 +44,16 @@ Three ADRs carry findings that changed the design rather than confirming it:
 
 ## Reusable pieces
 
-[`.claude/skills/`](../.claude/skills/) holds six skills written to be
-project-agnostic — the tool boundary, progressive disclosure, the triage gate,
-injection defence, retrieval, and cost observability. They carry the numbers from
-this project but none of its code, so they travel to any agentic backend.
+[`.claude/skills/`](../.claude/skills/) holds fourteen skills written to be
+project-agnostic. Six describe a piece of this design — the tool boundary,
+progressive disclosure, the triage gate, injection defence, retrieval, and cost
+observability. Eight are about *building* one: authoring a tool, authoring a
+skill, reviewing a layer that already ships, auditing a codebase, proving a change
+safe, deciding what a turn remembers, composing a runtime, and spending a
+sub-agent.
+
+They carry the numbers from this project but none of its code, so they travel to
+any agentic backend.
 
 [`.claude/rules/micronaut-langchain4j.md`](../.claude/rules/micronaut-langchain4j.md)
 holds what does not travel: the framework traps that compiled, or ran, or passed a

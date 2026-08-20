@@ -103,7 +103,7 @@ Also:
   the tests enforce.
 - **[`docs/adr/`](docs/adr/README.md)** — one record per decision, with the
   measurement behind it.
-- **[`.claude/skills/`](.claude/skills/)** — six skills written to be
+- **[`.claude/skills/`](.claude/skills/)** — fourteen skills written to be
   project-agnostic, so the reasoning travels to other agentic backends.
 
 ## What this is not
