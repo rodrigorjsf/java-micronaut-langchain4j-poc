@@ -10,9 +10,9 @@ import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.output.FinishReason;
 import dev.langchain4j.model.output.TokenUsage;
 
-import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.Deque;
+import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.List;
 import java.util.function.Function;
 
@@ -27,8 +27,19 @@ import java.util.function.Function;
  */
 public class ScriptedChatModel implements ChatModel {
 
-    private final Deque<Function<ChatRequest, AiMessage>> script = new ArrayDeque<>();
-    private final List<ChatRequest> requests = new ArrayList<>();
+    /**
+     * Both are concurrent on purpose, and it is not defensive.
+     *
+     * <p>{@link #routeBy} exists because the trip-briefing workflow runs two
+     * sub-agents at the same time — its own javadoc says so — and those two threads
+     * land in {@link #chat} together. With a plain {@code ArrayList}, two concurrent
+     * {@code add} calls lose one: {@code callCount()} came back 3 where four
+     * sub-agents had run, intermittently, on a clean build. The symptom read exactly
+     * like a sub-agent failing silently in the workflow, which is a far more alarming
+     * bug than the one that was there. {@code ArrayDeque.poll} races the same way.
+     */
+    private final Deque<Function<ChatRequest, AiMessage>> script = new ConcurrentLinkedDeque<>();
+    private final List<ChatRequest> requests = new CopyOnWriteArrayList<>();
     private AiMessage fallback = AiMessage.from("ok");
     private List<ChatModelListener> listeners = List.of();
     private Function<ChatRequest, AiMessage> router;
