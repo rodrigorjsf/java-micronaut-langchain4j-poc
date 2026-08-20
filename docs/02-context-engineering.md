@@ -25,14 +25,41 @@ would accept.
 | Region | Budget | Paid |
 |---|---|---|
 | System prompt | ~1 500 | every turn, unchanged |
+| Voice document | ~2 000 | every turn, unchanged |
 | Skills index | ~970 at 12 skills | every turn, unchanged |
 | Retrieved content | 0–1 000 | only on routed turns |
 | Conversation | up to ~14 400 before compaction | every turn, growing |
 | This turn's tool results | ≤ 32 KB per call, ~8k tokens | this turn, then in memory |
 | Reserve for the answer | ~4 000 | — |
 
-The first two rows are the *standing* cost — the number that multiplies by every
+The first three rows are the *standing* cost — the number that multiplies by every
 turn of every conversation, so it gets the most attention.
+
+The voice document is the largest single line in that block, and the interesting
+thing about it is that **moving it did not help**. A ~2000-token tone-of-voice
+contract looks exactly like something progressive disclosure should own, so the
+first instinct is a skill. Work it through and every property inverts:
+
+| | in the system prompt | behind a skill |
+|---|---|---|
+| when it is needed | every answer | every answer — so routing decides nothing |
+| what activation costs | nothing | an `activate_skill` round trip on the first qualifying turn |
+| where the tokens land | the constant prefix, billed at the cached rate after turn one | a tool result in chat memory, replayed at the *fresh* rate on every later turn |
+| what a mistake looks like | the process does not start | a fluent answer in the wrong voice, and no log line anywhere |
+
+The last row is the one that settles it. Under-firing is invisible: a turn where
+the model did not realise the voice skill applied is indistinguishable from a turn
+that correctly needed no skill.
+
+What *was* real in the concern is **position**, not presence. The document governs
+the moment the answer is written, and everything above it governs the moments
+before. So it is the last section of the prompt, and one line of the per-turn
+context points back at it — a pointer costs ~15 tokens, a second copy would cost
+2000 and then be replayed out of memory for the rest of the conversation.
+
+A startup assertion checks the assembled prompt actually contains the document,
+byte for byte, and refuses to start if it does not. That is the whole activation
+guarantee: the failure mode has no other symptom.
 
 ## Lever 1 — progressive tool disclosure
 
