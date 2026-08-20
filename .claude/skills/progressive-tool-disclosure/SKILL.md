@@ -1,6 +1,6 @@
 ---
 name: progressive-tool-disclosure
-description: Keep a large tool set affordable by showing the model only what the turn needs. Use when an agent has more than ~15 tools, when the system prompt is dominated by tool schemas, when tool selection accuracy drops as tools are added, or when deciding between skills and tool search.
+description: Keep a large tool set affordable by showing the model only what the turn needs. Use when an agent has more than ~15 tools, when the system prompt is dominated by tool schemas, when tool selection accuracy drops as tools are added, or when deciding between skills and tool search. For one tool's own description misrouting, use agentic-tool-boundary.
 ---
 
 # Progressive tool disclosure
