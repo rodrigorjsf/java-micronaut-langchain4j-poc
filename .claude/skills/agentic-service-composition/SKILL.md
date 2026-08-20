@@ -1,6 +1,6 @@
 ---
 name: agentic-service-composition
-description: Wire an agent runtime out of one service per role. Use when a single service both classifies and answers, when a model name appears in application code, when deciding where a guardrail, listener or tool provider attaches — or when one never seems to run, when a provider's prompt cache is not hitting, or when something expensive is built on first use.
+description: Wire an agent runtime out of one service per role. Use when a single service both classifies and answers, when a model name appears in application code, when deciding where a guardrail, listener or tool provider attaches — or when one never seems to run, when a provider's prompt cache is not hitting, or when something expensive is built on first use. For whether a cheap classifier should run in front at all, use llm-triage-gate.
 ---
 
 # Composing an agent runtime

@@ -1,6 +1,6 @@
 ---
 name: authoring-agent-skills
-description: Write the document a model reads when tools are grouped behind a skill — its description routes, its body teaches. Use when a skill fires on the wrong turns or never the right ones, when two descriptions cover the same ground, when a rule spans a whole tool set rather than one call, or when activation seems to change nothing. For one tool's own contract, use authoring-agent-tools; for whether to group tools at all, progressive-tool-disclosure; for the turn set that scores routing, reviewing-agent-tools-and-skills.
+description: Write the document a model reads when tools are grouped behind a skill — its description routes, its body teaches. Use when a skill fires on the wrong turns or never the right ones, when two skill descriptions cover the same ground, when a rule spans a whole tool set rather than one call, or when activation seems to change nothing. For one tool's own contract, use authoring-agent-tools; for whether to group tools at all, progressive-tool-disclosure. Before shipping a description change, score it against a turn set written down before the edit — ask the user to run reviewing-agent-tools-and-skills, which they invoke by name.
 ---
 
 # Writing the document the model reads
