@@ -80,6 +80,7 @@ public class ConversationCompactor {
     private final ChatMemoryStore store;
     private final ConversationSummarizer summarizer;
     private final MeterRegistry meters;
+    private final io.micrometer.core.instrument.DistributionSummary conversationTokens;
     private final int triggerTokens;
 
     public ConversationCompactor(ChatMemoryStore store,
@@ -89,6 +90,10 @@ public class ConversationCompactor {
         this.store = store;
         this.summarizer = summarizer;
         this.meters = meters;
+        this.conversationTokens = io.micrometer.core.instrument.DistributionSummary
+                .builder("agentic.memory.tokens")
+                .description("Estimated tokens in a conversation when compaction was considered")
+                .register(meters);
         this.triggerTokens = triggerTokens;
     }
 
@@ -100,7 +105,11 @@ public class ConversationCompactor {
         try {
             var messages = store.getMessages(conversationId.value());
             int before = estimateTokens(messages);
-            meters.gauge("agentic.memory.tokens", before);
+            // A DistributionSummary, not a gauge. Micrometer holds a gauge's source by
+            // WEAK reference and registers a given name once, so `gauge(name, boxedInt)`
+            // reports the first conversation this process ever compacted and turns NaN
+            // after the first GC. A summary records every observation.
+            conversationTokens.record(before);
             if (before < triggerTokens) {
                 return;
             }
@@ -127,6 +136,12 @@ public class ConversationCompactor {
         int anchorFrom = Math.max(0, messages.size() - RECENCY_ANCHOR);
         var anchor = new ArrayList<>(messages.subList(anchorFrom, messages.size()));
 
+        // An activation is a tool RESULT, and a result without the AiMessage that
+        // requested it is an orphan: the id in its tool_call has no counterpart, and
+        // a provider rejects the list. So the request travels with it — which means
+        // finding the request first, before either is classified.
+        var activationRequests = requestsBehindActivations(messages, anchorFrom);
+
         var activations = new ArrayList<ChatMessage>();
         var candidates = new ArrayList<ChatMessage>();
         for (int i = 0; i < anchorFrom; i++) {
@@ -134,7 +149,7 @@ public class ConversationCompactor {
             if (message instanceof SystemMessage) {
                 continue;
             }
-            if (carriesActivation(message)) {
+            if (carriesActivation(message) || activationRequests.contains(i)) {
                 activations.add(message);
             } else {
                 candidates.add(message);
@@ -181,10 +196,12 @@ public class ConversationCompactor {
             if (message instanceof ToolExecutionResultMessage result) {
                 String text = result.text() == null ? "" : result.text();
                 if (looksLikeFailure(text)) {
+                    out.add(replaceText(result, DROPPED_FAILURE));
                     continue;
                 }
                 String fingerprint = result.toolName() + "|" + text;
                 if (!seen.add(fingerprint)) {
+                    out.add(replaceText(result, DROPPED_DUPLICATE));
                     continue;
                 }
                 out.add(truncate(result, text));
@@ -216,6 +233,66 @@ public class ConversationCompactor {
                 .toolName(result.toolName())
                 .text(text.substring(0, TOOL_RESULT_CHARS)
                         + "\n\n[truncated during compaction: this result is older context]")
+                .attributes(result.attributes())
+                .build();
+    }
+
+    /**
+     * The text a dropped tool result leaves behind.
+     *
+     * <p>The message stays because removing it breaks the pair; the payload goes
+     * because that was the point. Saying which of the two happened keeps the model
+     * from reading an empty result as "the tool returned nothing".
+     */
+    static final String DROPPED_FAILURE =
+            "[this call failed earlier in the conversation; the error was dropped during compaction]";
+
+    static final String DROPPED_DUPLICATE =
+            "[an identical result appears elsewhere in this conversation; dropped during compaction]";
+
+    /**
+     * Indices of the {@link AiMessage}s that requested a skill activation.
+     *
+     * <p>Matched by tool-call id, and falling back to the nearest preceding
+     * {@code AiMessage} when the id is absent — a store that round-trips through a
+     * format without ids would otherwise silently orphan every activation.
+     */
+    private static Set<Integer> requestsBehindActivations(List<ChatMessage> messages, int until) {
+        var activationIds = new HashSet<String>();
+        for (int i = 0; i < until; i++) {
+            if (carriesActivation(messages.get(i))
+                    && messages.get(i) instanceof ToolExecutionResultMessage result
+                    && result.id() != null) {
+                activationIds.add(result.id());
+            }
+        }
+        var requests = new HashSet<Integer>();
+        for (int i = 0; i < until; i++) {
+            if (!(messages.get(i) instanceof AiMessage ai) || !ai.hasToolExecutionRequests()) {
+                continue;
+            }
+            boolean requestsAnActivation = ai.toolExecutionRequests().stream()
+                    .anyMatch(request -> activationIds.contains(request.id()));
+            if (requestsAnActivation) {
+                requests.add(i);
+                continue;
+            }
+            // No id to match on: keep the request if the very next message is an
+            // activation, which is the shape every real exchange has.
+            if (i + 1 < until && carriesActivation(messages.get(i + 1))
+                    && messages.get(i + 1) instanceof ToolExecutionResultMessage next
+                    && next.id() == null) {
+                requests.add(i);
+            }
+        }
+        return requests;
+    }
+
+    private static ChatMessage replaceText(ToolExecutionResultMessage result, String text) {
+        return ToolExecutionResultMessage.builder()
+                .id(result.id())
+                .toolName(result.toolName())
+                .text(text)
                 .attributes(result.attributes())
                 .build();
     }

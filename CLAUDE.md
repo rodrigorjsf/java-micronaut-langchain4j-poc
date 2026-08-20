@@ -88,6 +88,7 @@ When something fails repeatedly, when User has to re-explain, or when a workarou
 - Reordering `@Factory` methods leaves stale `Bean1`/`Bean2` definitions; run `mvnw clean`.
 - `git checkout -- <file>` discards unstaged edits; copy the file first.
 - `ToolJson.project` on a container path keeps it whole; use `projectList`.
+- Workflow `resumeFromRunId` is same-session only; make long fan-outs idempotent.
 
 
 

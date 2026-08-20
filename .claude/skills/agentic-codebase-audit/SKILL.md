@@ -141,7 +141,7 @@ inside-one-job half and one good call site speaks for all of them. Either way tw
 audits of the same codebase stop comparing. Most 0s therefore name a real symbol;
 `absent` is the one that does not.
 
-Both rungs above 0 are measured rather than read for, in ladder order:
+Both measurements are run rather than read for, in ladder order:
 
 **1 vs 2 — add a call site the way a newcomer would.** Copy the nearest existing
 example, wire it the minimal way, change nothing else, run it, and write down
@@ -173,7 +173,9 @@ tool with an id belonging to somebody else, and that read has already happened b
 the time you switch branches back. Point it at a scratch tenant whose data is
 yours, or at a stubbed downstream — never a real caller's id — the way 6.1 names
 its scratch conversation. Its other two arguments are harmless: the hazard is that
-one value, not the probe, and dropping 3.8 leaves ASI02 with nothing behind it.
+one value, not the probe. Dropping 3.8 does not strip ASI02: `OWASP-COVERAGE.md`
+keys that item on three probes, and 3.3 and 3.6 still stand — you lose the one
+clause about rejection at the boundary, and say so.
 
 ### Step 3 — Answer the ten coverage items
 
@@ -254,6 +256,13 @@ that stops the bleeding and the part that does it properly.
 **Cap the plan at ten findings.** Ten that get done beat thirty that get read.
 The rest stay in the scored table, where the next audit will find them.
 
+### Step 6 — Commit the three blocks
+
+Table, coverage lines, capped plan, into one file in the repository, on the
+commit you audited. An audit that ends in a chat window cannot be diffed, and the
+demotion from 2 to 1 is only ever visible as a diff. **The artefact** below says
+where it lives and what re-runs it.
+
 ## Report first, fix second
 
 Land the whole report before changing a line. An audit that stops to fix its
@@ -264,9 +273,12 @@ remembers.
 ## When you have two hours, not two days
 
 A partial audit is a deliverable; an all-or-nothing procedure on a large codebase
-produces nothing at all. Probe these four first — they read out of the source, so
-they need no running system, and they are where absence is both most common and
-most expensive:
+produces nothing at all. **Step 1 still runs in full** — locating nine seams is
+the cheap half, and it is what keeps the table nine rows of evidence rather than
+five rows and four apologies. The budget is spent on Step 2, and it buys these
+four seams, six probes, first: they are almost entirely source reads, needing no running
+system beyond the one rider 5.1 names, and they are where absence is both most
+common and most expensive:
 
 1. **Guardrails, probe 5.1** — the census of every path carrying text the user
    did not type, and which of them has a check.
@@ -277,7 +289,7 @@ most expensive:
 4. **Model access, probes 1.1 and 1.4** — the construction sites, and the bound
    this codebase chose on the call.
 
-**A pass that runs nothing writes 0 or `not yet probed`, and nothing between.** 0
+**A probe you did not run writes 0 or `—`, and nothing between.** 0
 survives a paper reading because an empty answer has no rung beneath it — no bound
 chosen anywhere, no check on any row of the census, no tenant component in the
 key. Every rung above 0 is one of Step 2's two measurements, so a job that turns
@@ -288,14 +300,18 @@ exactly the reading Step 2 says decides it wrong every time. The same rule cover
 a seam whose probes you ran only some of: a 0 stands, because no unrun probe goes
 lower, and anything above 0 waits.
 
-Mark the other five seams `not yet probed`, and commit **all three blocks** — a
-short run does not get to drop one. The table is still nine rows. The coverage
-block is still ten lines: `uncovered` where the mapped seam scored 0, `unmeasured
-— <seam> not yet probed` wherever that seam carries no score — ASI04 at
-discovery, ASI07 at sub-agents and ASI10 at observability, unless Step 1
-*located* that seam as `n/a`, which is a locate result and stands whatever the
-budget was. The plan ranks what the four probes found, and the summary names
-which seams you stopped at and which probe goes first next time.
+The other five seams keep whatever Step 1 wrote in **Where** and score `—`: a
+located seam is not an unprobed one, and erasing the `file:symbol` you just found
+throws away the half of the audit you did finish. `not yet probed` is reserved
+for a seam Step 1 itself never reached — which, on a budget that funds Step 1,
+should be none. Commit **all three blocks**; a short run does not get to drop one.
+The table is still nine rows. The coverage block is still ten lines: `uncovered`
+where the mapped seam scored 0, and where the mapped seam carries no score,
+`unmeasured — <seam> located at <file:symbol>, not measured` if Step 1 found it,
+`unmeasured — <seam> not yet probed` only if it did not. `n/a` is a locate result
+and stands whatever the budget was. The plan ranks what the six probes found,
+and the summary names which seams you stopped at and which probe goes first next
+time.
 
 ## The artefact, and when you run it again
 

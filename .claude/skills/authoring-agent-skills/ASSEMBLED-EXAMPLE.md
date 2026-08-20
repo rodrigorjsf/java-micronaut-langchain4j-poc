@@ -17,7 +17,7 @@ nothing here resolves an amount. If three lookups have not found it, say what yo
 for one narrower detail.
 
 To refund the last charge: `find_customer(email)` → `list_invoices(customerId, limit 5, newest
-first)` → `read_invoice(invoiceId)` → `issue_refund(invoiceId, amount)`. Start at `read_invoice`
+first)` → `read_invoice(invoiceId)` → `issue_refund(invoiceId, refundToken)`. Start at `read_invoice`
 if the user already gave the number.
 
 `[]` from `list_invoices` means nothing matched the filter you sent. A refund whose status is
@@ -55,8 +55,8 @@ And there are no headings at all: at this size they cost more lines than the str
 them pays twice for one meaning and teaches nothing.
 
 **No confirmation instruction before `issue_refund`.** That one is irreversible, so it is not a
-sentence here — `issue_refund` takes a required amount parameter read back from `read_invoice`,
-which a persuasive turn cannot argue away.
+sentence here — `issue_refund` requires the opaque `refundToken` that
+`read_invoice` mints, which the model cannot construct and a persuasive turn cannot argue away.
 
 **No second recipe.** Refunding the last charge is the traffic. A recipe nobody's turn matches is
 re-sent on every turn of the conversation for nothing.

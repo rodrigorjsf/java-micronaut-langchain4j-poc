@@ -71,6 +71,19 @@ public class InjectionHeuristics {
             Pattern.CASE_INSENSITIVE | Pattern.MULTILINE);
 
     /**
+     * The delimiters again, minus {@code <s>} and {@code </s>}.
+     *
+     * <p>Those two are HTML strikethrough. In a user's own sentence they are a
+     * chat-template leak worth blocking; in a document a tool fetched from a wiki
+     * they are ordinary markup, and blocking on them withholds the article.
+     */
+    private static final Pattern ROLE_DELIMITERS_IN_DATA = Pattern.compile(
+            "<\\|(im_start|im_end|system|user|assistant|endoftext)\\|>"
+                    + "|<<\\s*/?\\s*SYS\\s*>>|\\[/?INST]"
+                    + "|^###\\s*(system|instruc(ao|oes))\\b",
+            Pattern.CASE_INSENSITIVE | Pattern.MULTILINE);
+
+    /**
      * A code fence claiming to be a privileged role.
      */
     private static final Pattern ROLE_FENCE = Pattern.compile(
@@ -222,6 +235,69 @@ public class InjectionHeuristics {
             rules.add("P2_probe:" + probeHits);
         }
 
+        return new Score(score, rules);
+    }
+
+    /**
+     * Scores a TOOL RESULT, which needs its own rules rather than the user's.
+     *
+     * <p>Three of the structural rules above measure properties of a sentence, and
+     * against machine output they measure the machine. Compact JSON carries no
+     * whitespace at all, so {@code S2_long_token} — one run of 400 non-space
+     * characters — fires on any result over 400 bytes: measured, a twelve-month
+     * SELIC series from the central bank is 457 characters with a longest run of
+     * 457, and the model was told the source had tried to give it instructions
+     * instead of receiving the series. {@code S1_too_long} does the same to any
+     * endpoint whose transport ceiling sits above 12 000, and the transport ceiling
+     * is already the bound that belongs there.
+     *
+     * <p>What survives is the part that is about <em>instructions</em>, which is the
+     * only thing indirect injection can be: role delimiters, a fence claiming a
+     * privileged role, a data URI, an override or probe phrase, invisible
+     * characters, and a decodable base64 payload. A retrieved document that argues
+     * with the model still gets caught; a large one no longer does.
+     */
+    public Score scoreToolResult(String normalized, String rawText) {
+        if (normalized == null || normalized.isBlank()) {
+            return new Score(0, List.of());
+        }
+        var rules = new ArrayList<String>();
+        int score = 0;
+
+        if (hasDecodableBase64Blob(normalized)) {
+            score += HARD_BLOCK;
+            rules.add("S3_base64_payload");
+        }
+        if (ROLE_DELIMITERS_IN_DATA.matcher(fold(normalized)).find()) {
+            score += HARD_BLOCK;
+            rules.add("S6_role_delimiter");
+        }
+        if (ROLE_FENCE.matcher(normalized).find()) {
+            score += HARD_BLOCK;
+            rules.add("S7_role_fence");
+        }
+        if (DATA_URI.matcher(normalized).find()) {
+            score += HARD_BLOCK;
+            rules.add("S9_data_uri");
+        }
+
+        int invisible = TextNormalizer.countInvisible(rawText);
+        if (invisible > 0) {
+            score += SIGNAL_SCORE;
+            rules.add("S5_invisible_chars:" + invisible);
+        }
+
+        String matchable = fold(CODE_FENCE.matcher(normalized).replaceAll(" "));
+        int overrideHits = countMatches(OVERRIDE_PHRASES, matchable);
+        if (overrideHits > 0) {
+            score += HARD_BLOCK;
+            rules.add("P1_instruction_override:" + overrideHits);
+        }
+        int probeHits = countMatches(PROBE_PHRASES, matchable);
+        if (probeHits > 0) {
+            score += PROBE_SCORE * probeHits;
+            rules.add("P2_probe:" + probeHits);
+        }
         return new Score(score, rules);
     }
 

@@ -1,6 +1,6 @@
 ---
 name: agentic-tool-boundary
-description: Design the boundary between an LLM agent and the outside world. Use when adding or reviewing agent tools, when a tool takes a URL or a path, when tool output is large or unbounded, when tool failures reach the model as exceptions, or when the model keeps picking the wrong tool.
+description: Design the boundary between an LLM agent and the outside world. Use when adding or reviewing agent tools, when a tool takes a URL or a path, when tool output is large or unbounded, when tool failures reach the model as exceptions, or when the model picks the wrong tool from a set small enough to read in one sitting. Past roughly fifteen tools, use progressive-tool-disclosure.
 ---
 
 # The tool boundary

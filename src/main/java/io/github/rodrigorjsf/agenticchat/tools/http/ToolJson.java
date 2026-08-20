@@ -143,7 +143,7 @@ public class ToolJson {
 
     private ArrayNode capArray(ArrayNode array, int max, java.util.function.UnaryOperator<JsonNode> shape) {
         var out = MAPPER.createArrayNode();
-        int kept = Math.min(array.size(), Math.max(0, max));
+        int kept = Math.clamp(max, 0, array.size());
         for (int i = 0; i < kept; i++) {
             out.add(shape.apply(array.get(i)));
         }

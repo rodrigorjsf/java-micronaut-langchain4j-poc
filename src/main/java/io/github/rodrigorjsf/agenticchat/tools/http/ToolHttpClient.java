@@ -205,7 +205,12 @@ public class ToolHttpClient {
         return switch (status.getCode()) {
             case 400, 422 -> ToolResponse.failure(ToolResponse.Outcome.INVALID_REQUEST,
                     "the service rejected these arguments.");
-            case 401, 403 -> ToolResponse.failure(ToolResponse.Outcome.UPSTREAM_ERROR,
+            // NOT_FOUND rather than UPSTREAM_ERROR, which is the one outcome the retry
+            // loop treats as retryable. A refusal is deterministic — the same request
+            // gets the same 403 — so retrying spends a second request to be refused
+            // twice, and against a host that answers 403 to an unidentified client it
+            // is exactly the traffic that gets an IP blocked.
+            case 401, 403 -> ToolResponse.failure(ToolResponse.Outcome.NOT_FOUND,
                     "this data source refused the request.");
             case 404 -> ToolResponse.failure(ToolResponse.Outcome.NOT_FOUND,
                     "the service has no record matching those arguments.");

@@ -1,6 +1,6 @@
 ---
 name: agentic-evals
-description: Prove a prompt, classifier or guardrail change safe before it ships. Use when a prompt changes and someone has to show nothing regressed, when building a labelled dataset for a guardrail or classifier, when deciding what a build gates on versus what it only reports and how many rows and what threshold that gate needs, when an LLM judge is scoring another model's output, or when a case fails and the case may be the thing that is wrong.
+description: Prove a prompt, classifier or guardrail change safe before it ships. Use when a prompt, a tool description or a rule changes and someone has to show nothing regressed, when building a labelled dataset for a guardrail or classifier, when deciding what a build gates on versus what it only reports, when choosing how many rows a gate needs and where its threshold goes, when the same suite scores differently on two runs, when an LLM judge is scoring another model's output, or when a row fails and the row may be the thing that is wrong.
 ---
 
 # Evals that gate a change
@@ -12,8 +12,8 @@ test: a labelled dataset, a score, and a threshold that fails the build.
 
 One split organises the suite: **does this need a model to run?** A
 **deterministic** suite — no model call, no key, no network — gates every commit;
-a **live** one runs before a release. A suite needing a key and four minutes on
-every push gets marked ignored by the third person it blocks.
+a **live** one runs before a release. A suite needing a key and, illustratively, four
+minutes on every push gets marked ignored by the third person it blocks.
 
 ## The deterministic suite
 
@@ -25,7 +25,7 @@ catch. Arriving with a change, find your deterministic asset first:
 |---|---|---|
 | a detector or classifier rule | labelled rows, scored | agreement with a human on rows people argue about |
 | a tool description | a snapshot of the shipped text: any edit to it fails the build until someone re-runs routing and updates the snapshot | whether the model still picks it for the right request |
-| a refusal or a template | the invariants your refusals promise, over every variant | whether it reads as helpful |
+| a refusal or a template | the promises your refusals make, over every variant | whether it reads as helpful |
 
 They reach well past detectors — these are ordinary tests that are really evals:
 
@@ -43,7 +43,7 @@ got 0.87` costs a re-run with logging turned on before anyone can start work.
 
 The dataset is a file in the repository with **rows in a stable order — never
 generated, never shuffled**, because several rules below are enforced by reading a
-diff. A row is `{id, families, label, reason, text}`: a stable `id`, so a failure
+diff. A row is `{id, families, label, text, reason}`: a stable `id`, so a failure
 names a row you can open; `families`, the tags an assertion selects on — mechanism
 and provenance — so a failure names what to look at; and `reason`, written the day
 the row is created and the only defence you have the day it fails.
@@ -103,11 +103,11 @@ sets the target** — nine rules yield nine near-misses, and a gate needing more
 owed the difference in reported false positives plus minimal pairs on the rules
 that misfire most. A component with too few rules to reach the count is not padded
 up to it: under roughly twenty near-miss rows the gate is a count, not a rate, and
-is written as one. The count `<= 0.05` implies below twenty rows is **no false
-positives** — 1/19 = 0.053 fails it, and one permitted miss first becomes reachable
-at exactly `n = 20` — so the percentage disguises a zero tolerance as a 5%
-allowance, and whoever restates that gate as `at most one false positive` loosens
-it believing they copied it.
+is written as one. Below twenty rows the count `<= 0.05` implies is **no false
+positives at all** — 1/19 = 0.053 fails it, and one permitted miss first becomes
+reachable at exactly `n = 20`. That is the reason to write it as a count: the
+percentage disguises a zero tolerance as a 5% allowance, and whoever restates the
+gate as *at most one false positive* loosens it believing they copied it.
 
 **Two families get their own assertion instead of being averaged in: every row
 tagged with them passes, or the run fails.** An aggregate hides a regression by
@@ -173,9 +173,8 @@ The sample bounds the gate; the full pass admits the row.
 **When they agreed on only 0.70 of the sample, the labels are the defect and the
 gate is not where you absorb it.** Read the rows they split on — usually two rules
 of the component's own policy collide there. Rewrite the rule until a third person
-reproduces the labels and measure agreement again; rows still ambiguous after that
-are not gate material. A 0.70 gate over a set nobody can label twice is a number
-that moves when the labellers do.
+reproduces the labels and measure agreement again. A 0.70 gate over a set nobody
+can label twice is a number that moves when the labellers do.
 
 **A tool-description change is a live-suite change**, proved by a set of user turns
 each labelled with the item that should fire: no code changes, so no functional
@@ -186,7 +185,7 @@ before/after run it feeds. What follows applies to it as to any live set.
 **One run is one sample — here, not in the deterministic suite.** That one
 reproduces its own number exactly; a live one does not, so a gate set at the
 number you measured once will flap. Measure **five runs**, set the gate below the
-worst, and treat *re-running until green* exactly as you treat editing a case
+worst, and treat *re-running until green* exactly as you treat editing a row
 until green. If the spread across five runs is wider than the regression you want
 to catch, the gate cannot see it at all.
 
@@ -194,8 +193,7 @@ to catch, the gate cannot see it at all.
 every row records who labelled it, never the author of the prompt under test, and
 a second labeller reproduced that label; every release-blocking failure has a row;
 and no row also appears among the prompt's few-shot examples — diff the two files,
-the intersection is empty. Rows nobody can label twice are not gate material: they
-go to the drift report below, or they go.
+the intersection is empty.
 
 ## A judge is an unevaluated classifier
 
@@ -273,9 +271,12 @@ template moves on every model version for reasons unrelated to your change. Drif
 is still a regression waiting for a consumer — a decision that stayed right while
 its label moved breaks whatever keys on that label. Promote a pair into the gate,
 and out of the drift report, the moment a metric dimension, a template lookup or a
-routing hint reads it.
+routing hint reads it. **The drift report is also where individual rows go** —
+a row two labellers read differently tags out of the gate the same way an
+`evasion` row tags into one, and lands in the same advisory bucket as the
+dimensions above. The printed per-dimension block is not all of it.
 
-**A skipped case is not a failure.** A quota error, a provider 5xx and a timeout
+**A skipped row is not a failure.** A quota error, a provider 5xx and a timeout
 are not wrong answers. Count them **skipped**, exclude them from both denominators,
 and report passed, failed and skipped as three separate counts — one merged
 "58 failures" line cannot tell an outage from a regression. Scoring an
@@ -288,7 +289,7 @@ Without it the skip rule degenerates into its own worst failure: every row
 rate-limited means zero rows ran, and accuracy over zero rows offends no
 threshold.
 
-## When the case is the thing that is wrong
+## When the row is the thing that is wrong
 
 Sometimes the component is right and the label was wrong. This is the moment the
 suite is most likely to be quietly destroyed, so it gets a bar.
@@ -328,5 +329,8 @@ Ask, in order:
    denominator.
 4. Where did the labels come from, and do any of the rows also appear in the
    prompt?
-5. Does every edited label in the dataset's history carry a reason, in its own
+5. If a model scores the output, who scored the scorer? A judge with no
+   human-labelled set of its own, or one grading on an absolute scale rather than
+   pairwise against a baseline, makes every number downstream of it decorative.
+6. Does every edited label in the dataset's history carry a reason, in its own
    commit?

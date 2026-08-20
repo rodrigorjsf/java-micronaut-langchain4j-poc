@@ -13,12 +13,16 @@ import io.github.rodrigorjsf.agenticchat.observability.CostCalculator;
 import io.github.rodrigorjsf.agenticchat.observability.TokenCostListener;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.core.annotation.Nullable;
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -53,7 +57,7 @@ public class ChatModelRegistry {
      * is one number and there is no way to see that the judge is most of the calls
      * and a small part of the cost — the fact the whole triage design rests on.
      */
-    @jakarta.inject.Inject
+    @Inject
     public ChatModelRegistry(List<ModelRoleProperties> roles,
                              ProviderCredentials credentials,
                              List<ChatModelListener> listeners,
@@ -62,10 +66,10 @@ public class ChatModelRegistry {
         this.configByRole = roles.stream()
                 .collect(Collectors.toUnmodifiableMap(ModelRoleProperties::name, Function.identity()));
 
-        var models = new java.util.LinkedHashMap<String, ChatModel>();
+        var models = new LinkedHashMap<String, ChatModel>();
         for (ModelRoleProperties role : roles) {
             ModelRoleValidator.validate(role);
-            var perRole = new java.util.ArrayList<>(listeners);
+            var perRole = new ArrayList<>(listeners);
             if (meters != null && costs != null) {
                 perRole.add(new TokenCostListener(role.name(), meters, costs));
             }
@@ -95,7 +99,7 @@ public class ChatModelRegistry {
         return configByRole.get(role);
     }
 
-    public java.util.Set<String> roles() {
+    public Set<String> roles() {
         return modelsByRole.keySet();
     }
 

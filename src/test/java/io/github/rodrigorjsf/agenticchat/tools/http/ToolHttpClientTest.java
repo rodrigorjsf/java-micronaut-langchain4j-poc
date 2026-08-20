@@ -177,4 +177,19 @@ class ToolHttpClientTest {
     void exposesTheCatalogueForStartupValidation() {
         assertThat(tools.knownApis()).contains("stub", "slowapi");
     }
+
+    @Test
+    @DisplayName("a 403 is asked once, not retried — a refusal is deterministic")
+    void aRefusalIsNotRetried() {
+        StubApiController.REFUSED_CALLS.set(0);
+
+        var response = tools.get("stub", "/refused");
+
+        assertThat(response.isOk()).isFalse();
+        assertThat(StubApiController.REFUSED_CALLS.get())
+                .as("this endpoint has max-retries 1, so a retryable outcome would call twice; "
+                        + "retrying a deterministic refusal buys a second refusal and, on a host "
+                        + "that 403s an unidentified client, an IP block")
+                .isEqualTo(1);
+    }
 }

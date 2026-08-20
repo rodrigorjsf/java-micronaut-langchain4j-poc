@@ -2,6 +2,7 @@ package io.github.rodrigorjsf.agenticchat.memory;
 
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.data.message.UserMessage;
@@ -111,8 +112,8 @@ class ConversationCompactorTest {
     }
 
     @Test
-    @DisplayName("failed tool results are dropped entirely — a failure carries no reusable fact")
-    void failedToolResultsAreDropped() {
+    @DisplayName("a failed tool result loses its payload but keeps its place in the pair")
+    void failedToolResultsAreEmptiedNotRemoved() {
         var messages = new ArrayList<ChatMessage>();
         messages.add(SystemMessage.from("system"));
         for (String prefix : ConversationCompactor.failurePrefixes()) {
@@ -122,16 +123,25 @@ class ConversationCompactorTest {
         for (int i = 0; i < 8; i++) {
             messages.add(UserMessage.from("filler " + i + " ".repeat(200)));
         }
+        // No summary, so the reduced block is kept as messages. That is the branch
+        // where an orphaned result would actually reach a provider; when the
+        // summariser runs it replaces request and result together and cannot orphan.
+        summarizer.next = "";
 
         var compacted = compactor.compact(messages);
 
         assertThat(compacted)
-                .as("a failed result carries no reusable fact and should be gone")
+                .as("a failed result carries no reusable fact, so the error text is gone")
                 .noneMatch(m -> m instanceof ToolExecutionResultMessage r
                         && ConversationCompactor.failurePrefixes().stream().anyMatch(r.text()::startsWith));
+        // But the MESSAGE stays. Removing it would orphan the AiMessage whose
+        // tool_call it answers, and a provider rejects that list outright — which is
+        // a worse outcome than the tokens the removal saved.
         assertThat(compacted)
-                .as("the successful one survives")
-                .anyMatch(m -> m instanceof ToolExecutionResultMessage r && r.text().contains("\"ok\""));
+                .filteredOn(m -> m instanceof ToolExecutionResultMessage r
+                        && "some_tool".equals(r.toolName()))
+                .as("every failed call still has a result standing in its place")
+                .hasSize(ConversationCompactor.failurePrefixes().size());
     }
 
     @Test
@@ -145,16 +155,55 @@ class ConversationCompactorTest {
             messages.add(UserMessage.from("filler " + i + " ".repeat(200)));
         }
 
-        // The cheap pass may well get under the trigger on its own — which is the
-        // point of trying it first — so assert on the result, not on whether the
-        // summariser was reached.
+        // As above: assert the cheap pass on the branch that keeps its output.
+        summarizer.next = "";
+
         var compacted = compactor.compact(messages);
 
         assertThat(compacted)
                 .filteredOn(m -> m instanceof ToolExecutionResultMessage r
-                        && "lookup_cep".equals(r.toolName()))
-                .as("six identical results collapse to one")
+                        && "lookup_cep".equals(r.toolName())
+                        && r.text().contains("01310100"))
+                .as("six identical results leave one copy of the payload")
                 .hasSize(1);
+        // The other five stay as markers rather than vanishing, for the pairing
+        // reason above; what compaction removes is the repetition, not the message.
+        assertThat(compacted)
+                .filteredOn(m -> m instanceof ToolExecutionResultMessage r
+                        && "lookup_cep".equals(r.toolName()))
+                .as("the five duplicates are still there, emptied")
+                .hasSize(6);
+    }
+
+    @Test
+    @DisplayName("an activation keeps the AiMessage that requested it, or the pair is broken")
+    void anActivationTravelsWithItsRequest() {
+        var messages = new ArrayList<ChatMessage>();
+        messages.add(SystemMessage.from("system"));
+        messages.add(UserMessage.from("qual o cep da paulista?"));
+        messages.add(AiMessage.from(ToolExecutionRequest.builder()
+                .id("call-1").name("activate_skill").arguments("{\"name\":\"brazil-civic-data\"}").build()));
+        messages.add(ToolExecutionResultMessage.builder()
+                .id("call-1")
+                .toolName("activate_skill")
+                .text("brazil-civic-data activated")
+                .attributes(Map.of(ConversationCompactor.ACTIVATED_SKILL_ATTRIBUTE, "brazil-civic-data"))
+                .build());
+        for (int i = 0; i < 12; i++) {
+            messages.add(UserMessage.from("filler " + i + " ".repeat(400)));
+        }
+
+        var compacted = compactor.compact(messages);
+
+        assertThat(compacted)
+                .as("the activation itself is Rule 0 and survives")
+                .anyMatch(ConversationCompactor::carriesActivation);
+        assertThat(compacted)
+                .as("and so does the AiMessage that asked for it — a result with no "
+                        + "request is a list the provider rejects")
+                .anyMatch(m -> m instanceof AiMessage ai
+                        && ai.hasToolExecutionRequests()
+                        && ai.toolExecutionRequests().stream().anyMatch(r -> "call-1".equals(r.id())));
     }
 
     @Test

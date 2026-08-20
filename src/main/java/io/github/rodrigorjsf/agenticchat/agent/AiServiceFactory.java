@@ -1,5 +1,6 @@
 package io.github.rodrigorjsf.agenticchat.agent;
 
+import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.rag.RetrievalAugmentor;
 import dev.langchain4j.service.AiServices;
@@ -137,7 +138,7 @@ public class AiServiceFactory {
                 // Without this the default is to throw, which turns a model typo into a
                 // 500. Returning the text lets the model correct its own call.
                 .hallucinatedToolNameStrategy(request ->
-                        dev.langchain4j.data.message.ToolExecutionResultMessage.from(request,
+                        ToolExecutionResultMessage.from(request,
                                 "There is no tool called '" + request.name()
                                         + "'. Activate the right skill first, then use the tools it lists."))
 
@@ -150,9 +151,16 @@ public class AiServiceFactory {
                     return ToolErrorHandlerResult.text(
                             "That tool failed. Tell the user this data source is temporarily unavailable.");
                 })
-                .toolArgumentsErrorHandler((error, context) ->
-                        ToolErrorHandlerResult.text("Invalid arguments: " + error.getMessage()
-                                + ". Fix them and call the tool again."))
+                // Same rule, and it was broken here: getMessage() on an argument-binding
+                // failure carries the argument values, which is where a credential a
+                // model was tricked into passing would appear.
+                .toolArgumentsErrorHandler((error, context) -> {
+                    LOG.warn("Tool arguments could not be bound", error);
+                    return ToolErrorHandlerResult.text(
+                            "Those arguments did not match the tool's parameters. Re-read the "
+                                    + "parameter descriptions and call it again, or ask the user "
+                                    + "for the detail that is missing.");
+                })
 
                 // A bound on agency. Six round trips is enough for activate_skill plus a
                 // couple of chained lookups; beyond that a model is looping, and each

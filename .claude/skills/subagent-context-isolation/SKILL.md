@@ -1,6 +1,6 @@
 ---
 name: subagent-context-isolation
-description: Spend a sub-agent only where the context it discards is worth the extra model calls. Use when work is being split across several agents, when writing the brief a child agent receives or reviewing a sub-agent that already ships, when an agent pipeline is going on the default path of every request, when fan-out or recursion has no call budget, or when a sub-agent's output is spliced into the parent's prompt.
+description: Spend a sub-agent only where the context it discards is worth the extra model calls. Use when work is being split across several agents, when writing the brief a child agent receives or reviewing a sub-agent that already ships, when an agent pipeline is going on the default path of every request, when fan-out or recursion has no call budget, or when a sub-agent's output is spliced into the parent's prompt. For separating roles inside one process rather than across agents, use agentic-service-composition.
 ---
 
 # Sub-agent context isolation

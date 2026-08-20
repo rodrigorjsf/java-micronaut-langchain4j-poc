@@ -45,7 +45,7 @@ whether anyone asks or not. Either ends the interview before the probe spends a 
 
 ## 2. What does the model answer without it?
 
-**Probe it.** Run the open sentences against today's agent a dozen times over — a
+**Probe it.** Run the open sentences against the unaided model a dozen times over — a
 smoke test, not a statistic; illustratively five to ten open sentences at twelve
 answers each is 60–120 calls. **The unit the table counts is one sentence's
 twelve answers**: variance is per phrasing, and a list-wide average hides the
@@ -58,7 +58,7 @@ because it misreads the phrasing is row one even inside an otherwise good batch.
 | wrong for a reason a tool does not fix | not a tool. Stale-but-static content is retrieval (`retrieval-that-earns-its-place`); a phrasing it keeps getting wrong is the standing prompt; a fixed multi-call sequence is a skill (`authoring-agent-skills`) |
 | unable to know today's truth, because the fact moves under it | build **for freshness, not knowledge** — the field list does not grow, the answer only has to be current. §3 still sets the tier, on its own question: a stale unread count is tier one, a stale price that feeds a charge is tier three |
 | wrong at least once, and a wrong answer is indistinguishable from a right one | **build.** This is the usual outcome, and one failure is enough — the count only sizes the urgency, because nobody reading an answer can tell which one they got, so the right ones do not help them. Eleven right out of twelve, with one invented tracking number, is the same decision |
-| wrong in none of the twelve, on facts that do not move | do not build it — the schema taxes every turn for a capability you already have |
+| wrong in none of the twelve | do not build it — the schema taxes every turn for a capability you already have |
 
 One sentence in a build row is enough to build; how many others join it is how
 wide the tool is. The probe's output is the verdict **plus every transcript where
@@ -71,24 +71,20 @@ list, probe output, which outcome. Never a refusal.
 ## 3. What does a wrong answer cost?
 
 Not how accurate the source is — what happens to the person when it is wrong.
-**Write the wrong-answer-cost sentence** beside the tool: who pays, what they pay,
-and whether they pay before they can correct it — that is what names the tier.
+**Write the cost sentence** beside the tool: who pays, what they pay, and
+whether they pay before they can correct it — that is what names the tier.
 
-A sentence the user will correct is **tier one** — a catalogue description they are
-reading right now: read-only, cache freely, partial data fine. A wasted trip or a
-support ticket is **tier two**, and the order lookup lands here, not in tier one:
-*a wrong "delivered" sends someone to an empty porch or opens a ticket, both paid
-before the user sees anything to correct.* Its contract is a **provenance field in
-the projection** — `as_of` and where the value came from, returned in the result and
-not logged — plus a description instructing the model to say it out loud: *"shipped
-as of 09:12 today, per the carrier"*. With no stamp the model has nothing to hedge
-with, and drops the hedge or invents one. Money, or an effect the user must undo, is
-**tier three**, whose contract is **two calls** — one returns what *would* happen
-plus a token, the second takes only that token, so the model can show the user what
-it is about to do, the only moment anyone can stop it. Above tier one, ask what a
-*second identical call* costs: `get_order_status` served from cache after its `as_of`
-window has passed hands back a stamp that is no longer true, so it caches for that
-window and not past it.
+| Cost sentence | Tier | Contract it buys |
+|---|---|---|
+| *the user is reading the answer and will correct it themselves* — a catalogue description on screen | one | read-only; cache freely; partial data fine |
+| *a wasted trip or a support ticket, paid before the user sees anything to correct* — a wrong "delivered" sends someone to an empty porch | two | a **provenance field in the projection** — `as_of` and where the value came from, returned in the result and not merely logged — plus a description telling the model to say it out loud: *"shipped as of 09:12 today, per the carrier"* |
+| *money moves, or the user must undo an effect* | three | **two calls** — one returns what *would* happen plus a token, the second takes only that token, so the model can show the user what it is about to do, the only moment anyone can stop it |
+
+The order lookup lands in tier two, not tier one. Without the stamp the model has
+nothing to hedge with, and drops the hedge or invents one. Above tier one, ask what
+a *second identical call* costs: `get_order_status` served from cache after its
+`as_of` window has passed hands back a stamp that is no longer true, so it caches
+for that window and not past it.
 
 Choosing the tier deliberately closes **Tool Misuse & Exploitation (ASI02)** of
 the OWASP Top 10 for Agentic Applications 2026: the ranked risk is not that a
@@ -107,10 +103,15 @@ narrow inside a scope the system already fixed** — the model fills parameters
 from the conversation, and the conversation is where an attacker writes.
 
 **From the user**: it appears in the open sentences. **From the system**:
-identity, tenant, locale, the catalogue key — injected by the tool layer, absent
-from the schema. The answer belongs to one customer, so `customerId` is not a
-parameter and no argument exists to smuggle an account number through, which
-removes **Identity & Privilege Abuse (ASI03)** rather than filtering for it.
+identity, tenant, locale, the key that fixes *whose* data is in scope — injected
+by the tool layer, absent from the schema. A key that only *narrows* inside that
+scope — which of the configured sources or destinations to hit — is the model's
+to pick and stays in the schema, where it can be validated against the configured
+set; a parameter absent from the schema can never be handed a hostile value, and
+so can never be tested for refusing one.
+
+The answer belongs to one customer, so `customerId` is not a parameter and no
+argument exists to smuggle an account number through, which removes **Identity & Privilege Abuse (ASI03)** rather than filtering for it.
 **Invented**: nothing in the conversation or session supplies it, so the model
 guesses — a fabrication with a function call around it. Either the user is asked,
 or it is not a parameter.
@@ -174,7 +175,7 @@ the first one silently picked.
 A list naming only `not_found` and `invalid_input` was copied from the vendor's 200
 example: `unavailable`, `ambiguous` and `not_permitted` are in no API doc's error
 table and happen every week. Illustratively a healthy read tool carries those five
-and no more — the other two belong to a write, and to a shape needing redesign.
+and no more — the other two belong to a shape needing redesign, and to a write.
 
 ## Shape the result before you budget it
 
@@ -219,27 +220,30 @@ Three are deterministic and sit beside the code.
   every outcome means the taxonomy is still open.
 - **Budget** — the fattest fixture, shaped by the projection, stays inside the
   per-result budget. The day upstream adds a field, the build fails, not the bill.
-- **Refusal** — a conversation asking for another account's data is refused
-  because the account came from the session, not because a filter caught it.
+- **Refusal** — a call made in a session for one account, with arguments naming
+  another, returns the session's account: refused by where identity comes from,
+  not by a filter that caught a string.
 
 **Routing is the fourth, and not a unit test** — it runs the model, so the pass
 threshold and the flaky-case rule are `agentic-evals` territory, which you can
 invoke. Sourcing, sizing and scoring the set are `reviewing-agent-tools-and-skills`,
 which is human-invoked only: read its `ROUTING-SET.md` directly, or ask the user to
-run it. This pass owes it four kinds of case: **positives from the sealed third**,
-which the description was never written from; a sentence belonging to the **nearest
-sibling by name**, labelled with that sibling, which fails the day someone edits its
-description into your territory; a turn nothing in the layer should take, labelled
-**none**; and — because §4 just made a two-call sequence — one labelled with the
-**ordered pair** `find_orders → get_order_status`.
+run it. This pass owes it four kinds of case, in that file's names: **Own**, sourced from
+the sealed third the description was never written from; **Boundary**, a sentence
+belonging to the nearest sibling by name and labelled with that sibling, which
+fails the day someone edits its description into your territory; **Orphan**, a
+turn nothing in the layer should take; and — because §4 just made a two-call
+sequence — **Sequence**, labelled with the ordered pair
+`find_orders → get_order_status`.
 
 ## Before it ships
 
-1. Sentence list came from real traffic; the sealed file exists, was written in one operation and has not been opened since; every result field traces to an open sentence.
+1. Sentence list came from real traffic; the sealed file exists, was written in one operation and has not been opened since; every result field traces to the answer sentence.
 2. Every candidate landed in the user or the system bucket; nothing invented.
-3. The tier is written beside the tool with the wrong-answer-cost sentence that fixed it; a second identical call is safe; tier three is two calls.
+3. The tier is written beside the tool with the cost sentence that fixed it; a second identical call is safe; tier three is two calls.
 4. The taxonomy preceded the happy path; *not found* and *not yours* read alike.
 5. Projection sized against the worst account; above tier one the stamp is a field in it; shaped max under budget; fixture kept.
 6. The cannot-decide sentence was written; a split's summaries carry the id.
-7. Description derived from the open sentences; routing set carries sealed positives, the nearest sibling's sentence, a *none*, and the ordered pair.
+7. Description derived from the open sentences; routing set carries Own from the sealed third, a Boundary case named for the nearest sibling, an Orphan, and the Sequence pair.
 8. A case per taxonomy branch, and a refusal that passes on session identity rather than on a filter.
+9. The probe transcripts where the unaided model was wrong are kept as eval cases, and the shipped tool answers them.

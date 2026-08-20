@@ -1,6 +1,6 @@
 ---
 name: llm-cost-observability
-description: Make LLM spend attributable and cache hits provable. Use when the model bill is one number nobody can decompose, when claiming a prompt-caching win, when pricing lives in code, or when instrumenting an agent with more than one model call per request.
+description: Make LLM spend attributable and cache hits provable. Use when the model bill is one number nobody can decompose, when claiming a prompt-caching win, when pricing lives in code, or when instrumenting an agent with more than one model call per request. For why a cache is not hitting rather than how to prove it does, use agentic-service-composition.
 ---
 
 # LLM cost observability

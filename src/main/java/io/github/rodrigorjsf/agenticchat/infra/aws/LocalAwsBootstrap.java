@@ -84,6 +84,15 @@ public class LocalAwsBootstrap {
                             .enabled(true)
                             .attributeName("expires_at")
                             .build()));
+        } catch (ResourceInUseException notReadyYet) {
+            // CreateTable is asynchronous on real AWS, and UpdateTimeToLive against a
+            // table still in CREATING throws this. Swallowed at debug it produced the
+            // worst outcome available: expires_at written on every item and honoured
+            // by nothing, conversations never expiring, and no signal anywhere. WARN,
+            // because the fix is to re-run the bootstrap once the table is ACTIVE.
+            LOG.warn("TTL not enabled on {} — the table was not ready. Items will carry "
+                    + "expires_at and never expire until this is re-run: {}",
+                    persistence.tableName(), notReadyYet.getMessage());
         } catch (RuntimeException e) {
             // Re-enabling an already-enabled TTL is an error on real AWS and a no-op
             // on some emulators. Neither is worth failing startup over.

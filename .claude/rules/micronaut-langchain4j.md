@@ -61,6 +61,11 @@ chunk into persisted memory.
 **`@V` on every AI-service parameter.** Argument binding otherwise depends on
 `-parameters` surviving the annotation processor.
 
+**Compaction may never separate a tool result from the `AiMessage` that
+requested it.** Preserving an activation while summarising away its request leaves
+a tool_call id with no counterpart, and a provider rejects the list. Drop a
+result's payload if you must; keep the message.
+
 **Skill activation state lives in chat-memory message attributes.** Serialize
 with `ChatMessageSerializer`, never a hand-rolled format that keeps only
 `message.text()` — see `ChatMemoryStoreFlociIT`.
@@ -78,6 +83,11 @@ half by hand.
 `project(body, "meals")` on `{"meals":[…]}` reads like a projection and drops
 nothing. Use `projectList(body, "meals", max, fields…)` for a list nested inside
 an object; `project` only reaches leaves.
+
+**A tool result gets `scoreToolResult`, never `score`.** The user-text rules
+measure sentence properties. Compact JSON has no whitespace, so the 400-character
+long-token rule fires on any result over 400 bytes — a 457-byte SELIC series was
+answered as an injection attempt.
 
 **A third-party URL in a tool result costs the whole answer, not the tokens.**
 `ExfiltrationGuardrail` withholds any response linking outside the tool

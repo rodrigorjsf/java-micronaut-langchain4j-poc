@@ -50,7 +50,7 @@ an empty summary rather than as an error.
 
 ## The invariant extractor rides the same call, and emits fields
 
-The bindings come back from the summariser, not from the deterministic pass — a
+The bindings come back from the summariser, not from the cheap pass — a
 pronoun cannot be resolved by a scan — but they come back as **fields, not
 sentences**: slot, current value, the message id that set it, and the values
 rejected as of that value. Ask for a sentence and you get a summary again ("the

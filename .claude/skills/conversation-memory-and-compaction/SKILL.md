@@ -26,7 +26,8 @@ function of the stored list. So **let the window decide what is evicted and a to
 only when to compact**: eviction has to be replayable, a trigger only roughly right.
 
 - **Pin the system message explicitly** — an eviction loop counting from the end takes it. If a
-  budget drives eviction, store the **message list**, not the raw log alone, or replay is unservable.
+  budget drives eviction, store the **message list**, not the raw log alone, or no later
+  turn can rebuild the prompt an earlier one saw.
 - **Estimate the trigger, then calibrate the ratio against a real history — the error is
   directional.** Four characters per token is calibrated on English prose; punctuation-dense JSON
   runs nearer 2.5–3 (illustrative — count one real history against your provider's counter), so one
@@ -47,9 +48,10 @@ Name these first — a compactor written as a list of prohibitions keeps everyth
 
 - **A determinate outcome is not a transient failure.** "That order number does not exist" is the
   fact that stops the model looking it up again — compress it to that sentence rather than drop it.
-- **Key that row and the marker row below on a value your own code owns** — the outcome type
-  `agentic-tool-boundary` returns instead of exceptions, a marker constant named in your own code —
-  and pin each in a test: a rewording upstream otherwise kills the rule with the build still green.
+- **Key that row and the marker row in the invariant table on a value your own code
+  owns** — the outcome type `agentic-tool-boundary` returns instead of exceptions, a marker constant
+  named in your own code — and pin each in a test: a rewording upstream otherwise kills the rule with
+  the build still green.
 
 ## What a turn must remember: the invariant
 
@@ -61,9 +63,9 @@ same confidence from a state it should not be in. **The invariant is the state w
 | Silent loss | Why nothing announces it |
 |---|---|
 | a correction — "no, the second one" | the value it rejects survives inside a summary wearing that summary's authority, and the message that rejected it survives pointing at a list that does not |
-| a restriction the user imposed | losing a *granted* permission is loud, the agent asks again; losing a *withheld* one ("don't contact anyone about this") is silent, and the agent proceeds |
+| a restriction the user imposed — the one row that changes **authorization** | losing a *granted* permission is loud, the agent asks again; losing a *withheld* one ("don't contact anyone about this") is silent, and the agent proceeds |
 | a scope binding — which account, which document, which of two candidates | the model does not notice it has come unbound; it picks |
-| a marker a framework reads back to reconstruct runtime state — an attribute carried on a stored message, `active_skill: billing`, scanned at load to rebuild which tools this turn can see | eviction losing it is expected, *compaction* losing it is a bug you authored, and the turn simply runs with a tool set nobody chose |
+| a marker a framework reads back to reconstruct runtime state — an attribute carried on a stored message, `active_skill: billing`, scanned at load to rebuild which tools this turn can see | eviction only narrows the view onto a list that still exists, so losing it there is expected; *compaction* rewrites the stored list, so losing it there is a bug you authored, and the turn simply runs with a tool set nobody chose |
 
 **A literal moves byte-identical; everything else moves resolved.** The marker row is a *literal* — a
 token something scans for, and any rewrite of it is a miss. The other three rows are *bindings*: a
@@ -125,8 +127,8 @@ then assert per kind. Every literal byte-identical — a framework scanning for 
 it in prose. Every binding by *value*: ask the compacted history the question only the binding answers
 ("which office?") rather than string-matching the sentence that set it, or the assertion passes on a
 preserved `"no, the second one"` and proves nothing. The superseded value present only as rejected.
-And **prose is enough where the loss is embarrassing, never where it changes authorization** — "this
-caller may not touch billing", as model-written text, is now negotiable.
+Prose in a summary is enough for every row but the authorization one: "this caller may not touch
+billing", as model-written text, is negotiable by anything that can influence that text.
 
 ## Compaction you should not build
 
@@ -135,10 +137,10 @@ everything** is the correct memory layer, and every compactor bug is one you nev
 
 ## The cheap pass runs before any model pass
 
-Drop failed results, drop duplicates, lift the literals out, truncate the bulk of large results
-*older than the anchor* — **marking each cut as compaction's own**. Re-check the budget: if that alone lands under it, the
-turn cost no model call. Only what survives is summarised, then reassembled: system · summary ·
-invariants · anchor. **Inside the anchor, the anchor wins:** those turns are still answering from it,
+Lift the literals out **first**, then drop failed results, drop duplicates, truncate the bulk of
+large results *older than the anchor* — **marking each cut as compaction's own**. Re-check the
+budget: if that alone lands under it, the turn cost no model call. Only what survives is
+summarised, then reassembled: system · summary · invariants · anchor. **Inside the anchor, the anchor wins:** those turns are still answering from it,
 and a cut there reads as a result that came back short. If a 9 200-char result puts the anchor alone
 over budget, shorten the anchor by whole call/result pairs; the fix is a cap at the tool boundary.
 
@@ -168,8 +170,9 @@ from the user — check which your framework does, because **withhold-only is of
 
 Three controls on the summary itself, all placement rather than detection: **bound its length**, so a
 compromised summariser cannot grow itself into the prompt; **keep its role non-system**, or it is now
-standing instruction; and **never derive the standing prompt from memory** — configuration assembles
-it at startup, and nothing in a conversation may change it. **ASI06, Memory & Context Poisoning.**
+standing instruction; and **never derive the standing prompt from memory** — `agentic-service-composition`
+owns why that prompt is assembled at startup; the delta here is that a summary is a candidate input
+to it. **ASI06, Memory & Context Poisoning.**
 
 ## A cache in front of the durable store
 
@@ -183,7 +186,7 @@ in-process-store trap, TTL ordering and conversation-id validation are in [`STOR
 1. What is the invariant list, split into literals and bindings? Does a test correct one slot twice
    and then assert the literals byte-identical and the bindings by value?
 2. Can a tool call and its result be separated, by eviction or by compaction?
-3. Does a model run before the deterministic pass, and is the compaction rate per conversation rising?
+3. Does a model run before the cheap pass, and is the compaction rate per conversation rising?
 4. Is a guardrail-flagged message withheld or removed, and what role does the summary carry?
 5. Fail the cache write: key deleted, or left stale? Can an unvalidated conversation id reach a key?
 
