@@ -155,7 +155,7 @@ public class ToolGuardProvider implements ToolProvider {
                 return result;
             }
 
-            var score = heuristics.score(TextNormalizer.normalize(text), text);
+            var score = heuristics.scoreToolResult(TextNormalizer.normalize(text), text);
             if (!score.blocks()) {
                 return result;
             }

