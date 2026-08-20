@@ -475,6 +475,59 @@ agentic:
     # keep a normal turn inside the range where that degradation is small.
     compaction-trigger-tokens: 14400
 
+  # ---------------------------------------------------------------------------
+  # Tone of voice.
+  #
+  # The document itself is src/main/resources/voice/VOICE.md and goes into the
+  # system prompt verbatim, as its LAST section. It is not a skill: a skill is for
+  # something the model needs on some turns, and this applies to every answer, so
+  # routing would buy nothing and would cost an activate_skill round trip plus a
+  # body replayed from chat memory at full price on every later turn. Last in a
+  # process-constant prompt is the cheapest position there is — the whole prefix is
+  # billed at cached-input rates after the first turn — and it is also the closest
+  # to the moment the answer is written.
+  #
+  # What is listed HERE is only the part a machine checks. VoiceComplianceGuardrail
+  # repairs what the document itself defines a replacement for, sends the rest back
+  # to the model once, and then delivers the answer regardless: a rule about emoji
+  # must never be able to withhold a response.
+  # ---------------------------------------------------------------------------
+  voice:
+    document: voice/VOICE.md
+
+    # The document's emoji table. In configuration rather than in Java because it is
+    # the half of the document most likely to be got wrong, and a wrong entry makes
+    # the guardrail delete an emoji the document explicitly allows. Written without
+    # the U+FE0F variation selector; the guardrail strips it from both sides before
+    # comparing, so either spelling matches.
+    #
+    # Every context here is reachable by a skill this assistant actually has. That
+    # is deliberate: voice/VOICE_EXAMPLE.md, the contract this mechanism was first
+    # built against, reserves emoji for an app, for Pix keys and for a global
+    # account, none of which exist here — three of its fourteen entries can never
+    # fire. See issue #8.
+    allowed-emoji:
+      - "❗"   # point of attention
+      - "💡"   # a suggestion or a next step
+      - "⏰"   # a time, a local time, a business-hours limit
+      - "📅"   # a date, a holiday, a long weekend
+      - "📈"   # a rate, an index, a quotation
+      - "🧭"   # a place, an address, a postal code
+      - "🌎"   # a country, a world figure
+      - "📚"   # a book, an article, a paper
+      - "🔎"   # nothing found, or a result to narrow
+      - "🚀"   # space, orbit, a launch
+      - "⚠"    # an approximate figure, an unstable source
+      - "😊"   # a question successfully resolved
+
+    max-bullet-items: 5
+
+    # One. LangChain4j's guardrail executor throws once ITS retry budget is spent,
+    # so an unbounded reprompt turns a stray second emoji into a 500. Past this the
+    # answer is repaired, delivered, and the residue counted in
+    # agentic.voice.violations{outcome="delivered_with_violation"}.
+    max-reprompts: 1
+
   rag:
     # minScore is a relevance score in [0,1], not raw cosine similarity. 0.6 lets
     # capability questions through while keeping a CEP lookup — which a tool should

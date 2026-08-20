@@ -11,6 +11,7 @@ import io.github.rodrigorjsf.agenticchat.guardrail.input.InjectionTriageGuardrai
 import io.github.rodrigorjsf.agenticchat.guardrail.input.NormalizingInputGuardrail;
 import io.github.rodrigorjsf.agenticchat.guardrail.output.ExfiltrationGuardrail;
 import io.github.rodrigorjsf.agenticchat.guardrail.output.SystemPromptLeakageGuardrail;
+import io.github.rodrigorjsf.agenticchat.guardrail.output.VoiceComplianceGuardrail;
 import io.github.rodrigorjsf.agenticchat.guardrail.tool.ToolGuardProvider;
 import io.github.rodrigorjsf.agenticchat.llm.ChatModelRegistry;
 import io.github.rodrigorjsf.agenticchat.memory.SummarizerPrompt;
@@ -86,6 +87,7 @@ public class AiServiceFactory {
                                 InjectionTriageGuardrail injectionTriage,
                                 SystemPromptLeakageGuardrail leakage,
                                 ExfiltrationGuardrail exfiltration,
+                                VoiceComplianceGuardrail voice,
                                 InjectionHeuristics heuristics,
                                 MeterRegistry meters,
                                 @Value("${agentic.agent.memory-window-messages:20}") int memoryWindow,
@@ -133,7 +135,13 @@ public class AiServiceFactory {
                 // Order matters and is the annotation order: normalize first so every
                 // later check and the model itself see one canonical form.
                 .inputGuardrails(List.of(normalizer, injectionTriage))
-                .outputGuardrails(List.of(leakage, exfiltration))
+
+                // Order is severity, descending, and it is load-bearing. The first two
+                // withhold the answer and delete it from memory; the third repairs the
+                // answer and delivers it. Running the voice check first would spend a
+                // reprompt polishing the emoji on a response that is about to be
+                // withheld for leaking the prompt.
+                .outputGuardrails(List.of(leakage, exfiltration, voice))
 
                 // Without this the default is to throw, which turns a model typo into a
                 // 500. Returning the text lets the model correct its own call.

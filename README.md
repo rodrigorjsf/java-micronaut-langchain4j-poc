@@ -71,6 +71,7 @@ in-process and starting a real Valkey container for the cache.
 | **Triage gate** | a small, fast model decides whether a turn reaches the expensive one — and pre-filters and a cache mean most turns never reach it either |
 | **Skills** | 102 tools over free public APIs, disclosed progressively: the prompt carries skill names, not tool schemas |
 | **Guardrails** | normalize → deterministic score → gray-zone classifier on the way in; canary and exfiltration checks on the way out; and a tool-result screen, which is the only place indirect injection can be caught |
+| **Voice** | a brand's tone-of-voice contract, last in the cacheable prefix rather than behind a skill, with a startup assertion that it reached the model and an output check that repairs what the document defines and never withholds an answer |
 | **RAG** | over the assistant's own documentation, routed so it only runs when a tool is not going to answer |
 | **Memory** | Valkey in front of DynamoDB, with compaction that never drops a skill activation |
 | **Sub-agents** | a composed workflow — resolve, then two lookups in parallel, then summarise — used for context isolation, not for org charts |
@@ -84,6 +85,7 @@ in-process and starting a real Valkey container for the cache.
 | progressive disclosure through skills | more than ~15 tools, or tool selection accuracy dropping as tools are added |
 | a sub-agent workflow | a subtask produces output the main conversation will never reference again |
 | retrieval | there are questions no tool can answer — usually about the assistant itself |
+| a voice document in the prompt, not behind a skill | the rule applies to *every* answer. Routing buys nothing when the answer is always, and it fails silently when the model does not notice the turn qualifies |
 | compaction | conversations run long enough that recall, not the context limit, becomes the constraint |
 | **none of the above** | fewer than ten tools and short conversations. Most of this is machinery for a scale you may not have |
 

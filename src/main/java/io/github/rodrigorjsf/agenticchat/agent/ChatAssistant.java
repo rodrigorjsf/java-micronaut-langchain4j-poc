@@ -23,6 +23,13 @@ import dev.langchain4j.service.V;
  * names as untrusted data, which gives the model a structural cue that this region
  * is content rather than instruction.
  *
+ * <p>{@code response_style} is one line, not the voice document. The document itself
+ * is the last section of the system prompt, where it is process-constant and billed
+ * as cached input; repeating it per turn would put ~2100 uncached tokens into every
+ * message and then replay them out of chat memory for the rest of the conversation.
+ * What the turn needs is not another copy but a reminder close to the point of
+ * writing, after the tool results have pushed the prompt's opening a long way back.
+ *
  * <p>{@link InvocationParameters} is LangChain4j's own per-invocation carrier. It
  * is how the triage verdict reaches components that run inside the invocation —
  * here, the query router — without smuggling values through the prompt text.
@@ -38,6 +45,7 @@ public interface ChatAssistant {
             <turn_context>
             reply_language: {{language}}
             suggested_skill: {{skillHint}}
+            response_style: follow <tone_of_voice> in full for this response
             </turn_context>
             <message>
             {{message}}
