@@ -501,18 +501,18 @@ agentic:
     # without the U+FE0F variation selector; the guardrail strips it from both sides
     # before comparing, so either spelling matches.
     allowed-emoji:
-      - "❗"   # ponto de atenção
-      - "💡"   # ideias ou sugestões
-      - "📱"   # falar sobre algo do app com deeplink
-      - "💻"   # falar sobre algo pelo PC
-      - "😊"   # conseguir resolver uma questão
-      - "⏰"   # prazos e horários
-      - "📅"   # datas
-      - "⚠"    # instabilidades e pontos importantes
-      - "💛"   # despedida
-      - "🔑"   # falar sobre chaves do Pix
-      - "🌎"   # scripts de global account
-      - "🙋"   # bonequinhos amarelos
+      - "❗"   # point of attention
+      - "💡"   # ideas or suggestions
+      - "📱"   # something in the app, with a deeplink
+      - "💻"   # something done on a computer
+      - "😊"   # a question successfully resolved
+      - "⏰"   # deadlines and times
+      - "📅"   # dates
+      - "⚠"    # instabilities and important points
+      - "💛"   # sign-off
+      - "🔑"   # Pix keys
+      - "🌎"   # global account scripts
+      - "🙋"   # yellow figures
       - "😀"
       - "🙌"
 

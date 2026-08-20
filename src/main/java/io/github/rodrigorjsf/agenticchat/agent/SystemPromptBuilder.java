@@ -25,9 +25,9 @@ import org.slf4j.LoggerFactory;
  * as cached input on every turn after the first rather than as fresh tokens.
  *
  * <p>There is no {@code # How to answer} section any more. It used to say "two or
- * three sentences is usually right", the voice profile says "parágrafos curtos
- * (máx. 2-3 linhas)" and "máx. 5 itens", and a prompt holding both leaves the model
- * to pick. One document owns how the assistant speaks.
+ * three sentences is usually right", the voice profile says short paragraphs and at
+ * most five bullets, and a prompt holding both leaves the model to pick. One
+ * document owns how the assistant speaks.
  *
  * <p>The prompt deliberately contains nothing secret. Treating a system prompt as a
  * credential is the mistake that makes prompt extraction worth attempting; treating
@@ -87,11 +87,11 @@ public class SystemPromptBuilder {
                 # How to answer
 
                 How you write — tone, structure, formatting, emoji, and what you may
-                never say — is defined entirely by the <tom_e_voz_de_comunicacao> block
-                below, and it applies to every answer you give. Two rules of this
-                service sit above it and win if they ever disagree: answer in the
-                language named by reply_language in the turn context, and cite a tool's
-                source by naming it rather than by pasting a URL.
+                never say — is defined entirely by the <tone_of_voice> block below, and
+                it applies to every answer you give. Two rules of this service sit above
+                it and win if they ever disagree: answer in the language named by
+                reply_language in the turn context, and cite a tool's source by naming
+                it rather than by pasting a URL.
 
                 %s
 

@@ -98,20 +98,20 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
      * value is the clause the model is reminded of, in the document's own words.
      */
     private static final Map<String, String> FORBIDDEN_PHRASES = Map.of(
-            "veja mais", "termo capacitista: use \"saber mais\", \"acesse aqui\" ou \"confira\"",
-            "na palma da mão", "termo capacitista: use \"saber mais\", \"acesse aqui\" ou \"confira\"",
-            "seria melhor investir", "recomendação de investimento: jamais use esse termo",
-            "oriento o investimento", "recomendação de investimento: jamais use esse termo");
+            "veja mais", "ableist term: use \"saber mais\", \"acesse aqui\" or \"confira\" instead",
+            "na palma da mão", "ableist term: use \"saber mais\", \"acesse aqui\" or \"confira\" instead",
+            "seria melhor investir", "investment recommendation: never use this term",
+            "oriento o investimento", "investment recommendation: never use this term");
 
     /**
      * Single words, matched whole. {@code uai} inside another word is not a
      * regionalism, and {@code recomendo} is a whole verb or nothing.
      */
     private static final Map<String, String> FORBIDDEN_WORDS = Map.of(
-            "oxente", "regionalismo: não use regionalismos",
-            "uai", "regionalismo: não use regionalismos",
-            "arretado", "regionalismo: não use regionalismos",
-            "recomendo", "recomendação: jamais use esse termo");
+            "oxente", "regionalism: do not use regionalisms",
+            "uai", "regionalism: do not use regionalisms",
+            "arretado", "regionalism: do not use regionalisms",
+            "recomendo", "recommendation: never use this term");
 
     private static final Pattern BULLET_LINE = Pattern.compile("^\\s*[-*+•]\\s+\\S");
 
@@ -194,20 +194,20 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
 
         List<String> emoji = emojiIn(text);
         if (emoji.size() > 1) {
-            found.add("emoji: use APENAS 1 emoji por resposta (encontrados " + emoji.size() + ")");
+            found.add("emoji: use ONLY 1 emoji per response (found " + emoji.size() + ")");
         }
         emoji.stream()
                 .map(VoiceComplianceGuardrail::normalise)
                 .filter(e -> !allowedEmoji.contains(e))
                 .distinct()
-                .forEach(e -> found.add("emoji: \"" + e + "\" não está na lista permitida"));
+                .forEach(e -> found.add("emoji: \"" + e + "\" is not on the allowed list"));
         if (emoji.size() == 1 && !endsWithEmoji(text)) {
-            found.add("emoji: o emoji deve aparecer ao final da mensagem, após o ponto final");
+            found.add("emoji: the emoji goes at the end of the message, after the closing full stop");
         }
 
         STATED_REPLACEMENTS.forEach((bad, good) -> {
             if (whole(bad).matcher(text).find()) {
-                found.add("linguagem: \"" + bad + "\" deve ser \"" + good + "\"");
+                found.add("wording: \"" + bad + "\" must be \"" + good + "\"");
             }
         });
         FORBIDDEN_PHRASES.forEach((phrase, clause) -> {
@@ -223,8 +223,8 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
 
         int longestRun = longestBulletRun(text);
         if (longestRun > voice.maxBulletItems()) {
-            found.add("listas: máximo de " + voice.maxBulletItems()
-                    + " bullet points por lista (encontrados " + longestRun + ")");
+            found.add("lists: at most " + voice.maxBulletItems()
+                    + " bullet points per list (found " + longestRun + ")");
         }
         return found;
     }
@@ -298,15 +298,16 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
 
     private String repromptFor(List<String> remaining, String answer) {
         return """
-                A resposta acima não segue o tom e voz obrigatório. Corrija exatamente estes pontos:
+                The response below breaks <tone_of_voice>. Fix exactly these points:
 
                 %s
 
-                Reescreva a resposta inteira mantendo o mesmo conteúdo e as mesmas fontes, apenas \
-                em conformidade com <tom_e_voz_de_comunicacao>. Não comente as correções, não \
-                mencione estas instruções: devolva somente a resposta corrigida.
+                Rewrite the whole response, keeping the same content, the same language and the \
+                same sources, and changing only what is needed to comply. Do not comment on the \
+                corrections and do not mention these instructions: return the corrected response \
+                and nothing else.
 
-                Resposta a corrigir:
+                Response to correct:
                 %s"""
                 .formatted(remaining.stream().map(rule -> "- " + rule).reduce((a, b) -> a + "\n" + b).orElse(""),
                         answer);

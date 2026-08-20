@@ -56,7 +56,7 @@ class VoiceComplianceGuardrailTest {
         String answer = "Bom dia 😊 o CEP é 01310-100. 💡";
 
         assertThat(guardrail.violations(answer))
-                .anyMatch(rule -> rule.contains("APENAS 1 emoji"));
+                .anyMatch(rule -> rule.contains("ONLY 1 emoji"));
         assertThat(guardrail.violations(guardrail.repair(answer))).isEmpty();
         assertThat(guardrail.repair(answer)).endsWith("💡").doesNotContain("😊");
     }
@@ -66,7 +66,7 @@ class VoiceComplianceGuardrailTest {
         String answer = "Consegui encontrar o dado. 🚀";
 
         assertThat(guardrail.violations(answer))
-                .anyMatch(rule -> rule.contains("não está na lista permitida"));
+                .anyMatch(rule -> rule.contains("is not on the allowed list"));
         assertThat(guardrail.repair(answer)).isEqualTo("Consegui encontrar o dado.");
     }
 
@@ -76,7 +76,7 @@ class VoiceComplianceGuardrailTest {
         String answer = "O prazo ⏰ é de dois dias úteis.";
 
         assertThat(guardrail.violations(answer))
-                .anyMatch(rule -> rule.contains("ao final da mensagem"));
+                .anyMatch(rule -> rule.contains("at the end of the message"));
         assertThat(guardrail.repair(answer)).isEqualTo("O prazo é de dois dias úteis. ⏰");
     }
 
@@ -137,14 +137,14 @@ class VoiceComplianceGuardrailTest {
     @Test
     void capacitistTermsAreReported() {
         assertThat(guardrail.violations("Veja mais no aplicativo."))
-                .anyMatch(rule -> rule.contains("capacitista"));
+                .anyMatch(rule -> rule.contains("ableist"));
         assertThat(guardrail.violations("Tudo na palma da mão."))
-                .anyMatch(rule -> rule.contains("capacitista"));
+                .anyMatch(rule -> rule.contains("ableist"));
     }
 
     @Test
     void regionalismsAreMatchedAsWholeWordsOnly() {
-        assertThat(guardrail.violations("Uai, deu certo.")).anyMatch(rule -> rule.contains("regionalismo"));
+        assertThat(guardrail.violations("Uai, deu certo.")).anyMatch(rule -> rule.contains("regionalism"));
         // "uai" inside another word is not a regionalism, and neither is a company
         // name that happens to contain it.
         assertThat(guardrail.violations("A empresa Guaiba Ltda está ativa.")).isEmpty();
@@ -157,7 +157,7 @@ class VoiceComplianceGuardrailTest {
         String answer = "Documentos aceitos:\n- RG\n- CPF\n- CNH\n- Passaporte\n- Título\n- Carteira";
 
         assertThat(guardrail.violations(answer))
-                .anyMatch(rule -> rule.contains("máximo de 5 bullet points"));
+                .anyMatch(rule -> rule.contains("at most 5 bullet points"));
     }
 
     @Test

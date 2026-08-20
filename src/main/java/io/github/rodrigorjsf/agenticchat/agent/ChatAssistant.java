@@ -45,7 +45,7 @@ public interface ChatAssistant {
             <turn_context>
             reply_language: {{language}}
             suggested_skill: {{skillHint}}
-            response_style: siga <tom_e_voz_de_comunicacao> integralmente nesta resposta
+            response_style: follow <tone_of_voice> in full for this response
             </turn_context>
             <message>
             {{message}}
