@@ -83,6 +83,80 @@ public class StubApiController {
                 : HttpResponse.ok("{\"recovered\":true}");
     }
 
+    // ------------------------------------------------------------------
+    // Recorded-shape bodies for the link-policy tests.
+    //
+    // These are not inventions: each carries the URL-valued fields the real
+    // upstream documents for that route, and nothing else about them matters.
+    // They exist so a projection can be run for real — the same tool method, the
+    // same ToolJson call — against a body shaped like the one it will meet.
+    // ------------------------------------------------------------------
+
+    /** Crossref's single-work route. The record's own {@code URL} is a doi.org address. */
+    @Get("/crossref/works/{+doi}")
+    public String crossrefWork(String doi) {
+        return """
+                {"status":"ok","message-type":"work","message-version":"1.0.0","message":{
+                "DOI":"%s",
+                "URL":"https://doi.org/%s",
+                "title":["Applying Deep Learning to Airbnb Search"],
+                "container-title":["KDD '19"],
+                "publisher":"ACM",
+                "is-referenced-by-count":42,
+                "abstract":"<jats:p>A short abstract.</jats:p>",
+                "issued":{"date-parts":[[2019,7,25]]},
+                "author":[{"given":"Malay","family":"Haldar","sequence":"first",
+                "ORCID":"http://orcid.org/0000-0002-1825-0097","authenticated-orcid":true}]}}
+                """.formatted(doi, doi);
+    }
+
+    /**
+     * Crossref's search route. {@code select} constrains the fields, and an author
+     * object still carries an {@code ORCID} — a URL on a host no tool ever calls.
+     */
+    @Get("/crossref/works")
+    public String crossrefSearch() {
+        return """
+                {"status":"ok","message-type":"work-list","message":{"total-results":812,
+                "items":[{"DOI":"10.1145/3292500.3330701",
+                "title":["Applying Deep Learning to Airbnb Search"],
+                "container-title":["KDD '19"],
+                "issued":{"date-parts":[[2019,7,25]]},
+                "author":[{"given":"Malay","family":"Haldar","sequence":"first",
+                "ORCID":"http://orcid.org/0000-0002-1825-0097"}]}]}}
+                """;
+    }
+
+    /**
+     * OpenAlex's search route. {@code id} is an openalex.org address — in the
+     * catalogue, so an answer may cite it — and {@code doi} is a doi.org one, which
+     * is not.
+     */
+    @Get("/openalex/works")
+    public String openalexSearch() {
+        return """
+                {"meta":{"count":1,"per_page":3},
+                "results":[{"id":"https://openalex.org/W2741809807",
+                "doi":"https://doi.org/10.7717/peerj.4375",
+                "title":"The state of OA","publication_year":2018,"cited_by_count":935}]}
+                """;
+    }
+
+    /**
+     * One body carrying a catalogue host, two hosts outside it, and the two
+     * disguises a plain {@code https://} scan misses: JSON-escaped slashes, which a
+     * PHP-backed API emits, and a scheme-relative address, which MediaWiki does.
+     */
+    @Get("/mixed-links")
+    public String mixedLinks() {
+        return """
+                {"allowed":"https://pt.wikipedia.org/wiki/Brasil",
+                "resolver":"https://doi.org/10.7717/peerj.4375",
+                "escaped":"https:\\/\\/www.bbcgoodfood.com\\/recipes\\/lasagne",
+                "schemeRelative":"//www.example.test/w/Q155"}
+                """;
+    }
+
     @Get("/slow")
     public String slow() throws InterruptedException {
         Thread.sleep(3_000);

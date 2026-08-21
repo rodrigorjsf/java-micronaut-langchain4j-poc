@@ -37,6 +37,20 @@ import java.util.stream.Collectors;
  *   <li><b>Bounded output.</b> Every response is capped at the endpoint's byte
  *       budget, and truncation is reported to the model instead of silently
  *       dropping data.</li>
+ *   <li><b>Allow-listed links.</b> A body may not carry an address to a host outside
+ *       the catalogue — see {@link LinkPolicy}. It is here rather than in each tool
+ *       because a tool that projects can be told to keep a URL-valued field and a
+ *       tool that does not project hands its body over untouched; the door is the
+ *       only point that sees both. The cost of missing one is not tokens: the
+ *       output guardrail withholds the entire answer, so an ordinary question is
+ *       answered "The response was withheld by the output policy."
+ *       <p>Read as a substitution, not as a second ceiling. It runs <em>after</em> the
+ *       truncation above, and {@code LinkPolicy.REMOVED} is 42 characters, so
+ *       replacing anything shorter than that grows the body: one already at its byte
+ *       budget can finish over it. That ordering is deliberate and not worth trading
+ *       away — both the projection and the guardrail's own URL scan need a whole
+ *       address, and a cut that lands mid-host leaves a stump the scan still reads as
+ *       a host. Only the byte budget above is enforced.</p></li>
  *   <li><b>Failures are values.</b> Nothing throws at the tool boundary, so
  *       LangChain4j never falls back to its default handler, which puts
  *       {@code Throwable.getMessage()} — upstream URLs, bodies, stack traces —
@@ -81,14 +95,17 @@ public class ToolHttpClient {
     private final HttpClient httpClient;
     private final Map<String, ApiEndpointProperties> catalogue;
     private final String defaultUserAgent;
+    private final LinkPolicy links;
     private final Semaphore inFlight = new Semaphore(IN_FLIGHT_LIMIT);
 
     public ToolHttpClient(HttpClient httpClient,
                           List<ApiEndpointProperties> endpoints,
+                          LinkPolicy links,
                           @io.micronaut.context.annotation.Value(
                                   "${agentic.tools.user-agent:agentic-chat-poc/0.1}") String defaultUserAgent) {
         this.httpClient = httpClient;
         this.defaultUserAgent = defaultUserAgent;
+        this.links = links;
         this.catalogue = endpoints.stream().collect(Collectors.toUnmodifiableMap(
                 ApiEndpointProperties::name, e -> e));
         LOG.info("Tool API catalogue: {}", new java.util.TreeSet<>(catalogue.keySet()));
@@ -185,7 +202,13 @@ public class ToolHttpClient {
                 .header("User-Agent", userAgent);
         String body = Mono.from(httpClient.retrieve(request, String.class))
                 .block(endpoint.timeout());
-        return truncate(body == null ? "" : body, endpoint.maxResponseBytes());
+        // Scrubbed AFTER truncation, and the order is deliberate. A cut lands
+        // anywhere, so a truncated body can end mid-address — "https://doi.o" is
+        // still a host to the output guardrail's URL scan, and still costs the whole
+        // answer. Scrubbing the survivor catches the stump too, and spends no cycles
+        // on bytes that were already thrown away.
+        var truncated = truncate(body == null ? "" : body, endpoint.maxResponseBytes());
+        return new ToolResponse(links.scrub(truncated.body()), truncated.outcome(), truncated.truncated());
     }
 
     private static ToolResponse truncate(String body, int maxBytes) {

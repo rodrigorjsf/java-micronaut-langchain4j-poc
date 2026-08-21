@@ -209,6 +209,29 @@ class ToolJsonTest {
     }
 
     @Test
+    @DisplayName("projectList reaches a NESTED array, which is where the container trap lives")
+    void projectsThroughADottedPathToANestedArray() {
+        // Crossref answers {"message":{"items":[…]}} and Wikipedia answers
+        // {"query":{"search":[…]}}. Both are the exact shape projectList exists for,
+        // and both were written as project(body, "message.items") — the container
+        // path — because projectList resolved its argument with a single get() and
+        // could not reach two levels down. The method that exists to prevent the trap
+        // could not be used at the shape that produces it.
+        var body = """
+                {"status":"ok","message":{"total-results":812,"items":[
+                 {"DOI":"10.1145/3292500.3330701","title":["Applying Deep Learning"],
+                  "URL":"https://doi.org/10.1145/3292500.3330701"}]}}""";
+
+        var projected = json.projectList(body, "message.items", 3, "DOI", "title");
+
+        assertThat(projected).contains("10.1145/3292500.3330701", "Applying Deep Learning");
+        assertThat(projected).doesNotContain("doi.org", "812");
+        // The leaf name, as everywhere else in this class: "message.items" is stored
+        // under "items", not under the dotted path.
+        assertThat(projected).startsWith("{\"items\":");
+    }
+
+    @Test
     void everythingOutsideTheNamedArrayIsDropped() {
         var body = """
                 {"count":812,"page":1,"meals":[{"strMeal":"Lasagne","strSource":"https://x.test/1"}]}""";

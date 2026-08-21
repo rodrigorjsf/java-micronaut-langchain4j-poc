@@ -165,7 +165,15 @@ tools appear. Standing cost measured at **81 tokens per skill**, against roughly
 80 per raw tool schema.
 
 Bounds that make agency finite: six tool round trips, a 20-message memory window,
-and a per-endpoint byte budget on every tool result.
+and a per-endpoint byte budget on every tool result. The budget is a transport
+bound, applied before link scrubbing — a removed address shorter than the
+42-character marker leaves the body marginally over it.
+
+**Links are scrubbed at the door, not only at the exit.** Any address in a tool
+body whose host is outside the catalogue is replaced with
+`[link removed: outside the tool catalogue]` before the model sees it. A link the
+answer may not carry is a link the model should never have been shown — and it
+cannot quote what it was never given.
 
 ## Step 8 — output guardrails
 
@@ -175,7 +183,9 @@ the model paraphrases.
 
 **Exfiltration.** A markdown image pointing at an attacker host fires on render
 with no click, so link hosts are allow-listed; credential-shaped strings are
-matched narrowly.
+matched narrowly. This is the *second* application of the same allow-list — the
+first ran at the tool door in step 6 — and the two share one object rather than two
+derivations, so they cannot disagree.
 
 Both remove the offending message from chat memory rather than merely blocking
 it. Leaving it would replay the leaked text into every later prompt.

@@ -60,7 +60,7 @@ Two traps in building that decorator, both of which fail silently:
 | ID | Title | Control here | Test |
 |---|---|---|---|
 | **ASI01** | Agent Goal Hijack | Input guardrail chain: normalize → deterministic score → gray-zone classifier. System prompt is assembled from config at startup and never derived from a request or from memory. | 71 corpus cases, half of them benign traffic that looks like an attack |
-| **ASI02** | Tool Misuse and Exploitation | Tools name a catalogue key, never a URL. Arguments screened for credential shapes. Results screened for injection. `maxToolCallingRoundTrips(6)`. Per-endpoint timeouts and byte budgets. | SSRF refusal via an unconfigured catalogue key; credential-shaped argument refused; injected result neutralised |
+| **ASI02** | Tool Misuse and Exploitation | Tools name a catalogue key, never a URL. Arguments screened for credential shapes. Results screened for injection. `maxToolCallingRoundTrips(6)`. Per-endpoint timeouts and byte budgets (a transport bound, applied before link scrubbing). Addresses outside the catalogue are removed from a tool body before the model reads it. | SSRF refusal via an unconfigured catalogue key; credential-shaped argument refused; injected result neutralised |
 | **ASI03** | Identity and Privilege Abuse | `ConversationId` is validated before it builds a storage key in either store — the memory-isolation boundary. No tool parameter may be named like a credential. | 13 `ConversationId` cases naming each rejected shape; the parameter-name test over every tool |
 | **ASI04** | Agentic Supply Chain | All tools are compiled `@Tool` methods in this repository. There is no runtime tool registry, no MCP mount, no dynamic descriptor. | ArchUnit: tools may not open their own connections |
 | **ASI05** | Unexpected Code Execution | There is no code-execution tool, no `eval`, no template engine reachable from a prompt. The applicable slice is deserialization hygiene on anything persisted. | ArchUnit no-cycles and the tool-boundary rules |
@@ -164,6 +164,25 @@ is not mitigated, and nothing here should be read as implying otherwise.
 - **HTTP rate limiting.** Deliberately at the gateway in a real deployment, and
   absent here. The per-turn bounds cap what one *request* can cost; they do not
   cap how many requests one caller can make.
+- **Per-endpoint transport limits.** The heap a tool call can occupy is bounded
+  globally — `micronaut.http.client.max-content-length` is 3 MB and at most twelve
+  requests are in flight — but it is bounded by *one* number for sixty endpoints,
+  and that number is chosen with a margin rather than derived from the catalogue.
+  The version that would derive it gives `ToolHttpClient` a client configured per
+  entry, or streams the body and cancels past the budget. Not built, because no
+  upstream here is hostile and the exposure is bounded either way; recorded because
+  the reasoning belongs somewhere a reader will find it. See issue #1.
+
+  **The trap in the obvious version**, written down because it looks like the fix
+  and is the opposite: the transport floor is the largest **raw** body an endpoint
+  can return, not the largest `max-response-bytes`. Those differ by an order of
+  magnitude — themealdb's ceiling is 262 144 and its one-letter search measured
+  2.3 MB. Set the transport under the raw body and `truncate()` never runs: the
+  client refuses the response, the retry loop retries a deterministic failure, and
+  the explicit "narrow your query" the model can act on becomes "the request did
+  not complete". Raising `max-response-bytes` to compensate is worse again — it
+  raises the buffered ceiling too. Pinned by
+  `ToolHttpClientTest#aTransportCeilingBelowTheBodyIsNotABudget`.
 
 ## The one that generalises
 

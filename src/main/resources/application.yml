@@ -555,3 +555,9 @@ agentic:
       # markdown image fires with no user click.
       extra-allowed-link-hosts:
         - gov.br
+        # search_stackoverflow fetches api.stackexchange.com, and every result it
+        # returns links to stackoverflow.com — the same operator, a different
+        # registrable domain, which the catalogue derivation cannot see and only
+        # configuration can express. Without it the tool searches but cannot cite.
+        # Deliberately NOT gravatar.com (an avatar is part of no answer) and NOT
+        # doi.org (no tool fetches it, and the bare DOI is the better citation).

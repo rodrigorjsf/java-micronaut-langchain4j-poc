@@ -20,13 +20,22 @@ parameter that accepts a host, so there is nothing for a crafted argument to
 occupy. The test that pins it passes `http://169.254.169.254` as the API name and
 asserts the call is refused because that key is not in the catalogue.
 
-Three more responsibilities live in the same class rather than in each of sixty
+Four more responsibilities live in the same class rather than in each of sixty
 tools:
 
 **Bounded output.** Every response is capped at a per-endpoint byte budget
 (32 KB default — roughly 8k tokens, already more than any single tool result
 should cost). Truncation is *reported* to the model, so it can narrow the query
 instead of answering from a fragment it believes is complete.
+
+The cap is a *transport* bound and it is enforced first. Link scrubbing runs after
+it, and the removal marker is 42 characters, so replacing an address shorter than
+that pushes a body marginally over the budget. Rare, bounded by the number of
+addresses in the body, and stated here rather than left as a claim the code
+falsifies.
+
+**Allow-listed links, at the door.** A tool body is scrubbed of any address outside
+the catalogue before the model reads it — see ADR 0008.
 
 **Failures are values, never exceptions.** LangChain4j's default tool-error
 handler feeds `Throwable.getMessage()` to the model — its own javadoc names this

@@ -25,8 +25,9 @@ flowchart TB
     T -->|clean| A[Agent]
     T -->|"score ≥ 6"| X[Refuse]
     T -->|"gray zone"| J["LLM classifier"] --> X
-    A --> L["3 · System-prompt leakage<br/>canary match"]
-    L --> E["4 · Exfiltration<br/>link allow-list · credential shapes"]
+    A --> D["3 · Link scrub at the tool door<br/>same allow-list, applied inbound"]
+    D --> L["4 · System-prompt leakage<br/>canary match"]
+    L --> E["5 · Exfiltration<br/>link allow-list · credential shapes"]
     E --> R[Reply]
 
     class N rewrite
