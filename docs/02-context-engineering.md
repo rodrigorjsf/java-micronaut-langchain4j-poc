@@ -29,7 +29,7 @@ would accept.
 | Skills index | ~970 at 12 skills | every turn, unchanged |
 | Retrieved content | 0–1 000 | only on routed turns |
 | Conversation | up to ~14 400 before compaction | every turn, growing |
-| This turn's tool results | ≤ 32 KB per call, ~8k tokens | this turn, then in memory |
+| This turn's tool results | ≤ 32 KB per call at the transport, ~8k tokens | this turn, then in memory |
 | Reserve for the answer | ~4 000 | — |
 
 The first three rows are the *standing* cost — the number that multiplies by every
@@ -168,7 +168,7 @@ a summary that reproduces the tone of a conversation has compressed nothing.
 
 | Thing | Ceiling |
 |---|---|
-| A tool response | per-endpoint byte budget, 32 KB default, truncation announced |
+| A tool response | per-endpoint byte budget, 32 KB default, truncation announced — a transport bound, applied before link scrubbing |
 | A tool response's *shape* | projected to the fields the answer needs |
 | Tool round trips per turn | 6 |
 | Conversation | 40 messages, then compaction by token estimate |

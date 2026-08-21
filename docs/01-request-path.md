@@ -64,6 +64,21 @@ Three deterministic answers, no model:
 The greeting rule matches the **whole** message. `oi` is a greeting; `oi, qual o
 CEP da Paulista?` is a request that starts with one and goes to the judge.
 
+**Each of the three has to say what language it is answering in**, because language
+detection lives in the judge and none of them calls it. They used to say `pt-BR`
+without looking, which answered `hello` in Portuguese and declined 12 000 characters
+of English with the Portuguese template while the English one sat unreachable. The
+tag is only a hint in the prompt — the model is told the message wins where the two
+disagree — but on the refusal path it is final: `RefusalTemplates` picks by it and no
+model is in the loop to correct it.
+
+| Path | How the language is decided |
+|---|---|
+| a bare greeting | a lookup, not detection — the greeting vocabulary is closed and already partitioned by language |
+| over 12 000 characters | a stopword ratio over the head of the message, which is abundant evidence at that size |
+| blank | the documented `pt-BR` default: no text, no evidence, and this assistant's audience is Brazilian |
+| the judge failed | detected from the text the judge was about to read |
+
 ## Step 3 — the verdict cache
 
 Keyed on the normalized text, 30-minute TTL.
@@ -96,10 +111,11 @@ this workload, and the newer generation renamed the thinking parameter such that
 the old name is silently ignored — see
 [ADR 0006](adr/0006-llm-as-judge-triage.md).
 
-Its verdict carries seven fields, each with exactly one consumer. Two of them —
-`language` and `skillHint` — reach the agent's prompt, so both are constrained
-before they get there: the guardrail chain inspected the user's *message*, not
-this object.
+Its verdict carries six fields. Five have exactly one consumer; `riskFlags` has
+two — the metrics counter, and the `offence` flag that gates the voice document's
+mandated de-escalation sentence. Two fields — `language` and `skillHint` — reach
+the agent's prompt, so both are constrained before they get there: the guardrail
+chain inspected the user's *message*, not this object.
 
 **A refusal ends here.** The judge writes the out-of-scope reply itself, so
 declining a request costs one small-model call rather than two.
@@ -149,7 +165,15 @@ tools appear. Standing cost measured at **81 tokens per skill**, against roughly
 80 per raw tool schema.
 
 Bounds that make agency finite: six tool round trips, a 20-message memory window,
-and a per-endpoint byte budget on every tool result.
+and a per-endpoint byte budget on every tool result. The budget is a transport
+bound, applied before link scrubbing — a removed address shorter than the
+42-character marker leaves the body marginally over it.
+
+**Links are scrubbed at the door, not only at the exit.** Any address in a tool
+body whose host is outside the catalogue is replaced with
+`[link removed: outside the tool catalogue]` before the model sees it. A link the
+answer may not carry is a link the model should never have been shown — and it
+cannot quote what it was never given.
 
 ## Step 8 — output guardrails
 
@@ -159,7 +183,9 @@ the model paraphrases.
 
 **Exfiltration.** A markdown image pointing at an attacker host fires on render
 with no click, so link hosts are allow-listed; credential-shaped strings are
-matched narrowly.
+matched narrowly. This is the *second* application of the same allow-list — the
+first ran at the tool door in step 6 — and the two share one object rather than two
+derivations, so they cannot disagree.
 
 Both remove the offending message from chat memory rather than merely blocking
 it. Leaving it would replay the leaked text into every later prompt.

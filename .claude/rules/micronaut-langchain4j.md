@@ -100,12 +100,24 @@ measure sentence properties. Compact JSON has no whitespace, so the 400-characte
 long-token rule fires on any result over 400 bytes — a 457-byte SELIC series was
 answered as an injection attempt.
 
-**A third-party URL in a tool result costs the whole answer, not the tokens.**
-`ExfiltrationGuardrail` withholds any response linking outside the tool
-catalogue, so a projection that keeps `strSource`, `strYoutube`, `website_url` or
-a thumbnail turns the most ordinary question in that skill into "The response was
-withheld by the output policy." Projections are **keep-lists**, never deny-lists:
-a deny-list has to be right about every field the source adds next.
+**A third-party URL in a tool result no longer costs the answer — it costs the
+field.** `LinkPolicy.scrub` replaces any address outside the catalogue with
+`[link removed: outside the tool catalogue]` at the tool door, before the model
+reads the body, so a projection that keeps `strSource`, `strYoutube`,
+`website_url` or a thumbnail now yields a marker rather than "The response was
+withheld by the output policy." Two things follow. A `@Tool` description or a
+`SKILL.md` that promises a link the door removes is a standing instruction to
+invent one — say what the tool returns after the scrub, not before. And
+projections are still **keep-lists**, never deny-lists: the scrub bounds the
+damage, it does not make a deny-list right about the field the source adds next.
+
+**The same allow-list runs twice, and it is one object.** `LinkAllowList` is a
+façade over `LinkPolicy`, which lives in the tool package because `guardrail`
+already depends on `tools` and the reverse edge would close a package cycle. It is
+injected, never re-derived from the property a second time: two derivations agree
+until someone renames the key on one side, and then the tool layer allows a host
+the guardrail blocks, for a link this application put there itself, with nothing
+red.
 
 **A byte ceiling cannot classify semantics.** `max-response-bytes` was once used
 to separate a dish name from an ingredient, on three samples. Ten of eleven

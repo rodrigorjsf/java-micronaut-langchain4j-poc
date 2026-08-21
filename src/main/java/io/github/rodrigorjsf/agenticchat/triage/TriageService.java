@@ -7,8 +7,6 @@ import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Locale;
-import java.util.Set;
 
 /**
  * Everything that happens to a user turn before the main agent sees it.
@@ -45,15 +43,6 @@ public class TriageService {
      */
     private static final int MAX_CHARS = 12_000;
 
-    /**
-     * Whole-message greetings only. A message that merely starts with "oi" carries a
-     * real request after it and must reach the judge.
-     */
-    private static final Set<String> GREETINGS = Set.of(
-            "oi", "ola", "opa", "eai", "e ai", "bom dia", "boa tarde", "boa noite",
-            "hi", "hello", "hey", "yo", "hola",
-            "obrigado", "obrigada", "valeu", "vlw", "thanks", "thank you", "tchau", "ate mais", "bye");
-
     private final CachedTriageJudge judge;
     private final MeterRegistry meters;
 
@@ -82,37 +71,51 @@ public class TriageService {
             meters.counter("agentic.triage.failures").increment();
             // Fail open: the guardrail chain still runs on the escalated turn.
             LOG.warn("Triage judge unavailable, escalating the turn to the main agent", e);
-            return TriageVerdict.deterministic(
-                    TriageVerdict.Decision.IN_SCOPE, TriageVerdict.Intent.UNKNOWN, "pt-BR");
+            // The judge is where language detection lives, and it is the component
+            // that just failed — but its input is still in hand, so the turn is
+            // escalated with a language read from the text rather than assumed.
+            return TriageVerdict.deterministic(TriageVerdict.Decision.IN_SCOPE,
+                    TriageVerdict.Intent.UNKNOWN, MessageLanguage.detect(normalized));
         }
     }
 
+    /**
+     * <p>Each of these three answers a turn without the judge, and the judge is where
+     * language detection lives — so each one has to say what language it is answering
+     * in. The tag is not cosmetic, and its load-bearing consumer is the refusal path:
+     * {@link RefusalTemplates#refusalFor} picks the template by it, and that text
+     * reaches the user with no model in the loop to correct it. In the prompt the same
+     * tag is only a hint — {@code SystemPromptBuilder} tells the model the message
+     * wins where the two disagree — so a wrong tag is recoverable there and final
+     * here. All three used to say {@code pt-BR} without looking, which answered
+     * "hello" in Portuguese and declined 12 000 characters of English with the
+     * Portuguese template while the English one sat unreachable.
+     */
     private TriageVerdict preFilter(String normalized) {
         if (normalized.isBlank()) {
-            return TriageVerdict.deterministic(
-                    TriageVerdict.Decision.OUT_OF_SCOPE, TriageVerdict.Intent.EMPTY, "pt-BR");
+            // No text, so no evidence, so nothing to detect. The default is the whole
+            // answer here — deliberately, not for want of looking — because this
+            // assistant's audience is Brazilian. It is the one path where a constant
+            // is the honest choice.
+            return TriageVerdict.deterministic(TriageVerdict.Decision.OUT_OF_SCOPE,
+                    TriageVerdict.Intent.EMPTY, MessageLanguage.DEFAULT);
         }
         if (normalized.length() > MAX_CHARS) {
-            return TriageVerdict.deterministic(
-                    TriageVerdict.Decision.OUT_OF_SCOPE, TriageVerdict.Intent.TOO_LONG, "pt-BR");
+            // Over 12 000 characters: more than enough prose for a word list, and the
+            // one refusal a user can act on by rewriting, so it had better be in a
+            // language they read.
+            return TriageVerdict.deterministic(TriageVerdict.Decision.OUT_OF_SCOPE,
+                    TriageVerdict.Intent.TOO_LONG, MessageLanguage.detect(normalized));
         }
-        if (isGreeting(normalized)) {
-            return TriageVerdict.deterministic(
-                    TriageVerdict.Decision.IN_SCOPE, TriageVerdict.Intent.GREETING, "pt-BR");
+        String greeting = MessageLanguage.ofGreeting(normalized);
+        if (greeting != null) {
+            // A lookup, not detection. "hi" is two characters of evidence for any
+            // detector and an exact answer for a closed vocabulary that was already
+            // partitioned by language.
+            return TriageVerdict.deterministic(TriageVerdict.Decision.IN_SCOPE,
+                    TriageVerdict.Intent.GREETING, greeting);
         }
         return null;
-    }
-
-    private static boolean isGreeting(String normalized) {
-        String stripped = normalized.toLowerCase(Locale.ROOT)
-                .replaceAll("[!?.,;:\\s]+$", "")
-                .strip();
-        if (stripped.length() > 20) {
-            return false;
-        }
-        String folded = java.text.Normalizer.normalize(stripped, java.text.Normalizer.Form.NFD)
-                .replaceAll("\\p{InCombiningDiacriticalMarks}+", "");
-        return GREETINGS.contains(folded);
     }
 
     private void count(TriageVerdict verdict, String source) {

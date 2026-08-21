@@ -152,9 +152,15 @@ public class KnowledgeResearchTools implements SkillTools {
         // Server-side field selection: without it every hit also carries its byte
         // size, word count and last-edit timestamp.
         params.put("srprop", "snippet");
-        params.put("srlimit", Integer.toString(clamp(limit, 1, MAX_WIKI_RESULTS, 3)));
+        int wanted = clamp(limit, 1, MAX_WIKI_RESULTS, 3);
+        params.put("srlimit", Integer.toString(wanted));
         params.put("format", "json");
-        return json.project(http.get(api, MEDIAWIKI_API, params), "query.search").toModelText();
+        // projectList, not project(…, "query.search"). A path that lands on a
+        // container keeps the container whole, so the second form was a projection
+        // in name only: it kept each hit's namespace number and page id, and it
+        // would keep whatever srprop grows next without anyone deciding to.
+        return json.projectList(http.get(api, MEDIAWIKI_API, params), "query.search", wanted,
+                "title", "snippet").toModelText();
     }
 
     @Tool("""
@@ -224,7 +230,10 @@ public class KnowledgeResearchTools implements SkillTools {
         params.put("gsradius", Integer.toString(clamp(radiusMetres, 10, 10000, 1000)));
         params.put("gslimit", Integer.toString(MAX_WIKI_RESULTS));
         params.put("format", "json");
-        return json.project(http.get(api, MEDIAWIKI_API, params), "query.geosearch").toModelText();
+        // The title is what wikipedia_summary takes next; the page id, the namespace
+        // and the primary-coordinate flag answer nothing anyone asked.
+        return json.projectList(http.get(api, MEDIAWIKI_API, params), "query.geosearch",
+                MAX_WIKI_RESULTS, "title", "lat", "lon", "dist").toModelText();
     }
 
     // ------------------------------------------------------------------
@@ -255,9 +264,15 @@ public class KnowledgeResearchTools implements SkillTools {
         params.put("search", name.strip());
         params.put("language", lang);
         params.put("uselang", lang);
-        params.put("limit", Integer.toString(clamp(limit, 1, MAX_WIKI_RESULTS, 3)));
+        int wanted = clamp(limit, 1, MAX_WIKI_RESULTS, 3);
+        params.put("limit", Integer.toString(wanted));
         params.put("format", "json");
-        return json.project(http.get(WIKIDATA, MEDIAWIKI_API, params), "search").toModelText();
+        // Three fields out of ten. A wbsearchentities hit also carries `url` and
+        // `concepturi` — the same entity written twice more, once scheme-relative —
+        // plus the repository name, the page id, a display block that repeats the
+        // label and description, the substring that matched, and every alias.
+        return json.projectList(http.get(WIKIDATA, MEDIAWIKI_API, params), "search", wanted,
+                "id", "label", "description").toModelText();
     }
 
     @Tool("""
@@ -311,6 +326,13 @@ public class KnowledgeResearchTools implements SkillTools {
         // reference list, licence terms and funder records.
         params.put("select", "DOI,title,author,issued,container-title");
         params.put("mailto", CONTACT_EMAIL);
+        // Left as a container path on purpose, unlike the Wikipedia searches above.
+        // `select` already bounds the element fields server-side, so a keep-list here
+        // would repeat that list in a second place and could only differ from it by
+        // being wrong. What a keep-list would NOT have fixed is the one link this
+        // route carries: `author` is a list of objects and an author object holds an
+        // ORCID address, one level deeper than any keep-list written here reaches.
+        // That is the link policy's job, at the door.
         return json.project(http.get(CROSSREF, "/works", params), "message.items").toModelText();
     }
 
@@ -329,10 +351,18 @@ public class KnowledgeResearchTools implements SkillTools {
         }
         // No select parameter exists on this route, so the whole record arrives —
         // reference lists included — and is narrowed here.
+        //
+        // message.DOI, not message.URL. A Crossref work's URL field is its doi.org
+        // resolver address, and doi.org is not a host any tool in this catalogue
+        // calls — so an answer quoting it is withheld whole by the output link
+        // policy, and the user gets a blank refusal to a question about a paper.
+        // The bare identifier is strictly better anyway: it is the canonical way to
+        // cite a work, it is not a URL, and it costs fewer tokens than the address
+        // built around it.
         return json.project(http.get(CROSSREF, "/works/" + clean),
-                "message.title", "message.author", "message.issued", "message.container-title",
-                "message.publisher", "message.abstract", "message.is-referenced-by-count",
-                "message.URL").toModelText();
+                "message.DOI", "message.title", "message.author", "message.issued",
+                "message.container-title", "message.publisher", "message.abstract",
+                "message.is-referenced-by-count").toModelText();
     }
 
     @Tool("""
@@ -355,6 +385,10 @@ public class KnowledgeResearchTools implements SkillTools {
         // ~31 KB, most of it concept scores and per-year citation histograms.
         params.put("select", "id,title,publication_year,cited_by_count,doi");
         params.put("mailto", CONTACT_EMAIL);
+        // As above: `select` is the keep-list, and repeating it here would only add a
+        // second place to be wrong. Note what the two id fields cost differently —
+        // `id` is an openalex.org address, a host the catalogue contains, so an answer
+        // may cite it; `doi` is a doi.org one and is removed at the door.
         return json.project(http.get(OPENALEX, "/works", params), "results").toModelText();
     }
 

@@ -34,7 +34,10 @@ is how a user ends up installing a release that was yanked or never existed.
   `get_github_repo` afterwards if the user asked about activity or maintenance —
   the registry already told you the version and the licence.
 - **Front page in one call.** `get_hackernews_front_page` returns titles, scores
-  and links directly. `get_hackernews_top` returns only ids, and turning ten ids
+  and comment counts directly. A story's link is whatever site the submitter
+  pointed at, so it reads `[link removed: outside the tool catalogue]` unless that
+  site is one this assistant fetches from. That marker means a link existed and may
+  not be shown — say so, never guess the address. `get_hackernews_top` returns only ids, and turning ten ids
   into ten readable stories costs ten more calls, which exhausts the turn's tool
   budget before you can answer. Use `get_hackernews_top` only when the user
   actually needs "what is number one right now", then read at most two or three

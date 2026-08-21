@@ -114,7 +114,7 @@ Everything is tagged by **role**, which is the point — see
 | every turn slow, `agentic_triage_failovers_total` climbing | Google free tier at its 10–20 req/min limit | judge fails over to OpenAI; if none is configured, the turn escalates to the agent |
 | `RESOURCE_EXHAUSTED` on the agent role | same limit, no failover for the agent | the turn fails; the error handler returns a shaped 500 |
 | answers ignore tools, model "just knows" | skill activation lost — memory window too small, or a store that dropped message attributes | `SkillActivationTest` covers both; check the window first |
-| every response containing a link is blocked | the link allow-list is empty | it is derived from the tool catalogue, so this means the catalogue is empty — check `agentic.tools.apis` loaded |
+| tool results full of `[link removed: outside the tool catalogue]`, then responses containing a link blocked | the link allow-list is empty | it is derived from the tool catalogue, so this means the catalogue is empty — check `agentic.tools.apis` loaded. The removal marker is the **first** observable: the same list runs at the tool door before it runs on the answer |
 | `this data source is not configured` | a tool names a catalogue key that is not in config | `./scripts/check-tool-catalogue.py` |
 | a tool's arguments visible to anything on the path | a catalogue entry with an `http://` base URL | same script — it fails on any non-https base URL |
 | tools all fail after a deploy | a `@Factory` method was reordered and stale bean definitions linger | `./mvnw clean` |

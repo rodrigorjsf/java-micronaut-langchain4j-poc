@@ -132,9 +132,8 @@ public class DeveloperTools implements SkillTools {
 
     @Tool("""
             Read one Hacker News story or comment by its numeric id: title, author, \
-            score, comment count and the link it points to. Use to follow up on an id \
-            you already have from get_hackernews_top. Requires an id — it cannot look \
-            a story up by title.""")
+            score and comment count. Use to follow up on an id you already have from \
+            get_hackernews_top. Requires an id — it cannot look a story up by title.""")
     public String get_hackernews_item(
             @P("The numeric Hacker News item id, e.g. 8863.")
             String itemId) {
@@ -171,8 +170,8 @@ public class DeveloperTools implements SkillTools {
     }
 
     @Tool("""
-            Get the Hacker News front page as readable stories — title, link, score \
-            and comment count — in a single call. Use for "what is on Hacker News" or \
+            Get the Hacker News front page as readable stories — title, score and \
+            comment count — in a single call. Use for "what is on Hacker News" or \
             "what is the tech news today". Prefer this over get_hackernews_top, which \
             returns only ids.""")
     public String get_hackernews_front_page(
@@ -188,11 +187,23 @@ public class DeveloperTools implements SkillTools {
     // Stack Overflow
     // ------------------------------------------------------------------
 
+    // Three descriptions in this file used to promise a link — search_stackoverflow,
+    // get_hackernews_front_page, get_hackernews_item — and LinkPolicy removes all
+    // three at the door, because none of those hosts is one this application fetches
+    // from: an item's link is whatever site the story pointed at, and Stack Exchange
+    // answers api.stackexchange.com with stackoverflow.com addresses, a second
+    // registrable domain the derivation cannot see. A @Tool description is read by
+    // the model on every turn, so a promise the code contradicts is a standing
+    // instruction to invent what the tool did not return. The clauses were deleted
+    // rather than reworded: silence is true whether or not stackoverflow.com is later
+    // added to agentic.guardrails.output.extra-allowed-link-hosts, and a reworded
+    // description is an unmeasured change to the routing surface.
+
     @Tool("""
             Find the highest-voted Stack Overflow questions about a programming \
             problem, with their score, tags and whether they have an accepted answer. \
             Use for error messages, "how do I" and configuration questions. Returns \
-            question titles and links, not the answer text itself.""")
+            question titles, not the answer text itself.""")
     public String search_stackoverflow(
             @P("The problem in a few words, as you would type it into a search box, e.g. 'micronaut graalvm reflection'.")
             String query,

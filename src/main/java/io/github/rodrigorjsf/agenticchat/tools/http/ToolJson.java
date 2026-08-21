@@ -97,9 +97,19 @@ public class ToolJson {
      * // {"meals":[{"strMeal":…,"strCategory":…,"strInstructions":…}, …, {"_more":11}]}
      * }</pre>
      *
-     * <p>Everything outside the named array is dropped. If the key is absent or is not
-     * an array, the body comes back unchanged — a missing key is how these APIs report
-     * "no result", and turning that into an empty envelope would hide it.
+     * <p><b>{@code arrayField} is a dotted path, like every other path here.</b> It
+     * used to be a single key, resolved with one {@code get()}, and that is why the
+     * container-path projections outlived the fix that introduced this method:
+     * Crossref answers {@code {"message":{"items":[…]}}} and MediaWiki answers
+     * {@code {"query":{"search":[…]}}}, so at the two commonest shapes in the
+     * catalogue the method that exists to prevent the trap could not be called at
+     * all, and {@code project(body, "message.items")} was written instead. The array
+     * lands under its LEAF name in the result, as leaves do everywhere else in this
+     * class.
+     *
+     * <p>Everything outside the named array is dropped. If the path is absent or does
+     * not land on an array, the body comes back unchanged — a missing key is how these
+     * APIs report "no result", and turning that into an empty envelope would hide it.
      */
     public String projectList(String json, String arrayField, int max, String... paths) {
         if (json == null || json.isBlank()) {
@@ -107,12 +117,12 @@ public class ToolJson {
         }
         try {
             JsonNode root = MAPPER.readTree(json);
-            JsonNode array = root == null ? null : root.get(arrayField);
+            JsonNode array = root == null ? null : at(root, arrayField);
             if (array == null || !array.isArray()) {
                 return json;
             }
             ObjectNode out = MAPPER.createObjectNode();
-            out.set(arrayField, projectArray((ArrayNode) array, max, paths));
+            out.set(leafOf(arrayField), projectArray((ArrayNode) array, max, paths));
             return MAPPER.writeValueAsString(out);
         } catch (Exception cannotParse) {
             return json;
