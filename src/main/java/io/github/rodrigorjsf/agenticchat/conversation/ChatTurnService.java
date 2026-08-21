@@ -3,6 +3,7 @@ package io.github.rodrigorjsf.agenticchat.conversation;
 import dev.langchain4j.guardrail.GuardrailException;
 import dev.langchain4j.invocation.InvocationParameters;
 import io.github.rodrigorjsf.agenticchat.agent.ChatAssistant;
+import io.github.rodrigorjsf.agenticchat.guardrail.output.VoiceComplianceGuardrail;
 import io.github.rodrigorjsf.agenticchat.memory.ConversationCompactor;
 import io.github.rodrigorjsf.agenticchat.memory.ConversationId;
 import io.github.rodrigorjsf.agenticchat.rag.SkillAwareQueryRouter;
@@ -77,6 +78,12 @@ public class ChatTurnService {
             // the query router needs it, and the model does not need to read it twice.
             var parameters = InvocationParameters.from(
                     SkillAwareQueryRouter.SKILL_HINT, verdict.skillHint());
+            // The voice document mandates a sentence, word for word, for a reply to an
+            // offensive message. Whether the USER was offensive is the one thing the
+            // output guardrail cannot read off the answer, so the verdict's flag rides
+            // the same carrier as the skill hint — never the prompt, where it would be
+            // one more line for a user to argue with.
+            parameters.put(VoiceComplianceGuardrail.OFFENCE_KEY, verdict.carriesOffence());
             var result = assistant.chat(
                     conversationId.value(), message, verdict.language(), verdict.skillHint(), parameters);
             sample.stop(meters.timer("agentic.turn.latency", "path", "answered"));

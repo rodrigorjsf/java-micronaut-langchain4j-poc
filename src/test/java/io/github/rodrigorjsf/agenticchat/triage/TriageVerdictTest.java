@@ -82,6 +82,42 @@ class TriageVerdictTest {
     }
 
     @Test
+    @DisplayName("the offence flag is read by its exact spelling, and a near miss is silent")
+    void carriesOffenceReadsTheFlagTheJudgeWasAskedFor() {
+        // The negative cases first: a method that answers true to everything and a
+        // method that reads the right flag are indistinguishable from the positive case
+        // alone.
+        assertThat(verdict(TriageVerdict.Intent.DATA_REQUEST, "pt-BR", "", List.of()).carriesOffence())
+                .as("no flags at all").isFalse();
+        assertThat(verdict(TriageVerdict.Intent.FRUSTRATION, "pt-BR", "", List.of("abuse", "pii")).carriesOffence())
+                .as("abuse is aggression aimed at someone else, and the document's rule is "
+                        + "about aggression aimed at this service").isFalse();
+
+        // The positive case, spelled from the constant so a rename cannot leave the
+        // judge's prompt and this check disagreeing.
+        assertThat(verdict(TriageVerdict.Intent.DATA_REQUEST, "pt-BR", "",
+                List.of(TriageVerdict.OFFENCE_FLAG)).carriesOffence())
+                .as("an insulted CEP lookup is a DATA_REQUEST that still carries offence").isTrue();
+
+        // The failure mode worth writing down, because it is silent in both halves. The
+        // compact constructor keeps only flags matching [a-z][a-z0-9_]{0,39}, so a judge
+        // that answers "Offence" has the flag DROPPED rather than normalised — no log,
+        // no metric — and VoiceComplianceGuardrail then never requires the sentence the
+        // voice document mandates.
+        //
+        // Pinned, not fixed. Lowercasing in the compact constructor would change the
+        // contract for every risk flag on a path whose whole design is "anything not
+        // matching is replaced, never sanitised in place", and that is a decision about
+        // untrusted model output, not about this one flag.
+        assertThat(verdict(TriageVerdict.Intent.DATA_REQUEST, "pt-BR", "", List.of("Offence")).riskFlags())
+                .as("a capitalised flag is dropped by the pattern, not folded").isEmpty();
+        assertThat(verdict(TriageVerdict.Intent.DATA_REQUEST, "pt-BR", "", List.of("Offence")).carriesOffence())
+                .isFalse();
+        assertThat(verdict(TriageVerdict.Intent.DATA_REQUEST, "pt-BR", "", List.of("OFFENCE")).carriesOffence())
+                .isFalse();
+    }
+
+    @Test
     @DisplayName("a skill hint that names no real skill is dropped")
     void skillHintIsCheckedAgainstThePublishedCatalogue() {
         var known = Set.of("brazil-civic-data", "geo-and-weather");

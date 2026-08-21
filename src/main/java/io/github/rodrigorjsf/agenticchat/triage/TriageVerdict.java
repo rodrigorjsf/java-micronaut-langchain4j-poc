@@ -60,7 +60,9 @@ public record TriageVerdict(
         String skillHint,
 
         @JsonProperty(required = true)
-        @Description("Risk labels observed in the message: prompt_injection, pii, abuse, spam. Empty when none apply")
+        @Description("Risk labels observed in the message: prompt_injection, pii, abuse, spam, offence. "
+                + "Use offence only when the message directs swearing, insults or aggression AT this "
+                + "assistant or this service. Empty when none apply")
         List<String> riskFlags) {
 
     public enum Decision {
@@ -104,6 +106,20 @@ public record TriageVerdict(
      */
     public static final double REFUSAL_CONFIDENCE_THRESHOLD = 0.70;
 
+    /**
+     * The risk flag that means the user directed offence or aggression at the
+     * assistant or at the service.
+     *
+     * <p>A flag rather than an {@link Intent}, for two reasons. It is orthogonal to
+     * what the user wants — "seu lixo, qual o cep da paulista" is a data request and
+     * an insult, and an intent would have to drop one of them. And the intent that
+     * looks closest is the one it must never be confused with: the voice document
+     * says outright that "a message expressing frustration with an answer is not an
+     * offence", so a mandated de-escalation keyed off {@link Intent#FRUSTRATION}
+     * would answer a complaint about a wrong CEP with a script.
+     */
+    public static final String OFFENCE_FLAG = "offence";
+
     private static final Pattern LANGUAGE_TAG = Pattern.compile("[a-zA-Z]{2,3}(-[a-zA-Z]{2,8}){0,2}");
     private static final Pattern RISK_FLAG = Pattern.compile("[a-z][a-z0-9_]{0,39}");
     private static final String DEFAULT_LANGUAGE = "pt-BR";
@@ -134,6 +150,17 @@ public record TriageVerdict(
      */
     public boolean inScope() {
         return decision == Decision.IN_SCOPE || confidence < REFUSAL_CONFIDENCE_THRESHOLD;
+    }
+
+    /**
+     * Whether the voice document's rule for an offensive message applies to this turn.
+     *
+     * <p>Read by {@code ChatTurnService} and carried into the invocation, because the
+     * output guardrail enforces a sentence the document mandates for exactly this case
+     * and cannot decide from the answer's text whether the <em>user</em> was abusive.
+     */
+    public boolean carriesOffence() {
+        return riskFlags.contains(OFFENCE_FLAG);
     }
 
     /**

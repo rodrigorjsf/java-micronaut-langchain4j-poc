@@ -1,11 +1,14 @@
 package io.github.rodrigorjsf.agenticchat.guardrail.output;
 
 import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.guardrail.OutputGuardrail;
 import dev.langchain4j.guardrail.OutputGuardrailRequest;
 import dev.langchain4j.guardrail.OutputGuardrailResult;
 import dev.langchain4j.guardrail.config.OutputGuardrailsConfig;
 import dev.langchain4j.invocation.InvocationParameters;
+import dev.langchain4j.memory.ChatMemory;
 import io.github.rodrigorjsf.agenticchat.voice.VoiceProperties;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.inject.Singleton;
@@ -86,18 +89,65 @@ import java.util.regex.Pattern;
  *       the sixth item of the list above it, is damage either way.</li>
  * </ul>
  *
+ * <h2>One rule here is not decided from the text</h2>
+ * <p>
+ * {@link #DE_ESCALATION} is the sentence the document mandates word for word for a
+ * reply to an offensive message, and whether the <em>user</em> was offensive is not
+ * something the answer's text can say. The triage layer reports it as a risk flag and
+ * it arrives in {@link InvocationParameters}; everything else here stays decidable
+ * from the answer alone. Three decisions inside that rule are worth stating:
+ *
+ * <ul>
+ *   <li><b>Containment, and the clause asks for more than that.</b> The document
+ *       says "reply exactly": its promise is that the reply <em>is</em> that sentence
+ *       and nothing else. This check only verifies the sentence is <em>present</em>,
+ *       because equality can be enforced only by replacing the answer — and a
+ *       replacement on a classifier's false positive deletes a correct answer to a
+ *       legitimate question, which is the failure this class exists to avoid. So the
+ *       gap, stated rather than called "weaker": <b>a legitimate question asked
+ *       alongside the abuse can survive in the first reply, which the document does
+ *       not authorise and nothing here detects.</b> The document reserves answering
+ *       the factual part for after two replies — see {@link #MAX_DE_ESCALATIONS} —
+ *       and this check cannot tell a first reply that also answered the question from
+ *       one that did not. Closing the gap means either enforcing equality, with the
+ *       false-positive cost above, or a signal the answer's own text does not carry.
+ *       The wording of the clause is the voice document owner's to change, not this
+ *       class's: it is inherited verbatim from the brand contract transcribed in
+ *       {@code voice/VOICE_EXAMPLE.md}. The <em>reprompt</em>, however, is worded as
+ *       the clause rather than as the check — it asks for the sentence and nothing
+ *       else — because it is model-facing text and a retry instruction weaker than
+ *       the system prompt would teach the model the wrong rule.</li>
+ *   <li><b>Reprompted, never repaired.</b> Pasting the sentence onto an answer would
+ *       make {@code repair} add text rather than correct it, and would break the
+ *       {@code repair(repair(x)) == repair(x)} identity the reprompt budget depends
+ *       on. It joins the ordinary violation list and rides the same budget: one
+ *       reprompt naming the exact words, then delivered and counted.</li>
+ *   <li><b>{@code FRUSTRATION} is not offence.</b> The document is explicit —
+ *       "a message expressing frustration with an answer is not an offence" — so the
+ *       trigger is a separate {@code offence} risk flag, not an intent. Keying it off
+ *       {@code FRUSTRATION} would answer a complaint about a wrong CEP with a
+ *       de-escalation script.</li>
+ * </ul>
+ *
  * <h2>What this class does not check, and nothing else does either</h2>
  * <p>
  * Written down because the alternative is a reader assuming the document is enforced
  * end to end. These clauses are defaults in the prompt and nothing holds them:
  *
  * <ul>
- *   <li><b>The mandated reply to an offensive message.</b> The document says "reply
- *       exactly", and there is no mandated-phrase check here. The trigger is not
- *       available either: the triage layer classifies {@code FRUSTRATION}, which the
- *       document explicitly says is NOT an offence, and nothing classifies offence.</li>
- *   <li><b>The two-reply escalation.</b> The model reads it off its own memory window;
- *       no counter exists, and there is deliberately no handoff channel to check.</li>
+ *   <li><b>The two-reply escalation, exactly.</b> {@link #deEscalationsAlreadySent}
+ *       counts the replies in the memory window that carry the sentence, which is the
+ *       record the document itself points the model at and the same one it warns "does
+ *       not reach back forever". A compaction that drops those replies restarts the
+ *       count, and a model that resists past the reprompt budget delivers a paraphrase
+ *       the counter never sees — so the boundary is approximate on exactly the
+ *       conversations where it matters most. There is deliberately no handoff channel:
+ *       the document says so, and nothing here checks for one.</li>
+ *   <li><b>"Reply exactly" as an equality.</b> The de-escalation rule asks whether
+ *       the sentence is there, never whether it is the whole reply, so a first reply
+ *       that also delivers the CEP the user asked for alongside the abuse passes. See
+ *       the containment bullet above for why equality is not enforced and what it
+ *       would cost.</li>
  *   <li><b>"Respecting their contexts" for emoji</b>, and the ban on any emoji at all
  *       in an answer about an earthquake, a health topic or a person. Membership of
  *       the allow-list is checkable; the topic of the answer is not, and this class is
@@ -159,6 +209,43 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
             Map.entry("recomendo", "recommendation: never use this term"),
             Map.entry("seria melhor investir", "investment recommendation: never use this term"),
             Map.entry("oriento o investimento", "investment recommendation: never use this term")));
+
+    /**
+     * The sentence the voice document mandates word for word for a reply to an
+     * offensive or aggressive message, in Portuguese because the document says its
+     * quoted strings are reproduced and never translated.
+     *
+     * <p>Portuguese even for an English turn, and that is a deliberate cost rather
+     * than an oversight: the document owns this string, and a translated
+     * de-escalation is a different sentence with different legal weight. Everything
+     * else the assistant says still follows the turn's language.
+     */
+    static final String DE_ESCALATION =
+            "Respeito o que você sentiu, mas prefiro manter o foco no que posso consultar "
+                    + "para você. O que você precisa saber?";
+
+    /**
+     * How many replies carrying {@link #DE_ESCALATION} the current memory window may
+     * already hold before the rule stops asking for it.
+     *
+     * <p>The document's own escalation clause: "where you can see that the tone has
+     * not improved after two of your replies, stop answering the tone". Past that it
+     * tells the assistant to answer the factual part instead, so a rule that kept
+     * demanding the sentence would enforce one clause by breaking the next one.
+     */
+    private static final int MAX_DE_ESCALATIONS = 2;
+
+    /**
+     * Key under which the triage layer reports that this turn carried offence or
+     * aggression directed at the assistant or the service.
+     *
+     * <p>It is a signal from the classifier, not something this class can decide: the
+     * rules here are the ones decidable from the answer's own text, and whether the
+     * <em>user</em> was abusive is not one of them. It travels in
+     * {@link InvocationParameters} for the same reason the skill hint does — a value
+     * a component inside the invocation needs, with no business being in the prompt.
+     */
+    public static final String OFFENCE_KEY = "triage.offence";
 
     /**
      * The glyph the document mandates for a bullet.
@@ -285,12 +372,16 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
             return success();
         }
         String original = message.text();
-        if (violations(original).isEmpty()) {
+        // The one rule here that is not decidable from the answer's own text: whether
+        // the USER was offensive. It arrives from the triage layer, and the memory
+        // window says whether the document still wants the sentence at all.
+        boolean deEscalationRequired = deEscalationRequired(request);
+        if (violations(original, deEscalationRequired).isEmpty()) {
             return success();
         }
 
         String repaired = repair(original);
-        List<String> remaining = violations(repaired);
+        List<String> remaining = violations(repaired, deEscalationRequired);
         boolean rewritten = !repaired.equals(original);
         if (rewritten) {
             count("repaired");
@@ -318,9 +409,18 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
     // ------------------------------------------------------------------ detection
 
     /**
-     * Every violation the text carries, each phrased as the clause it broke.
+     * Every violation the text carries that can be decided from the text alone.
      */
     List<String> violations(String text) {
+        return violations(text, false);
+    }
+
+    /**
+     * @param deEscalationRequired whether this turn must carry {@link #DE_ESCALATION},
+     *                             which only the triage verdict and the memory window
+     *                             can say — see {@link #deEscalationRequired}
+     */
+    List<String> violations(String text, boolean deEscalationRequired) {
         var found = new ArrayList<String>();
 
         // Prose only. An emoji or a dash inside a fenced code block is part of the
@@ -370,7 +470,86 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
             // in the same pass that measured the right count.
             found.add("lists: bullets are written \"" + BULLET + "\", not \"-\", \"*\" or \"+\"");
         }
+        if (deEscalationRequired && !prose.contains(DE_ESCALATION)) {
+            // Read against the prose for the same reason every other rule is: a
+            // sentence inside a fenced code block is a sample, not a reply. The
+            // violation carries the sentence itself, because the reprompt is built
+            // from these strings and the model has to be told the exact words back.
+            //
+            // Worded as the DOCUMENT's clause ("reply exactly"), not as this check's
+            // containment. The two differ, and this string is the only one of the two
+            // the model reads on a retry: a reprompt saying "carry this sentence"
+            // would teach it the weaker rule and invite the very answer the clause
+            // forbids — the sentence with the CEP delivered alongside it. The check
+            // stays containment for the reason in this class's Javadoc; the
+            // instruction does not have to be softened just because the check is.
+            found.add("offence: the reply to an offensive message is exactly this sentence and "
+                    + "nothing else: \"" + DE_ESCALATION + "\"");
+        }
         return found;
+    }
+
+    /**
+     * Whether this turn must carry the mandated de-escalation sentence.
+     *
+     * <p>Two conditions, and the second one is the document's own. The triage layer
+     * has to have seen offence — {@code FRUSTRATION} is explicitly not offence, and a
+     * rule keyed off it would answer a complaint about a wrong CEP with a
+     * de-escalation script. And the conversation must not already hold two replies
+     * carrying the sentence, because at that point the document says to stop
+     * answering the tone and answer the factual part instead.
+     */
+    private boolean deEscalationRequired(OutputGuardrailRequest request) {
+        var params = request.requestParams();
+        var context = params == null ? null : params.invocationContext();
+        InvocationParameters parameters = context == null ? null : context.invocationParameters();
+        if (parameters == null || !Boolean.TRUE.equals(parameters.get(OFFENCE_KEY))) {
+            return false;
+        }
+        return deEscalationsAlreadySent(params.chatMemory()) < MAX_DE_ESCALATIONS;
+    }
+
+    /**
+     * How many replies in the window already carry the sentence.
+     *
+     * <p>The count stops at the last user message, and that is not a detail:
+     * everything after it belongs to the current turn, so counting to the end of the
+     * list could include the very text being validated and retire the rule one reply
+     * early. Stopping there also makes the method correct either way — whether
+     * LangChain4j has already written this turn's {@code AiMessage} into memory by the
+     * time the output guardrails run or writes it afterwards, the number is the same,
+     * so nothing here depends on an ordering a later version could change.
+     *
+     * <p>No new state was added for this. The window is the record the document
+     * itself names — "the conversation in front of you is your only record of this,
+     * and it does not reach back forever" — so a compaction that drops those replies
+     * restarts the count, which is the behaviour the document describes rather than a
+     * defect in this method.
+     */
+    private static int deEscalationsAlreadySent(ChatMemory memory) {
+        if (memory == null) {
+            return 0;
+        }
+        List<ChatMessage> messages = memory.messages();
+        // Zero, not messages.size(): with no user message in the window nothing is
+        // attributable to an earlier turn, so the conservative answer is "none sent"
+        // and the rule stays required. The reachable path always overwrites this.
+        int currentTurnFrom = 0;
+        for (int i = messages.size() - 1; i >= 0; i--) {
+            if (messages.get(i) instanceof UserMessage) {
+                currentTurnFrom = i;
+                break;
+            }
+        }
+        int sent = 0;
+        for (int i = 0; i < currentTurnFrom; i++) {
+            if (messages.get(i) instanceof AiMessage reply
+                    && reply.text() != null
+                    && reply.text().contains(DE_ESCALATION)) {
+                sent++;
+            }
+        }
+        return sent;
     }
 
     // ---------------------------------------------------------------------- repair
@@ -797,6 +976,17 @@ public class VoiceComplianceGuardrail implements OutputGuardrail {
         terms.addAll(STATED_REPLACEMENTS.values());
         terms.addAll(FORBIDDEN_TERMS.keySet());
         return Set.copyOf(terms);
+    }
+
+    /**
+     * Every sentence this class requires an answer to carry. Exposed for the same
+     * reason {@link #enforcedTerms()} is: the catalogue has to run in both
+     * directions. A sentence demanded here and absent from the document is a rule the
+     * model was never told about; a sentence the document mandates word for word and
+     * nobody requires is issue #7 all over again.
+     */
+    static Set<String> mandatedSentences() {
+        return Set.of(DE_ESCALATION);
     }
 
     // ------------------------------------------------------------------ text utils

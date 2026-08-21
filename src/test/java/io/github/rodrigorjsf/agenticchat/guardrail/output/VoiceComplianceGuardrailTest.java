@@ -7,6 +7,8 @@ import dev.langchain4j.guardrail.GuardrailRequestParams;
 import dev.langchain4j.guardrail.OutputGuardrailRequest;
 import dev.langchain4j.invocation.InvocationContext;
 import dev.langchain4j.invocation.InvocationParameters;
+import dev.langchain4j.memory.ChatMemory;
+import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import io.github.rodrigorjsf.agenticchat.voice.VoiceProfile;
 import io.github.rodrigorjsf.agenticchat.voice.VoiceProperties;
@@ -32,6 +34,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * within a week, and then none of the real rules are enforced either.
  */
 class VoiceComplianceGuardrailTest {
+
+    private static final String DE_ESCALATION = VoiceComplianceGuardrail.DE_ESCALATION;
 
     private static final List<String> ALLOWED = List.of("❗", "💡", "📱", "💻", "😊", "⏰", "📅", "⚠", "💛", "🔑", "🌎");
 
@@ -626,15 +630,211 @@ class VoiceComplianceGuardrailTest {
                 .isEqualTo("O CEP é 01310-200, na Bela Vista.");
     }
 
+    // ------------------------------------ the sentence the document mandates
+
+    @Test
+    @DisplayName("an answer to an offensive turn must carry the mandated sentence")
+    void theMandatedReplyIsRequiredWhenTheTurnCarriesOffence() {
+        // The failure this rule exists for is the ordinary one: verbatim reproduction
+        // of a fixed sentence under contextual pressure. The model writes something
+        // that means the same thing and the contract is a paraphrase.
+        var result = guardrail.validate(requestFor(
+                "Entendo sua frustração, mas prefiro focar em como posso te ajudar hoje.",
+                offendedTurn()));
+
+        assertThat(result.isSuccess())
+                .as("nothing checked for a required phrase; violations() held forbidden-term "
+                        + "lists only")
+                .isFalse();
+        assertThat(result.isRetry())
+                .as("the answer is not withheld — it goes back to the model once, inside the "
+                        + "same reprompt budget every other rule here shares")
+                .isTrue();
+    }
+
+    @Test
+    @DisplayName("a model that will not say the sentence still gets its answer delivered")
+    void theMandatedReplyStopsBeingAskedForOnceTheBudgetIsSpent() {
+        // The rule this class exists to obey, applied to its own newest rule:
+        // OutputGuardrailExecutor throws the moment ITS budget runs out, so a rule that
+        // keeps failing turns a word choice into a 5xx. One InvocationParameters, reused
+        // the way the executor reuses it across the retries of one turn.
+        var parameters = offendedTurn();
+        var request = requestFor(
+                "Entendo sua frustração, mas prefiro focar em como posso te ajudar hoje.", parameters);
+
+        assertThat(guardrail.validate(request).isRetry())
+                .as("first attempt: one reprompt, naming the exact sentence")
+                .isTrue();
+        assertThat(guardrail.validate(request).isSuccess())
+                .as("budget spent: the answer is delivered and the residue counted, never withheld")
+                .isTrue();
+    }
+
+    @Test
+    @DisplayName("the mandated sentence, present word for word, passes untouched")
+    void theMandatedReplyIsAcceptedVerbatim() {
+        var result = guardrail.validate(requestFor(DE_ESCALATION, offendedTurn()));
+
+        assertThat(result.isSuccess()).isTrue();
+    }
+
+    @Test
+    @DisplayName("frustration is not offence, and never asks for the de-escalation")
+    void frustrationAloneNeverAsksForTheDeEscalation() {
+        // VOICE.md, in the same section that mandates the sentence: "A message
+        // expressing frustration with an answer is not an offence. Take it as a signal
+        // that the answer missed, and ask what was wrong with it." A FRUSTRATION
+        // verdict raises no offence flag, so this answer must pass. Keying the rule off
+        // FRUSTRATION instead would answer a complaint about a wrong CEP with a
+        // de-escalation script, which is a worse bug than the one being fixed.
+        var result = guardrail.validate(requestFor(
+                "O CEP que passei não bateu com o endereço. O que exatamente estava errado nele?",
+                new InvocationParameters()));
+
+        assertThat(result.isSuccess()).isTrue();
+    }
+
+    @Test
+    @DisplayName("an ordinary turn is never asked for it either")
+    void theMandatedReplyIsNotRequiredOfAnOrdinaryTurn() {
+        assertThat(guardrail.validate(requestFor(
+                "O CEP da Avenida Paulista 1578 é 01310-200.", new InvocationParameters()))
+                .isSuccess()).isTrue();
+    }
+
+    @Test
+    @DisplayName("one earlier de-escalation in the window is not two")
+    void theDeEscalationIsStillRequiredAfterASingleReply() {
+        var memory = MessageWindowChatMemory.withMaxMessages(20);
+        memory.add(dev.langchain4j.data.message.UserMessage.from("seu lixo"));
+        memory.add(AiMessage.from(DE_ESCALATION));
+        memory.add(dev.langchain4j.data.message.UserMessage.from("seu lixo de novo"));
+
+        var result = guardrail.validate(requestFor(
+                "Vamos tentar de novo: o que você precisa consultar?", offendedTurn(), memory));
+
+        assertThat(result.isRetry()).isTrue();
+    }
+
+    @Test
+    @DisplayName("after two replies carrying it, the document says stop answering the tone")
+    void theDeEscalationStopsBeingRequiredAfterTwoReplies() {
+        // "Where you can see that the tone has not improved after two of your replies,
+        // stop answering the tone: answer the factual part of the message if there is
+        // one." A rule that kept demanding the sentence would enforce one clause of
+        // this section by breaking the next one. The count comes from the memory
+        // window — the same record the document tells the model to read, and the same
+        // one it warns "does not reach back forever".
+        var memory = MessageWindowChatMemory.withMaxMessages(20);
+        memory.add(dev.langchain4j.data.message.UserMessage.from("seu lixo"));
+        memory.add(AiMessage.from(DE_ESCALATION));
+        memory.add(dev.langchain4j.data.message.UserMessage.from("seu lixo de novo"));
+        memory.add(AiMessage.from(DE_ESCALATION));
+        memory.add(dev.langchain4j.data.message.UserMessage.from("seu lixo, e qual o cep da paulista"));
+
+        var result = guardrail.validate(requestFor(
+                "O CEP da Avenida Paulista 1578 é 01310-200.", offendedTurn(), memory));
+
+        assertThat(result.isSuccess()).isTrue();
+    }
+
+    @Test
+    @DisplayName("the mandated-sentence catalogue runs in both directions")
+    void theMandatedSentenceCatalogueRunsInBothDirections() {
+        // Negative control first, on the parser itself. Direction two below reads the
+        // document through sentencesMandatedBy, so a marker list that quietly fails to
+        // fire makes the whole check a rubber stamp that still reports green. BOTH
+        // markers are asserted, because only one of them is live at a time: the shipped
+        // VOICE.md:140 says "reply exactly:", inherited from the brand contract at
+        // voice/VOICE_EXAMPLE.md, and a parser that reads only the live wording cannot
+        // see a future clause phrased the other way — which is issue #7 again. Each
+        // sample is in the markdown shape VOICE.md:140-141 uses: marker line, then an
+        // indented sub-bullet carrying the sentence.
+        assertThat(sentencesMandatedBy("- reply exactly:\n  - Uma frase qualquer."))
+                .as("the phrasing live in the shipped document must not evade the parser")
+                .containsExactly("Uma frase qualquer.");
+        assertThat(sentencesMandatedBy("- carry this sentence, word for word:\n  - Outra frase."))
+                .as("a clause phrased \"word for word:\" must not evade the parser either")
+                .containsExactly("Outra frase.");
+
+        String document = new VoiceProfile(properties(1)).document();
+
+        // Direction one, the same rule as theTermCatalogueRunsInBothDirections: a
+        // sentence this class demands must be a sentence the model was given.
+        assertThat(VoiceComplianceGuardrail.mandatedSentences())
+                .allSatisfy(sentence -> assertThat(document)
+                        .as("\"%s\" is required of the answer, so the document must state it", sentence)
+                        .contains(sentence));
+
+        // Direction two, and it is the whole of issue #7: a sentence the document
+        // mandates word for word and nothing requires is a contract clause no path
+        // emits. One-directional, this check would pass forever while the two halves
+        // drifted apart.
+        assertThat(sentencesMandatedBy(document))
+                .as("every sentence VOICE.md mandates word for word is required by this class")
+                .isEqualTo(VoiceComplianceGuardrail.mandatedSentences());
+    }
+
+    /**
+     * Every sentence the document mandates verbatim, read out of the document itself:
+     * the line after each one ending in one of the {@link #VERBATIM_MARKERS}.
+     *
+     * <p>Two markers for one document, and that is the point of the list. Only one is
+     * live at a time — the shipped {@code VOICE.md:140} says "reply exactly:" — so
+     * keying on that phrase alone would still catch a rewording of that line, because
+     * direction two goes empty, but would let a NEW clause phrased "word for word:"
+     * pass unseen. A parser that reads only the wording already enforced cannot detect
+     * the clause nobody enforced yet, which is issue #7 again.
+     */
+    private static java.util.Set<String> sentencesMandatedBy(String document) {
+        var mandated = new java.util.LinkedHashSet<String>();
+        String[] lines = document.split("\\R");
+        for (int i = 0; i < lines.length - 1; i++) {
+            String line = lines[i].stripTrailing();
+            if (VERBATIM_MARKERS.stream().anyMatch(line::endsWith)) {
+                mandated.add(lines[i + 1].strip().replaceFirst("^[-*•]\\s*", ""));
+            }
+        }
+        return mandated;
+    }
+
+    /**
+     * The ways this document introduces a sentence it wants reproduced word for word.
+     */
+    private static final java.util.List<String> VERBATIM_MARKERS =
+            java.util.List.of("word for word:", "reply exactly:");
+
+    /**
+     * What ChatTurnService puts in the invocation parameters when the triage verdict
+     * carries the offence risk flag.
+     */
+    private static InvocationParameters offendedTurn() {
+        var parameters = new InvocationParameters();
+        parameters.put(VoiceComplianceGuardrail.OFFENCE_KEY, true);
+        return parameters;
+    }
+
     // ------------------------------------------------------------------ fixtures
 
     private OutputGuardrailRequest requestFor(String answer, InvocationParameters parameters) {
+        return requestFor(answer, parameters, null);
+    }
+
+    /**
+     * The memory is null on most of these, and deliberately: LangChain4j builds the
+     * guardrail params with whatever memory the service has, and a guardrail that
+     * needs one to decide would fail closed on a memory-less AI service.
+     */
+    private OutputGuardrailRequest requestFor(String answer, InvocationParameters parameters,
+                                              ChatMemory memory) {
         return OutputGuardrailRequest.builder()
                 .responseFromLLM(ChatResponse.builder().aiMessage(AiMessage.from(answer)).build())
                 .chatExecutor(noExecutor())
                 .requestParams(GuardrailRequestParams.builder()
                         .userMessageTemplate("")
                         .variables(Map.of())
+                        .chatMemory(memory)
                         .invocationContext(InvocationContext.builder()
                                 .invocationId(UUID.randomUUID())
                                 .interfaceName("ChatAssistant")
