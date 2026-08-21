@@ -113,7 +113,7 @@ import java.util.regex.Pattern;
  *       false-positive cost above, or a signal the answer's own text does not carry.
  *       The wording of the clause is the voice document owner's to change, not this
  *       class's: it is inherited verbatim from the brand contract transcribed in
- *       {@code voice/VOICE_EXAMPLE.md}. The <em>reprompt</em>, however, is worded as
+ *       {@code voice/VOICE.md}. The <em>reprompt</em>, however, is worded as
  *       the clause rather than as the check — it asks for the sentence and nothing
  *       else — because it is model-facing text and a retry instruction weaker than
  *       the system prompt would teach the model the wrong rule.</li>

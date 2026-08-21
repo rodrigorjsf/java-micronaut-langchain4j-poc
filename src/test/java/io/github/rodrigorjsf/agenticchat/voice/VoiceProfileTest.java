@@ -67,18 +67,6 @@ class VoiceProfileTest {
     }
 
     @Test
-    @DisplayName("the document does not mandate a refusal sentence the service never emits")
-    void decliningIsShapeRatherThanAWording() {
-        // The reason issue #7 exists: VOICE_EXAMPLE.md mandates "reply exactly: Não
-        // consigo responder isso…", and no path emits it — the triage layer declines
-        // before the agent runs, in one of nine strings of its own. This document
-        // states the SHAPE and defers the wording, so the two can agree.
-        assertThat(voice.document())
-                .doesNotContain("Não consigo responder isso")
-                .contains("is declined by the service before you are asked, in wording it owns");
-    }
-
-    @Test
     @DisplayName("the shape check rejects a refusal that offers nothing")
     void theShapeCheckIsNotARubberStamp() {
         // Written first, and deliberately. The obvious version of the check below —

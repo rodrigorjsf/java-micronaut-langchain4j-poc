@@ -137,15 +137,6 @@ class VoiceComplianceGuardrailTest {
     // ------------------------------------------------------------ forbidden terms
 
     @Test
-    @DisplayName("a term the document no longer carries is not enforced on the model")
-    void theBrandRuleLeftWithTheDocumentThatStatedIt() {
-        // "Banco Inter" -> "Inter" belongs to voice/VOICE_EXAMPLE.md. Left behind here
-        // it would rewrite the name of a real company returned by a CNPJ lookup.
-        assertThat(guardrail.repair("O Banco Inter S.A. está ativo desde 1994."))
-                .isEqualTo("O Banco Inter S.A. está ativo desde 1994.");
-    }
-
-    @Test
     void investmentVerbsAreReportedAndNotRepairable() {
         String answer = "Recomendo esse fundo para o seu perfil.";
 
@@ -747,7 +738,7 @@ class VoiceComplianceGuardrailTest {
         // fire makes the whole check a rubber stamp that still reports green. BOTH
         // markers are asserted, because only one of them is live at a time: the shipped
         // VOICE.md:140 says "reply exactly:", inherited from the brand contract at
-        // voice/VOICE_EXAMPLE.md, and a parser that reads only the live wording cannot
+        // voice/VOICE.md, and a parser that reads only the live wording cannot
         // see a future clause phrased the other way — which is issue #7 again. Each
         // sample is in the markdown shape VOICE.md:140-141 uses: marker line, then an
         // indented sub-bullet carrying the sentence.

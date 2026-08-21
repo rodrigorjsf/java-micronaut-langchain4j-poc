@@ -523,7 +523,7 @@ agentic:
     # comparing, so either spelling matches.
     #
     # Every context here is reachable by a skill this assistant actually has. That
-    # is deliberate: voice/VOICE_EXAMPLE.md, the contract this mechanism was first
+    # is deliberate: voice/VOICE.md, the contract this mechanism was first
     # built against, reserves emoji for an app, for Pix keys and for a global
     # account, none of which exist here — three of its fourteen entries can never
     # fire. See issue #8.
