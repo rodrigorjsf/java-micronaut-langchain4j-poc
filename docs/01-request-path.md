@@ -64,6 +64,21 @@ Three deterministic answers, no model:
 The greeting rule matches the **whole** message. `oi` is a greeting; `oi, qual o
 CEP da Paulista?` is a request that starts with one and goes to the judge.
 
+**Each of the three has to say what language it is answering in**, because language
+detection lives in the judge and none of them calls it. They used to say `pt-BR`
+without looking, which answered `hello` in Portuguese and declined 12 000 characters
+of English with the Portuguese template while the English one sat unreachable. The
+tag is only a hint in the prompt — the model is told the message wins where the two
+disagree — but on the refusal path it is final: `RefusalTemplates` picks by it and no
+model is in the loop to correct it.
+
+| Path | How the language is decided |
+|---|---|
+| a bare greeting | a lookup, not detection — the greeting vocabulary is closed and already partitioned by language |
+| over 12 000 characters | a stopword ratio over the head of the message, which is abundant evidence at that size |
+| blank | the documented `pt-BR` default: no text, no evidence, and this assistant's audience is Brazilian |
+| the judge failed | detected from the text the judge was about to read |
+
 ## Step 3 — the verdict cache
 
 Keyed on the normalized text, 30-minute TTL.
