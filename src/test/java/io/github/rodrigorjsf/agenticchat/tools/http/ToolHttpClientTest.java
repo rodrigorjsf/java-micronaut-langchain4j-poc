@@ -146,6 +146,43 @@ class ToolHttpClientTest {
     }
 
     @Test
+    @DisplayName("a transport ceiling below the body destroys the answer the model could act on")
+    void aTransportCeilingBelowTheBodyIsNotABudget() {
+        // PINNED, not red: this asserts a property of the HTTP client, not of a change
+        // in this repository, so nothing here can be mutated to make it fail. It is
+        // here because it is the measurement that decided a number in application.yml,
+        // and a number decided by an argument nobody can re-run is a number the next
+        // person raises.
+        //
+        // Issue #1 recommended setting micronaut.http.client.max-content-length to
+        // "the largest catalogue ceiling (1 MB, from pokeapi)". That conflates two
+        // different numbers. truncate() cannot cut a body it never received, so the
+        // transport floor is the largest RAW body any endpoint can return, not the
+        // largest max-response-bytes: themealdb's ceiling is 262 144 and its
+        // one-letter search measured 2.3 MB. Below the body, this is what happens.
+        var tight = new HashMap<String, Object>(Map.of(
+                "agentic.tools.apis.stub.base-url", "http://localhost:" + server.getPort() + "/stub",
+                "agentic.tools.apis.stub.timeout", "PT2S",
+                "agentic.tools.apis.stub.max-retries", 0,
+                "agentic.tools.apis.stub.max-response-bytes", 1024,
+                "micronaut.http.client.max-content-length", 2048));
+        try (var starved = ApplicationContext.run(tight)) {
+            var response = starved.getBean(ToolHttpClient.class).get("stub", "/big", Map.of("size", "5000"));
+
+            assertThat(response.outcome())
+                    .as("the endpoint budget is 1024 and the body is ~5000, so the shipped "
+                            + "configuration answers this with a truncated body and an explicit "
+                            + "\"narrow your query\". Put the transport ceiling under the body and "
+                            + "the client refuses the response instead, and the model is told the "
+                            + "request did not complete — the same request, a worse answer, and on "
+                            + "an endpoint with retries it is retried for nothing.")
+                    .isEqualTo(ToolResponse.Outcome.UPSTREAM_ERROR);
+            assertThat(response.truncated()).isFalse();
+            assertThat(response.toModelText()).doesNotContain("truncated");
+        }
+    }
+
+    @Test
     void truncatesToTheEndpointBudgetAndSaysSo() {
         var response = tools.get("stub", "/big", Map.of("size", "5000"));
 

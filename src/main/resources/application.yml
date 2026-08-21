@@ -1,6 +1,27 @@
 micronaut:
   application:
     name: agenticchat
+
+  http:
+    client:
+      # The transport ceiling, and a number this project picked rather than inherited.
+      # Micronaut's default is DEFAULT_MAX_CONTENT_LENGTH = 10485760 (10 MB, read with
+      # javap from micronaut-http-client-core), and ToolHttpClient holds at most
+      # IN_FLIGHT_LIMIT = 12 bodies at once, so the default exposure is 120 MB of heap
+      # behind a path where nothing else says stop.
+      #
+      # 3 MB, NOT the largest max-response-bytes. Those are different numbers and
+      # confusing them breaks a path this codebase engineered on purpose: truncate()
+      # cannot cut a body it never received, so the floor is the largest RAW body any
+      # endpoint returns — themealdb's one-letter search measured 2.3 MB against a
+      # 262 144 ceiling. Set this under that and the client refuses the response, the
+      # retry loop retries a deterministic failure, and an actionable "narrow your
+      # query" becomes "the request did not complete".
+      # ToolHttpClientTest#aTransportCeilingBelowTheBodyIsNotABudget pins that mechanism.
+      #
+      # Per-endpoint transport limits are the version that would make this derived
+      # rather than chosen; see docs/03-security.md.
+      max-content-length: 3145728
   server:
     port: 8080
 
