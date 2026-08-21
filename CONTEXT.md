@@ -76,10 +76,12 @@ answers and never acts. Distinct from the **injection classifier**, which is als
 a small model but answers a different question ("is this an attack" rather than
 "is this in scope").
 
-**Verdict** (`TriageVerdict`) — the judge's structured output. Every field has
-exactly one consumer, named in its javadoc. It is *model output* and therefore
-untrusted: `language` and `skillHint` are interpolated into the agent's prompt, so
-both are constrained before they get there.
+**Verdict** (`TriageVerdict`) — the judge's structured output, six fields, each
+read by something named in its javadoc. Five have exactly one consumer; `riskFlags`
+has two, because its `offence` entry gates the mandated de-escalation sentence as
+well as feeding a counter. It is *model output* and therefore untrusted: `language`
+and `skillHint` are interpolated into the agent's prompt, so both are constrained
+before they get there.
 
 **In scope** — conversational input of any kind, any question about the assistant
 itself, and anything a skill could serve even partly. **Out of scope** — anything

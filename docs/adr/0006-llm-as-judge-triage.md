@@ -111,14 +111,28 @@ neither depends on this class. Failing closed would convert a rate limit into a
 total outage while protecting nothing — the escalated turn still passes every
 guardrail.
 
-### Every field in the verdict has one consumer
+### Every field in the verdict is read, and one of them is read twice
 
 `decision` routes. `confidence` lets a low-confidence refusal escalate instead of
-turning away a real user. `intent` is the metric dimension and the eval label.
-`language` parameterises the agent's reply language. `skillHint` lets the agent
-activate the right skill on the first round trip. `riskFlags` feed the audit
-trail. `outOfScopeReply` is returned verbatim, which is what makes a refusal one
-model call rather than two.
+turning away a real user. `intent` is the metric dimension and the eval label, and
+it selects the refusal template. `language` selects the refusal template's
+language and parameterises the agent's reply language. `skillHint` lets the agent
+activate the right skill on the first round trip.
+
+`riskFlags` is the exception, and it stopped being audit-only. Besides the metrics
+counter it now carries `offence`, which gates the de-escalation sentence the voice
+document mandates word for word — a behaviour control, decided here and enforced in
+an output guardrail. It is a flag rather than an `Intent` because the two are
+orthogonal: *"seu lixo, qual o cep da paulista"* is a data request **and** an
+insult, and an intent would have to drop one of them. It is not `FRUSTRATION`
+because the voice document says outright that frustration is not offence, so keying
+it there would answer a complaint about a wrong CEP with a script.
+
+That qualifies the framing above. **The judge is still not a security control** —
+injection defence and tool access do not depend on it, and it still fails open. But
+one flag now steers what the assistant says, so a wrong `offence` is a visible
+defect rather than a wrong number on a dashboard, and it has no labelled eval yet
+(issue #12).
 
 A field nothing reads is tokens paid on every request, so there are none.
 

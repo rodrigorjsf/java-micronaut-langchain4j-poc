@@ -111,10 +111,11 @@ this workload, and the newer generation renamed the thinking parameter such that
 the old name is silently ignored — see
 [ADR 0006](adr/0006-llm-as-judge-triage.md).
 
-Its verdict carries seven fields, each with exactly one consumer. Two of them —
-`language` and `skillHint` — reach the agent's prompt, so both are constrained
-before they get there: the guardrail chain inspected the user's *message*, not
-this object.
+Its verdict carries six fields. Five have exactly one consumer; `riskFlags` has
+two — the metrics counter, and the `offence` flag that gates the voice document's
+mandated de-escalation sentence. Two fields — `language` and `skillHint` — reach
+the agent's prompt, so both are constrained before they get there: the guardrail
+chain inspected the user's *message*, not this object.
 
 **A refusal ends here.** The judge writes the out-of-scope reply itself, so
 declining a request costs one small-model call rather than two.
