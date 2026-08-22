@@ -15,6 +15,9 @@ import io.github.rodrigorjsf.agenticchat.guardrail.output.VoiceComplianceGuardra
 import io.github.rodrigorjsf.agenticchat.guardrail.tool.ToolGuardProvider;
 import io.github.rodrigorjsf.agenticchat.llm.ChatModelRegistry;
 import io.github.rodrigorjsf.agenticchat.memory.SummarizerPrompt;
+import io.github.rodrigorjsf.agenticchat.observability.trace.LangfuseAiServiceListener;
+import io.github.rodrigorjsf.agenticchat.observability.trace.LangfuseGuardrailListener;
+import io.github.rodrigorjsf.agenticchat.observability.trace.LangfuseToolListener;
 import io.github.rodrigorjsf.agenticchat.skills.SkillCatalog;
 import io.github.rodrigorjsf.agenticchat.triage.FailoverTriageJudge;
 import io.github.rodrigorjsf.agenticchat.triage.TriageJudge;
@@ -43,9 +46,12 @@ public class AiServiceFactory {
      * guardrail would call this same class and recurse.
      */
     @Singleton
-    TriageJudge triageJudge(ChatModelRegistry models, MeterRegistry meters) {
+    TriageJudge triageJudge(ChatModelRegistry models,
+                            MeterRegistry meters,
+                            LangfuseAiServiceListener observability) {
         var primary = AiServices.builder(TriageJudge.class)
                 .chatModel(models.forRole("judge"))
+                .registerListeners(observability.listeners())
                 .build();
 
         // Google's free tier returns RESOURCE_EXHAUSTED at roughly 10-20 requests per
@@ -57,6 +63,7 @@ public class AiServiceFactory {
         if (models.roles().contains("judge-fallback")) {
             fallback = AiServices.builder(TriageJudge.class)
                     .chatModel(models.forRole("judge-fallback"))
+                    .registerListeners(observability.listeners())
                     .build();
             LOG.info("Triage judge has a fallback provider configured");
         } else {
@@ -71,9 +78,10 @@ public class AiServiceFactory {
      * against 5.93 s on this machine.
      */
     @Singleton
-    SummarizerPrompt summarizerPrompt(ChatModelRegistry models) {
+    SummarizerPrompt summarizerPrompt(ChatModelRegistry models, LangfuseAiServiceListener observability) {
         return AiServices.builder(SummarizerPrompt.class)
                 .chatModel(models.forRole("judge"))
+                .registerListeners(observability.listeners())
                 .build();
     }
 
@@ -90,6 +98,9 @@ public class AiServiceFactory {
                                 VoiceComplianceGuardrail voice,
                                 InjectionHeuristics heuristics,
                                 MeterRegistry meters,
+                                LangfuseAiServiceListener aiServiceObservability,
+                                LangfuseToolListener toolObservability,
+                                LangfuseGuardrailListener guardrailObservability,
                                 @Value("${agentic.agent.memory-window-messages:20}") int memoryWindow,
                                 @Value("${agentic.agent.max-tool-round-trips:6}") int maxRoundTrips) {
 
@@ -98,6 +109,15 @@ public class AiServiceFactory {
 
         return AiServices.builder(ChatAssistant.class)
                 .chatModel(models.forRole("agent"))
+
+                // The observability seams. Nothing below this line knows it is being
+                // observed, and no span is started anywhere in the pipeline it describes:
+                // LangChain4j fires these on the calling thread, so each observation nests
+                // under the turn by virtue of the OpenTelemetry context alone.
+                // See docs/adr/0011.
+                .registerListeners(aiServiceObservability.listeners())
+                .registerListener(toolObservability)
+                .registerListeners(guardrailObservability.listeners())
 
                 // A message window rather than a token window: the cost of a slightly
                 // larger prompt is predictable, whereas a token window silently drops a

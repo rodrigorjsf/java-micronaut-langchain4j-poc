@@ -11,6 +11,9 @@ import io.github.rodrigorjsf.agenticchat.llm.config.ModelRoleValidator;
 import io.github.rodrigorjsf.agenticchat.llm.config.ProviderCredentials;
 import io.github.rodrigorjsf.agenticchat.observability.CostCalculator;
 import io.github.rodrigorjsf.agenticchat.observability.TokenCostListener;
+import io.github.rodrigorjsf.agenticchat.observability.trace.AgentTracer;
+import io.github.rodrigorjsf.agenticchat.observability.trace.LangfuseChatModelListener;
+import io.github.rodrigorjsf.agenticchat.observability.trace.ObservationContentPolicy;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.core.annotation.Nullable;
 import jakarta.inject.Inject;
@@ -48,7 +51,7 @@ public class ChatModelRegistry {
     public ChatModelRegistry(List<ModelRoleProperties> roles,
                              ProviderCredentials credentials,
                              List<ChatModelListener> listeners) {
-        this(roles, credentials, listeners, null, null);
+        this(roles, credentials, listeners, null, null, null, null);
     }
 
     /**
@@ -62,7 +65,9 @@ public class ChatModelRegistry {
                              ProviderCredentials credentials,
                              List<ChatModelListener> listeners,
                              @Nullable MeterRegistry meters,
-                             @Nullable CostCalculator costs) {
+                             @Nullable CostCalculator costs,
+                             @Nullable AgentTracer tracer,
+                             @Nullable ObservationContentPolicy content) {
         this.configByRole = roles.stream()
                 .collect(Collectors.toUnmodifiableMap(ModelRoleProperties::name, Function.identity()));
 
@@ -72,6 +77,12 @@ public class ChatModelRegistry {
             var perRole = new ArrayList<>(listeners);
             if (meters != null && costs != null) {
                 perRole.add(new TokenCostListener(role.name(), meters, costs));
+            }
+            // Per role for the same reason the cost listener is: the observation is named
+            // for the role, so the judge's generations and the agent's are separable in a
+            // trace without anyone having to recognise a model id.
+            if (tracer != null && costs != null && content != null) {
+                perRole.add(new LangfuseChatModelListener(role.name(), tracer, costs, content));
             }
             models.put(role.name(), build(role, credentials, perRole));
         }
