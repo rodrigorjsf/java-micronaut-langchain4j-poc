@@ -83,7 +83,14 @@ public class OtelAgentTracer implements AgentTracer {
             if (value == null) {
                 return this;
             }
-            String text = value instanceof String string ? string : json.write(value);
+            // A string and an enum are written bare; anything else is JSON. Metadata is
+            // what Langfuse filters on, and a filter for outcome=ANSWERED must not have to
+            // be spelled with the quotes a JSON encoder would add around the name.
+            String text = switch (value) {
+                case String string -> string;
+                case Enum<?> constant -> constant.name();
+                default -> json.write(value);
+            };
             return write(LangfuseAttributes.observationMetadata(key).getKey(), text);
         }
 

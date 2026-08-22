@@ -6,6 +6,12 @@ import io.github.rodrigorjsf.agenticchat.agent.ChatAssistant;
 import io.github.rodrigorjsf.agenticchat.guardrail.output.VoiceComplianceGuardrail;
 import io.github.rodrigorjsf.agenticchat.memory.ConversationCompactor;
 import io.github.rodrigorjsf.agenticchat.memory.ConversationId;
+import io.github.rodrigorjsf.agenticchat.observability.trace.AgentTracer;
+import io.github.rodrigorjsf.agenticchat.observability.trace.Observation;
+import io.github.rodrigorjsf.agenticchat.observability.trace.ObservationContentPolicy;
+import io.github.rodrigorjsf.agenticchat.observability.trace.ObservationType;
+import io.github.rodrigorjsf.agenticchat.observability.trace.TurnAttributes;
+import io.github.rodrigorjsf.agenticchat.observability.trace.TurnContext;
 import io.github.rodrigorjsf.agenticchat.rag.SkillAwareQueryRouter;
 import io.github.rodrigorjsf.agenticchat.skills.SkillCatalog;
 import io.github.rodrigorjsf.agenticchat.triage.RefusalTemplates;
@@ -28,11 +34,25 @@ import org.slf4j.LoggerFactory;
  * model — often zero, when a pre-filter or the cache answers — instead of a full
  * agent turn with the system prompt, the skills index, the tool schemas and the
  * conversation history. That gap is the entire economic argument for having a judge.
+ *
+ * <p>This is also the only place in the application that opens an observation by hand.
+ * Everything below it is covered by a listener or by {@code @Observed}, but the ROOT has
+ * to be opened somewhere, and Langfuse v4 wants the overall request and response on it:
+ * a trace there is a group of observations correlated by trace id, with no separate
+ * trace entity to hang them on. The HTTP server span is excluded for this route
+ * ({@code otel.exclusions}) so that this is the root rather than {@code POST /api/chat},
+ * which would carry neither the message nor the reply.
  */
 @Singleton
 public class ChatTurnService {
 
     private static final Logger LOG = LoggerFactory.getLogger(ChatTurnService.class);
+
+    /**
+     * The trace name in Langfuse. One name for every turn on purpose: it is what makes
+     * "the p95 of a turn" a number rather than a group-by over free text.
+     */
+    private static final String TRACE_NAME = "chat-turn";
 
     private static final String GUARDRAIL_REFUSAL =
             "Não consigo ajudar com essa mensagem. Posso te ajudar com dados públicos brasileiros, "
@@ -44,22 +64,47 @@ public class ChatTurnService {
     private final RefusalTemplates refusals;
     private final ConversationCompactor compactor;
     private final MeterRegistry meters;
+    private final AgentTracer tracer;
+    private final ObservationContentPolicy content;
 
     public ChatTurnService(TriageService triage,
                            ChatAssistant assistant,
                            SkillCatalog skills,
                            RefusalTemplates refusals,
                            ConversationCompactor compactor,
-                           MeterRegistry meters) {
+                           MeterRegistry meters,
+                           AgentTracer tracer,
+                           ObservationContentPolicy content) {
         this.triage = triage;
         this.assistant = assistant;
         this.skills = skills;
         this.refusals = refusals;
         this.compactor = compactor;
         this.meters = meters;
+        this.tracer = tracer;
+        this.content = content;
     }
 
     public ChatTurn handle(ConversationId conversationId, String message) {
+        // The conversation is the Langfuse session, which is how a multi-turn exchange
+        // reads as one thing there rather than as N unrelated traces.
+        var turnAttributes = TurnAttributes.builder()
+                .traceName(TRACE_NAME)
+                .sessionId(conversationId.value())
+                .build();
+        try (var ignored = TurnContext.open(turnAttributes);
+             var observation = tracer.start(TRACE_NAME, ObservationType.AGENT)) {
+            observation.input(content.capture(message));
+            var turn = observe(observation, conversationId, message);
+            observation.output(content.capture(turn.reply()));
+            observation.metadata("outcome", turn.outcome().name());
+            observation.metadata("intent", turn.verdict() == null ? null : turn.verdict().intent());
+            observation.metadata("tools_used", turn.toolsUsed().isEmpty() ? null : turn.toolsUsed());
+            return turn;
+        }
+    }
+
+    private ChatTurn observe(Observation observation, ConversationId conversationId, String message) {
         var sample = Timer.start(meters);
 
         // The verdict is model output. Its skill hint reaches the agent's prompt, so
@@ -96,6 +141,10 @@ public class ChatTurnService {
             // not say which rule fired, or the message becomes an oracle.
             sample.stop(meters.timer("agentic.turn.latency", "path", "blocked"));
             meters.counter("agentic.turn.guardrail_blocks").increment();
+            // WARNING rather than ERROR: a blocked turn is the defence working, and an
+            // alert that fires on it would fire on every probe an attacker sends.
+            observation.level(io.github.rodrigorjsf.agenticchat.observability.trace.ObservationLevel.WARNING,
+                    "blocked by an output guardrail");
             return ChatTurn.blocked(verdict, GUARDRAIL_REFUSAL);
         }
     }

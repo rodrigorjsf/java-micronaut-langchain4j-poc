@@ -1,6 +1,8 @@
 package io.github.rodrigorjsf.agenticchat.triage;
 
 import io.github.rodrigorjsf.agenticchat.guardrail.input.TextNormalizer;
+import io.github.rodrigorjsf.agenticchat.observability.trace.Observed;
+import io.github.rodrigorjsf.agenticchat.observability.trace.ObservationType;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import jakarta.inject.Singleton;
@@ -51,6 +53,7 @@ public class TriageService {
         this.meters = meters;
     }
 
+    @Observed(value = "triage", type = ObservationType.CHAIN, captureResult = true)
     public TriageVerdict triage(String rawText) {
         String normalized = TextNormalizer.normalize(rawText == null ? "" : rawText);
 

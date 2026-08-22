@@ -4,6 +4,8 @@ import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.store.memory.chat.ChatMemoryStore;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Requires;
+import io.github.rodrigorjsf.agenticchat.observability.trace.Observed;
+import io.github.rodrigorjsf.agenticchat.observability.trace.ObservationType;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.slf4j.Logger;
@@ -43,6 +45,7 @@ public class WriteThroughChatMemoryStore implements ChatMemoryStore {
     }
 
     @Override
+    @Observed(value = "memory-read", type = ObservationType.SPAN)
     public List<ChatMessage> getMessages(Object memoryId) {
         try {
             var cached = cache.getMessages(memoryId);
@@ -61,6 +64,7 @@ public class WriteThroughChatMemoryStore implements ChatMemoryStore {
     }
 
     @Override
+    @Observed(value = "memory-write", type = ObservationType.SPAN)
     public void updateMessages(Object memoryId, List<ChatMessage> messages) {
         durable.updateMessages(memoryId, messages);
         try {
@@ -72,6 +76,7 @@ public class WriteThroughChatMemoryStore implements ChatMemoryStore {
     }
 
     @Override
+    @Observed(value = "memory-delete", type = ObservationType.SPAN)
     public void deleteMessages(Object memoryId) {
         durable.deleteMessages(memoryId);
         invalidate(memoryId);
