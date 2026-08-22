@@ -1,0 +1,294 @@
+# The observability stack, in two independent profiles.
+#
+#   docker compose -f compose.observability.yaml --profile grafana  up -d
+#   docker compose -f compose.observability.yaml --profile langfuse up -d
+#
+# TWO PROFILES, NOT ONE STACK, and the reason is arithmetic. Langfuse self-hosted is six
+# containers (postgres, clickhouse, redis, minio, web, worker) and wants roughly 4 GB;
+# the Grafana side wants roughly 2.5 GB; compose.yaml's application and floci want 3 GB
+# more. This machine has 7 GB. Running one profile at a time is not a limitation of the
+# design, it is the machine, and pretending otherwise produces an OOM-killed ClickHouse
+# and a Langfuse that answers 500 with nothing in its logs to explain it.
+#
+# The application exports to each of them SEPARATELY — see agentic.observability.* in
+# application.yml. That is one extra egress from the app and it buys the independence:
+# the collector has no Langfuse leg, so the Grafana profile has no dead host in its
+# config and the Langfuse profile needs no collector.
+#
+# Run it alongside the application stack by passing both files:
+#   docker compose -f compose.yaml -f compose.observability.yaml --profile grafana up
+#
+# Image tags were resolved against each registry's tag API on 2026-08-22.
+
+name: agentic-chat
+
+services:
+
+  # ==================== Grafana profile ====================
+
+  otel-collector:
+    profiles: ["grafana"]
+    image: otel/opentelemetry-collector-contrib:0.159.0
+    container_name: agentic-otel-collector
+    command: ["--config", "/etc/otelcol-contrib/config.yaml"]
+    volumes:
+      - ./observability/otel-collector/config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    environment:
+      # 80% of the hard limit below, per the memory_limiter README. The limiter reads the
+      # cgroup limit, so these two numbers are one setting in two places.
+      GOMEMLIMIT: "400MiB"
+    ports:
+      - "4317:4317"     # OTLP gRPC — the application's door
+      - "4318:4318"     # OTLP HTTP — the application's door
+      - "8889:8889"     # span metrics, scraped by Prometheus
+      - "8888:8888"     # the collector's own telemetry
+      - "13133:13133"   # health_check
+    depends_on:
+      - tempo
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  tempo:
+    profiles: ["grafana"]
+    image: grafana/tempo:3.0.3
+    container_name: agentic-tempo
+    command: ["-target=all", "-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./observability/tempo/tempo.yaml:/etc/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    # 4317/4318 are DELIBERATELY not published. Tempo listens on the same ports as the
+    # collector, and the application must have exactly one OTLP door.
+    ports:
+      - "3200:3200"
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  prometheus:
+    profiles: ["grafana"]
+    image: prom/prometheus:v3.14.0
+    container_name: agentic-prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+      # Without this, an exemplar scraped from the collector is parsed and discarded, and
+      # the click-through from a slow bucket to its trace silently does nothing.
+      - --enable-feature=exemplar-storage
+      - --web.enable-lifecycle
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  grafana:
+    profiles: ["grafana"]
+    image: grafana/grafana:13.2.0
+    container_name: agentic-grafana
+    # grafana/grafana-oss lags: its newest tag on 2026-08-22 was 13.0.2 and 13.2.0
+    # returned no manifest.
+    environment:
+      # Local development only. This is an unauthenticated admin console.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_FEATURE_TOGGLES_ENABLE: traceqlEditor metricsSummary
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+      - tempo
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  # ==================== Langfuse profile ====================
+  #
+  # Trimmed from the upstream docker-compose.yml at langfuse/langfuse (v4.16.0, read
+  # 2026-08-22), with memory limits added and the headless-initialisation variables set so
+  # the project keys are DETERMINISTIC. That last part matters more than it looks: without
+  # it you boot Langfuse, click through a signup, copy two keys and restart the
+  # application. With it, the keys in .env are the keys, before the first boot.
+
+  langfuse-postgres:
+    profiles: ["langfuse"]
+    image: postgres:17
+    container_name: agentic-langfuse-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${LANGFUSE_POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - langfuse-postgres-data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  langfuse-clickhouse:
+    profiles: ["langfuse"]
+    image: clickhouse/clickhouse-server:25.3
+    container_name: agentic-langfuse-clickhouse
+    restart: always
+    user: "101:101"
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD:-clickhouse}
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    volumes:
+      - langfuse-clickhouse-data:/var/lib/clickhouse
+      - langfuse-clickhouse-logs:/var/log/clickhouse-server
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  langfuse-minio:
+    profiles: ["langfuse"]
+    image: minio/minio:latest
+    container_name: agentic-langfuse-minio
+    restart: always
+    entrypoint: sh
+    command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: ${LANGFUSE_MINIO_PASSWORD:-miniosecret}
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - langfuse-minio-data:/data
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  langfuse-redis:
+    profiles: ["langfuse"]
+    image: docker.io/valkey/valkey:8-alpine
+    container_name: agentic-langfuse-redis
+    restart: always
+    command: >
+      --requirepass ${LANGFUSE_REDIS_PASSWORD:-myredissecret}
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 3s
+      timeout: 10s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  langfuse-worker:
+    profiles: ["langfuse"]
+    image: docker.langfuse.com/langfuse/langfuse-worker:4
+    container_name: agentic-langfuse-worker
+    restart: always
+    depends_on: &langfuse-deps
+      langfuse-postgres:
+        condition: service_healthy
+      langfuse-minio:
+        condition: service_healthy
+      langfuse-redis:
+        condition: service_healthy
+      langfuse-clickhouse:
+        condition: service_healthy
+    environment: &langfuse-env
+      DATABASE_URL: postgresql://postgres:${LANGFUSE_POSTGRES_PASSWORD:-postgres}@langfuse-postgres:5432/postgres
+      SALT: ${LANGFUSE_SALT:-mysalt}
+      # openssl rand -hex 32
+      ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
+      TELEMETRY_ENABLED: "false"
+      CLICKHOUSE_MIGRATION_URL: clickhouse://langfuse-clickhouse:9000
+      CLICKHOUSE_URL: http://langfuse-clickhouse:8123
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD:-clickhouse}
+      CLICKHOUSE_CLUSTER_ENABLED: "false"
+      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
+      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: minio
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${LANGFUSE_MINIO_PASSWORD:-miniosecret}
+      LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://langfuse-minio:9000
+      LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+      LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
+      LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_MEDIA_UPLOAD_REGION: auto
+      LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: minio
+      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${LANGFUSE_MINIO_PASSWORD:-miniosecret}
+      LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://langfuse-minio:9000
+      LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
+      LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
+      REDIS_HOST: langfuse-redis
+      REDIS_PORT: "6379"
+      REDIS_AUTH: ${LANGFUSE_REDIS_PASSWORD:-myredissecret}
+      REDIS_TLS_ENABLED: "false"
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  langfuse-web:
+    profiles: ["langfuse"]
+    image: docker.langfuse.com/langfuse/langfuse:4
+    container_name: agentic-langfuse-web
+    restart: always
+    depends_on: *langfuse-deps
+    ports:
+      - "3000:3000"
+    environment:
+      <<: *langfuse-env
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-mysecret}
+      LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://localhost:9090
+      # Headless initialisation: the keys the application uses exist before anyone opens
+      # the UI, so .env can be written once and never touched again.
+      LANGFUSE_INIT_ORG_ID: agentic
+      LANGFUSE_INIT_ORG_NAME: Agentic
+      LANGFUSE_INIT_PROJECT_ID: agentic-chat
+      LANGFUSE_INIT_PROJECT_NAME: agentic-chat
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-pk-lf-0000000000000000000000000000000000}
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-sk-lf-0000000000000000000000000000000000}
+      LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_INIT_USER_EMAIL:-admin@example.com}
+      LANGFUSE_INIT_USER_NAME: admin
+      LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_INIT_USER_PASSWORD:-changemechangeme}
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+volumes:
+  tempo-data:
+  prometheus-data:
+  grafana-data:
+  langfuse-postgres-data:
+  langfuse-clickhouse-data:
+  langfuse-clickhouse-logs:
+  langfuse-minio-data:

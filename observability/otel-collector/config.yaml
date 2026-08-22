@@ -1,0 +1,112 @@
+# OpenTelemetry Collector — the fan-out for the Grafana side of this stack.
+#
+# WHAT it does: receives OTLP from the application, forwards traces to Tempo, and derives
+# RED metrics from the same spans through the span_metrics connector, which Prometheus
+# scrapes.
+#
+# WHAT it deliberately does NOT do: forward to Langfuse. The application exports to
+# Langfuse directly (agentic.observability.langfuse.*), which costs one extra egress and
+# buys something worth more here — the Langfuse half and the Grafana half of this stack
+# start and stop independently, so neither profile has a dead host in its config.
+#
+# Component names are snake_case, and this is not cosmetic. Between collector v0.144.0 and
+# v0.152.0 `otlphttp` became `otlp_http`, `otlp` (exporter) became `otlp_grpc` and
+# `spanmetrics` became `span_metrics`. The old names still resolve as DEPRECATED ALIASES
+# and log a warning, so a config copied from an older post runs — until the alias is
+# removed. Sources, both read 2026-08-22:
+#   https://raw.githubusercontent.com/open-telemetry/opentelemetry-collector/v0.159.0/CHANGELOG.md
+#   https://raw.githubusercontent.com/open-telemetry/opentelemetry-collector-contrib/v0.159.0/CHANGELOG.md
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  # First in every pipeline, per the memory_limiter README. It reads the CGROUP limit, so
+  # it only means something because compose sets deploy.resources.limits.memory below.
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 80
+    spike_limit_percentage: 20
+  batch:
+    send_batch_size: 8192
+    timeout: 5s
+
+connectors:
+  # Turns spans into RED metrics without the application emitting a single metric.
+  span_metrics:
+    histogram:
+      # Pinned. The default flips from ms to s once
+      # connector.spanmetrics.useSecondAsDefaultMetricsUnit becomes the default, and the
+      # unit is part of the Prometheus metric NAME — so leaving it implicit renames every
+      # dashboard query on a collector upgrade.
+      unit: ms
+      explicit:
+        buckets: [2ms, 4ms, 8ms, 50ms, 100ms, 200ms, 400ms, 800ms, 1s, 2s, 5s, 10s, 15s, 30s, 60s]
+    # These are the GenAI semantic-convention attributes the application sets beside the
+    # langfuse.* ones. Langfuse ignores them; this is what they are for.
+    dimensions:
+      - name: gen_ai.operation.name
+      - name: gen_ai.request.model
+      - name: langfuse.observation.type
+      - name: http.request.method
+      - name: http.response.status_code
+    exemplars:
+      enabled: true
+    metrics_flush_interval: 15s
+    metrics_expiration: 5m
+    aggregation_temporality: "AGGREGATION_TEMPORALITY_CUMULATIVE"
+    # A bound on cardinality, because gen_ai.request.model is model-influenced and a
+    # dimension with unbounded values is how a metrics backend runs out of memory.
+    aggregation_cardinality_limit: 10000
+
+exporters:
+  # This exporter requires TLS by default; a plaintext link inside a compose network needs
+  # insecure set explicitly.
+  otlp_grpc/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+    retry_on_failure:
+      enabled: true
+
+  # A PULL endpoint Prometheus scrapes — 0.0.0.0, not localhost, or it is unreachable from
+  # another container.
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    # Exemplars only exist in the OpenMetrics format, and an exemplar is what turns
+    # "p95 is bad" into a click-through to the trace that was slow.
+    enable_open_metrics: true
+    metric_expiration: 5m
+    resource_to_telemetry_conversion:
+      enabled: false
+
+service:
+  extensions: [health_check]
+  telemetry:
+    metrics:
+      level: normal
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: '0.0.0.0'
+                port: 8888
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      # span_metrics is an EXPORTER here and a RECEIVER in the metrics pipeline below.
+      exporters: [otlp_grpc/tempo, span_metrics]
+    metrics:
+      receivers: [otlp, span_metrics]
+      processors: [memory_limiter, batch]
+      exporters: [prometheus]
