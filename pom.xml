@@ -76,6 +76,18 @@
         <type>pom</type>
         <scope>import</scope>
       </dependency>
+      <!--
+        micronaut-parent imports micronaut-tracing-bom, but not the OpenTelemetry BOM itself.
+        Imported here so opentelemetry-exporter-otlp and opentelemetry-sdk-testing take the same
+        version as everything the tracing modules pull in (opentelemetry.version, from the platform).
+      -->
+      <dependency>
+        <groupId>io.opentelemetry</groupId>
+        <artifactId>opentelemetry-bom</artifactId>
+        <version>${opentelemetry.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
       <dependency>
         <groupId>software.amazon.awssdk</groupId>
         <artifactId>bom</artifactId>
@@ -193,6 +205,28 @@
       <artifactId>langchain4j-micrometer-metrics</artifactId>
     </dependency>
 
+    <!-- ==================== OpenTelemetry ====================
+         The export side of the observability layer. Micronaut Tracing provides the
+         HTTP server/client instrumentation and the OTel SDK wiring; the OTLP exporter
+         is the transport. Everything Langfuse-specific is this project's own code —
+         Langfuse reads plain OTLP and maps `langfuse.*` span attributes onto its
+         data model, so no Langfuse client library exists or is needed for Java.  -->
+    <dependency>
+      <groupId>io.micronaut.tracing</groupId>
+      <artifactId>micronaut-tracing-opentelemetry-http</artifactId>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.micronaut.tracing</groupId>
+      <artifactId>micronaut-tracing-opentelemetry-annotation</artifactId>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.opentelemetry</groupId>
+      <artifactId>opentelemetry-exporter-otlp</artifactId>
+      <scope>compile</scope>
+    </dependency>
+
     <!-- ==================== AWS (against floci locally) ==================== -->
     <!--
       apache-client is excluded from both service clients so exactly one sync
@@ -283,6 +317,16 @@
       <groupId>com.tngtech.archunit</groupId>
       <artifactId>archunit-junit5</artifactId>
       <version>${archunit.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <!--
+      InMemorySpanExporter. Every assertion about span hierarchy, attributes and
+      lifecycle runs against this in the DEFAULT build — no collector, no Langfuse,
+      no network.
+    -->
+    <dependency>
+      <groupId>io.opentelemetry</groupId>
+      <artifactId>opentelemetry-sdk-testing</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
