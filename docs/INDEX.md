@@ -16,6 +16,7 @@ material is usually in what a measurement overturned, not in what it confirmed.
 | 3 | [Security](03-security.md) | The OWASP Agentic Top 10, mapped to the class that answers each item |
 | 4 | [Operations](04-operations.md) | Running it, the local AWS emulator, metrics, cost |
 | 5 | [Evaluation](05-evaluation.md) | How a prompt change is proved not to have broken anything |
+| 6 | [Skills](06-skills.md) | Every skill under `.claude/skills/`, what it is for, and the situation that sends you to it |
 
 ## Two other places to look
 
@@ -44,16 +45,16 @@ Three ADRs carry findings that changed the design rather than confirming it:
 
 ## Reusable pieces
 
-[`.claude/skills/`](../.claude/skills/) holds fourteen skills written to be
-project-agnostic. Six describe a piece of this design — the tool boundary,
-progressive disclosure, the triage gate, injection defence, retrieval, and cost
-observability. Eight are about *building* one: authoring a tool, authoring a
-skill, reviewing a layer that already ships, auditing a codebase, proving a change
-safe, deciding what a turn remembers, composing a runtime, and spending a
-sub-agent.
+[`.claude/skills/`](../.claude/skills/) holds the skills, written to be
+project-agnostic: some describe a piece of this design, the rest are about
+*building* one. They carry the numbers from this project but none of its code, so
+they travel to any agentic backend.
 
-They carry the numbers from this project but none of its code, so they travel to
-any agentic backend.
+**[Chapter 6](06-skills.md) is the catalogue** — what each is for, the situations
+that send you to it, whether the model fires it or a person invokes it by name, and
+which skill hands off to which. It is checked against the directory in both
+directions by [`check-skill-docs.py`](../scripts/check-skill-docs.py), so no count
+is restated here to go stale.
 
 [`.claude/rules/micronaut-langchain4j.md`](../.claude/rules/micronaut-langchain4j.md)
 holds what does not travel: the framework traps that compiled, or ran, or passed a

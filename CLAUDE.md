@@ -36,6 +36,8 @@ Every script carries a `WHAT / WHY / WHEN / HOW` header comment; read it before 
 
 | Script | Use it when |
 |---|---|
+| [`check-tool-catalogue.py`](scripts/check-tool-catalogue.py) | after adding or renaming a tool, or editing `agentic.tools.apis` — pairs Java catalogue keys with configured endpoints both ways, and gates https |
+| [`check-skill-docs.py`](scripts/check-skill-docs.py) | after adding, renaming or removing a skill, or editing the tables in `docs/06-skills.md` — asserts set equality between `.claude/skills/` and the chapter, both ways |
 
 **Standing rule — export repeatable procedures.** Whenever you hit a multi-step procedure that is
 deterministic and likely to recur (release, registry verification, a gating/render check, an
@@ -95,6 +97,8 @@ When something fails repeatedly, when User has to re-explain, or when a workarou
 - Answering a workflow agent by message resumes it beside the workflow's own next round.
 - Transport ceiling floor is the largest raw body, not the largest response budget.
 - Per-piece critics cannot see docs the code falsified; run a cross-piece sweep.
+- Hand-off to a user-invoked skill must say "ask the user to run it".
+- Recursive splitters pack the next heading on; run one before printing a chunk.
 
 
 

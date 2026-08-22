@@ -59,7 +59,11 @@ Doctrine belongs to `agentic-service-composition`. These four establish facts.
 
 ## 2. Prompt assembly
 
-Doctrine belongs to `agentic-service-composition`. These four establish facts.
+Doctrine belongs to `agentic-service-composition`. Whether the content in the
+prompt *belongs* there rather than in a corpus is `prompt-to-corpus-migration`'s
+question — a model cannot load it: ask the user to run
+prompt-to-corpus-migration, which they invoke by name. These four establish
+facts.
 
 1. **Count the assembly points.** Two places that build standing instructions
    means two prompts in production, and one of them is reviewed by nobody.
