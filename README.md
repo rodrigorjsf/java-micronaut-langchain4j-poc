@@ -62,6 +62,7 @@ in-process and starting a real Valkey container for the cache.
 ./mvnw test -Pit                  # + floci via Testcontainers
 ./mvnw test -Pevals               # + the triage golden set against a live model
 ./scripts/check-tool-catalogue.py # tool code vs configured endpoints, both ways, https only
+./scripts/check-skill-docs.py     # skill directories vs docs/06-skills.md, both ways
 ```
 
 ## What is in it
@@ -96,7 +97,7 @@ at which it starts to pay, and
 
 ## Read the book
 
-**→ [`docs/INDEX.md`](docs/INDEX.md)** — the reading order, five chapters, and the
+**→ [`docs/INDEX.md`](docs/INDEX.md)** — the reading order, every chapter, and the
 decisions worth reading first.
 
 Also:
@@ -105,8 +106,10 @@ Also:
   the tests enforce.
 - **[`docs/adr/`](docs/adr/README.md)** — one record per decision, with the
   measurement behind it.
-- **[`.claude/skills/`](.claude/skills/)** — fourteen skills written to be
-  project-agnostic, so the reasoning travels to other agentic backends.
+- **[`docs/06-skills.md`](docs/06-skills.md)** — the catalogue of
+  [`.claude/skills/`](.claude/skills/): what each skill is for, the situation that
+  sends you to it, and who fires it. Written to be project-agnostic, so the
+  reasoning travels to other agentic backends.
 
 ## What this is not
 
