@@ -97,6 +97,8 @@ When something fails repeatedly, when User has to re-explain, or when a workarou
 - Answering a workflow agent by message resumes it beside the workflow's own next round.
 - Transport ceiling floor is the largest raw body, not the largest response budget.
 - Per-piece critics cannot see docs the code falsified; run a cross-piece sweep.
+- Hand-off to a user-invoked skill must say "ask the user to run it".
+- Recursive splitters pack the next heading on; run one before printing a chunk.
 
 
 
