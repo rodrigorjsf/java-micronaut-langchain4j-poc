@@ -13,8 +13,11 @@ judgement, a **Previous** field with `first run` as its honest empty value — r
 here as a whole column of the settings block — a **Smallest change** sized in
 files, and a **Proved by** field naming the test that closes the entry. Four shapes
 are new here because the noun is different: the settings block, the byte-and-share
-columns of the inventory, the closed section, and the acceptance list that hangs
-off each moving block.
+columns of the inventory, the closed section, and the plan entry's **Acceptance
+list** field. That last one is a pointer, not a list: the questions themselves are
+rows in the one query set committed beside the corpus, whose schema
+`corpus-retrieval-tests` owns, and this file neither defines them nor gives them a
+second home.
 
 ## 1. The settings block
 
@@ -168,25 +171,31 @@ Volatility       high — pricing changed twice since the block was written, and
                  neither change reached this file
 Silence          silent — a withdrawn tier is quoted in a confident sentence and
                  nothing logs it
-Acceptance list  7 questions in users' words, committed at
-                 docs/corpus/acceptance/plans.md before the document exists
+Acceptance list  7 questions in users' words, committed before the document
+                 exists as rows in the query set beside the corpus — the one
+                 whose schema corpus-retrieval-tests owns; no second file
 Smallest change  one corpus document, one capability line left in the prompt,
                  the block deleted — 3 files, in 3 commits
 Proved by        CorpusRetrievalTest#plans — every acceptance row retrieves its
-                 intended chunk through the router at the shipped threshold
+                 intended chunk (expected_source) through the router at the
+                 shipped threshold
 Re-measured      pending step 4: fresh payload must not contain the block
 ```
 
 Four fields do the work an improvised entry drops:
 
-- **Acceptance list** is a path, and it is committed before the document. Written
-  after, its questions come out of the document's own vocabulary and every one
-  passes.
+- **Acceptance list** is committed before the document. Written after, its
+  questions come out of the document's own vocabulary and every one passes. It is
+  **not** a new file at a path this skill invents: the rows go into the one query
+  set committed beside the corpus, `corpus-retrieval-tests` owns its schema, and
+  each row names the intended chunk in that schema's `expected_source` field.
 - **Smallest change** is sized in files *and* in commits, because the deletion
   being its own commit is what makes the migration revertable without also
   reverting the corpus.
-- **Proved by** names the test. Without it the document lands, the block is deleted
-  and nothing notices when a later edit stops the chunk retrieving.
+- **Proved by** names the test — the one `corpus-retrieval-tests` builds, which a
+  model cannot start: ask the user to run corpus-retrieval-tests, which they invoke
+  by name. Without this field the document lands, the block is deleted and nothing
+  notices when a later edit stops the chunk retrieving.
 - **Re-measured** stays `pending` until a payload captured *after* the deletion has
   been read. A migration whose last field never left `pending` is the one that only
   added.

@@ -1,6 +1,6 @@
 ---
 name: prompt-to-corpus-migration
-description: Find the domain content shipping in every prompt whether or not the turn needs it, and produce a ranked plan for moving what may move into a retrievable corpus and deleting it from the prompt.
+description: Find the domain content shipping in every prompt whether or not the turn needs it, and produce a ranked plan for moving what may move into a retrievable corpus and deleting it from the prompt. No block may be deleted until its proof runs, and that proof is a skill a model cannot load — ask the user to run corpus-retrieval-tests, which they invoke by name.
 disable-model-invocation: true
 ---
 
@@ -29,11 +29,15 @@ a container that ships it to a model that did not ask.
 | this ran before | *Running it again* |
 | the question is whether to retrieve at all, or what a corpus is for | `retrieval-that-earns-its-place` — not this skill |
 
-Four skills, one order, and it does not commute: **audit and plan here → write the
-document (`writing-retrievable-knowledge`) → prove it answers
-(`corpus-retrieval-tests`) → only then delete the text from the prompt, and
-re-measure.** Deleting before proving is the failure this whole document is built
-around.
+**Three skills, four steps, one order, and it does not commute:** audit and plan
+here → write the document (`writing-retrievable-knowledge`) → prove it answers
+(`corpus-retrieval-tests`) → only then delete the text from the prompt, back here,
+and re-measure. The audit and the deletion are this skill's; the two in the middle
+are not, and one of those a model cannot start on its own —
+`corpus-retrieval-tests` carries `disable-model-invocation: true`, as this skill
+does, so the proof happens when you ask the user to run corpus-retrieval-tests,
+which they invoke by name. Deleting before proving is the failure this whole
+document is built around.
 
 ## The noun, and how to inventory it
 
@@ -243,16 +247,18 @@ Five steps per block, with a gate before each one. The gates are the document.
 
 | # | Step | Gate before the next step |
 |---|---|---|
-| 0 | **Write the acceptance list** — the questions this block used to answer, in the words users type | the list is committed **before** the document exists |
-| 1 | **Write the document** — `writing-retrievable-knowledge` | every question on the list has an intended chunk you can name |
-| 2 | **Prove it answers** — `corpus-retrieval-tests` | every question retrieves its intended chunk, **through the router the application runs, at the threshold the application ships** |
+| 0 | **Write the acceptance list** — the questions this block used to answer, in the words users type | the list is committed **before** the document exists, as rows in the one query set committed beside the corpus, whose schema `corpus-retrieval-tests` owns. It is not a second list at a path of this skill's own |
+| 1 | **Write the document** — `writing-retrievable-knowledge` | every question on the list has an intended chunk you can name — the intended chunk is `expected_source` in the query set |
+| 2 | **Prove it answers** — `corpus-retrieval-tests`, which a model cannot load: ask the user to run corpus-retrieval-tests, which they invoke by name | every question retrieves its `expected_source`, **through the router the application runs, at the threshold the application ships** |
 | 3 | **Delete the block** | the deletion is its own commit and changes nothing else |
 | 4 | **Re-measure** | a **freshly captured payload** does not contain the block, and the end-to-end answers to the acceptance list are still right |
 
 **Step 0 is first because a list written afterwards is graded against itself.**
 Write the document first and the questions come out of its own vocabulary, so
 every one of them passes and the suite proves nothing. Draw the questions from
-real turns wherever logs have them.
+real turns wherever logs have them — where the sentences come from is one
+priority-ordered list, owned by `corpus-retrieval-tests`, and this skill points at
+it rather than printing a second one.
 
 **Step 2's gate says "through the router" for a reason.** A proof run with the
 router bypassed proves the chunk exists. It does not prove the turn reaches it,
@@ -268,15 +274,19 @@ fact**. A pointer carrying one fact is the two-answers drift at one-line scale.
 
 ### When step 2 fails, which is not "delete anyway"
 
-Which layer failed — chunk boundary, vocabulary, threshold, router, or the row
-itself — is diagnosed by `corpus-retrieval-tests`, and that diagnosis is not
-re-derived here. What this skill owns is what the migration does with each
-verdict:
+A query that misses has **four layers** that can be at fault — corpus, chunk
+boundary, vocabulary, threshold-or-router — and, checked ahead of all four, the row
+itself, which is not a layer. Which one it was is diagnosed by
+`corpus-retrieval-tests`, and that diagnosis is not re-derived here; that skill is
+one a model cannot load either, so the diagnosis happens when you ask the user to
+run corpus-retrieval-tests, which they invoke by name. What this skill owns is what
+the migration does with each verdict:
 
 | The diagnosis | The migration |
 |---|---|
-| the document is at fault — boundary or wording | back to step 1. The block stays in the prompt meanwhile and the branch does not merge half-done |
-| the retrieval layer is at fault — threshold or router | **stop migrating** and fix the layer first (`retrieval-that-earns-its-place`). Every further block loaded onto a layer that cannot route multiplies one defect |
+| the corpus layer — the fact is in no document, and the probe finds it only in the prompt | the document was never written for this fact, so this is a migration that did not happen rather than a test failure — back to step 1. `corpus-retrieval-tests` hands that verdict back to this skill by name |
+| the document is at fault — chunk boundary or vocabulary | back to step 1. The block stays in the prompt meanwhile and the branch does not merge half-done |
+| the retrieval layer is at fault — threshold-or-router | **stop migrating** and fix the layer first (`retrieval-that-earns-its-place`). Every further block loaded onto a layer that cannot route multiplies one defect |
 | the acceptance row was wrong | fix the row, re-run, **and record the edit in the ledger** — a row edited until it passed is honest only when the edit is visible |
 | nothing recognises the turn at all | return the block to the **stays** side of the test above and record why. This is a result, not a failure: question 2 answered "yes" on paper and "no" in practice |
 
@@ -326,7 +336,10 @@ assembly row next if there is one. Nothing at the ledger's path means this is ru
 Read the six out of the codebase again and set them beside the recorded ones before
 touching the inventory. A setting that moved changes what the already-closed
 documents retrieve — a new segment size re-cuts every one of them — so the closed
-section's acceptance suites re-run **before** a new block is ranked. A run that
+section's acceptance suites re-run **before** a new block is ranked. That re-run is
+`corpus-retrieval-tests`, which a model cannot load and this skill cannot execute:
+ask the user to run corpus-retrieval-tests, which they invoke by name, and rank
+nothing until its result is back. A run that
 spends its cap on ten new migrations while the corpus it already owns retrieves
 worse than it did last quarter is a net loss the ledger could have prevented.
 
@@ -356,23 +369,32 @@ failures:
 - **corpus → prompt, the direction that is easy to skip.** A document the migration
   wrote that nothing routes to — embedded, correct, never retrieved, invisible
   because no test asks for it. **Every document in the corpus must be the intended
-  chunk of at least one acceptance row.** One that is nobody's answer is dead
-  weight or a missing row, and you cannot tell which without asking.
+  chunk of at least one acceptance row** — `expected_source` in the query set. That
+  is the same assertion `corpus-retrieval-tests` states as its document → row
+  check, and the check itself is owned there, not specified a second time here: ask
+  the user to run corpus-retrieval-tests, which they invoke by name, and record the
+  result in the ledger.
 
 ## Not this skill's ground
 
 | The question | Whose |
 |---|---|
 | whether to retrieve at all, what a corpus is for, the threshold measurement, the router's signal, whether retrieved text is written into chat memory | `retrieval-that-earns-its-place` |
-| a control that is **absent** at a seam — no output guardrail, no tenant key in a conversation store, a catalogue that loads eleven of twelve entries | `agentic-codebase-audit` |
-| how the splitter cuts, what makes a chunk survive alone, how a document is worded so the user's phrasing matches it | `writing-retrievable-knowledge` |
-| what a positive and a negative row are for a corpus, and which layer failed when the row is right and the corpus is wrong | `corpus-retrieval-tests` |
+| a control that is **absent** at a seam — no output guardrail, no tenant key in a conversation store, a catalogue that loads eleven of twelve entries | `agentic-codebase-audit` — a model cannot load it either; ask the user to run agentic-codebase-audit, which they invoke by name |
+| how the splitter cuts, what makes a chunk survive alone, how a document is worded so the user's phrasing matches it | `writing-retrievable-knowledge` — the one skill in this chain a model may load itself |
+| the query set's schema, what a positive and a negative row are, where the question wording comes from, and which of the four layers failed when the row is right and the corpus is wrong | `corpus-retrieval-tests` — ask the user to run corpus-retrieval-tests, which they invoke by name |
 
 ## Done when
 
-**Rows 1–6 and 12–13 run once per audit. Rows 7–11 repeat per block**, once for
-each entry on the capped plan; a run that migrated three blocks answers them three
-times, and a run whose plan was all `stays` answers them none.
+**Rows 1–7 and 13–14 run once per audit. Rows 8–12 repeat per block**, once for
+each entry on the capped plan that row 7 produces; a run that migrated three blocks
+answers them three times, and a run whose plan was all `stays` answers them none.
+
+Three rows below — 6, 10 and 13 — complete only when a skill this one cannot invoke
+has run. `corpus-retrieval-tests` carries `disable-model-invocation: true`, so a
+model working through this table cannot start it and must not report those rows as
+done on its own: **ask the user to run corpus-retrieval-tests, which they invoke by
+name**, and carry its result into the row.
 
 | # | Check | Done when |
 |---|---|---|
@@ -381,14 +403,15 @@ times, and a run whose plan was all `stays` answers them none.
 | 3 | Inventory the standing text | every block in the payload carries a `file:symbol` origin and a byte count; any remainder is named as a dependency, a default or the stored conversation — never left blank |
 | 4 | Cost each block | each carries `B` and either a defensible `U` or the literal `U unknown` — never a share nobody measured. `C` is definitional and is not a per-row field |
 | 5 | Run S, D and the three questions | each block reads one of the four closed verdicts — `stays`, `moves`, `split`, `neither` — naming the check that decided it (`S`, `D`, `Q1`, `Q2`, `Q3`); no `split` row reaches the plan unsplit; every arguable `Q2` resolved to `stays` |
-| 6 | Read the retrieval configuration | all six settings in the ledger's settings block, each numeric value with its unit, the file it came from — the library's documentation and lock-file version for any it defaults and nobody set — and the previous run's value or `first run`; any setting that moved has the closed section's acceptance suites re-run before a new block is ranked |
-| 7 | Write the acceptance list | committed, in users' words, **before** the document exists |
-| 8 | Write the document | `writing-retrievable-knowledge` ran, and every acceptance question has a named intended chunk |
-| 9 | Prove it | `corpus-retrieval-tests` green: every question retrieves its intended chunk through the shipped router at the shipped threshold, and any edited row's edit is recorded |
-| 10 | Delete the block | one commit, that block only |
-| 11 | Re-measure | a **freshly captured** payload no longer contains the block, and the acceptance questions still answer correctly end to end |
-| 12 | Check both directions | no closed row's subject appears in the fresh payload, and every corpus document is some acceptance row's intended chunk |
-| 13 | Commit the ledger | settings block, inventory, closed section and capped plan, stamped with this run's date, branch and commit and the previous run's, at the stable path or behind a one-line stub there |
+| 6 | Read the retrieval configuration | all six settings in the ledger's settings block, each numeric value with its unit, the file it came from — the library's documentation and lock-file version for any it defaults and nobody set — and the previous run's value or `first run`. Any setting that moved has the closed section's acceptance suites re-run before a new block is ranked, and that re-run is `corpus-retrieval-tests`: the row is done when the user, asked to run corpus-retrieval-tests by name, has come back with its result — never on a model's own say-so |
+| 7 | Rank and cap the plan | row 6 came back first — where a setting moved, the closed section's re-run was green before anything here was ranked. Then every `moves` block, and every child of a `split`, never the parent, is ranked on waste and volatility, tie-broken silent before loud, and the plan carries **at most ten** entries; each entry names its verdict, its evidence and its smallest change; every block that did not make the cap is still in the inventory table, where the next run finds it. Rows 8–12 below run once per entry on this plan, so a plan that does not exist is a run that stops here |
+| 8 | Write the acceptance list | committed, in users' words, **before** the document exists, as rows in the one query set beside the corpus — no second list at a path of this skill's own |
+| 9 | Write the document | `writing-retrievable-knowledge` ran, and every acceptance question has a named intended chunk — `expected_source` in the query set |
+| 10 | Prove it | ask the user to run corpus-retrieval-tests, which they invoke by name, and the answer that comes back is green: every question retrieves its `expected_source` through the shipped router at the shipped threshold, and any edited row's edit is recorded |
+| 11 | Delete the block | one commit, that block only |
+| 12 | Re-measure | a **freshly captured** payload no longer contains the block, and the acceptance questions still answer correctly end to end |
+| 13 | Check both directions | no closed row's subject appears in the fresh payload; the corpus → prompt direction is `corpus-retrieval-tests`' document → row check — ask the user to run corpus-retrieval-tests, which they invoke by name, and record here that every corpus document is some acceptance row's `expected_source` |
+| 14 | Commit the ledger | settings block, inventory, closed section and capped plan, stamped with this run's date, branch and commit and the previous run's, at the stable path or behind a one-line stub there |
 
 A block that returned to **stays** is a completed migration, not an abandoned one,
 provided the ledger says which question turned it back. The entry that ends a

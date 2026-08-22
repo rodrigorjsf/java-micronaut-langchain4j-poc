@@ -28,13 +28,25 @@ the questions that must retrieve **nothing**.
 | you need row counts, gating, or the deterministic/live split | `agentic-evals` — that skill owns all three |
 | the document itself is what needs rewriting | `writing-retrievable-knowledge` |
 | the question is whether to retrieve at all, or where the threshold sits | `retrieval-that-earns-its-place` |
+| the text is still in a prompt and has not been migrated yet | `prompt-to-corpus-migration` — a model cannot load it; ask the user to run it, which they invoke by name |
 
-Four skills, one order, and it does not commute: **audit and plan
+**Three skills, four steps, one order, and it does not commute:** audit and plan
 (`prompt-to-corpus-migration`) → write the document
-(`writing-retrievable-knowledge`) → prove it answers (this page) → only then
-delete the text from the prompt.** Reading a document is not evidence that it
-retrieves; this page produces the evidence, and until it is green the prompt keeps
-its copy.
+(`writing-retrievable-knowledge`) → prove it answers (this page) → delete the text
+from the prompt (`prompt-to-corpus-migration` again). The first step and the last
+are the same skill, which is why three skills spend four steps. Reading a document
+is not evidence that it retrieves; this page produces the evidence, and until it is
+green the prompt keeps its copy.
+
+**Step 1 and step 4 are not a model's to take.** `prompt-to-corpus-migration`
+carries `disable-model-invocation: true`: a model cannot load it, so nothing a model
+emits reaches either end of the chain. At both hand-offs, **ask the user to run
+`prompt-to-corpus-migration`, which they invoke by name**, and leave the step open
+until they have. Reporting a step done because you pointed at the skill that owns it
+is how the prompt keeps its copy of text everyone believes was deleted. The middle
+step is different: `writing-retrievable-knowledge` carries no such restriction and a
+model can load it itself. This page carries the same restriction as step 1 and step
+4 — you are reading it because the user named it, and the same is true of them.
 
 ## The query set is a committed file, not test code
 
@@ -50,6 +62,15 @@ beside each document, and `prompt-to-corpus-migration` commits an acceptance lis
 at its step 0, before the document exists. Extend whichever exists. A second list
 nobody reconciles is how a question passes in one file and is unknown to the other.
 
+**One home, one owner.** The query set is committed **beside the corpus**, and
+**this skill owns its schema** — the field table below is that schema, and there is
+no second copy of it anywhere. Every document that names the set is naming this one
+artifact in that one home: `prompt-to-corpus-migration`'s acceptance list and
+`writing-retrievable-knowledge`'s per-document question list are *this* file at
+earlier moments in its life, not two other files that later have to be reconciled
+with it. A document may point here for the fields; it may not declare a second
+location for the set or a second definition of a field.
+
 | Field | Why it is there |
 |---|---|
 | `id` | a failure names a row somebody can open. Stable, never renumbered |
@@ -63,8 +84,11 @@ nobody reconciles is how a question passes in one file and is unknown to the oth
 | `provenance` and date | where the question came from — a log line, a ticket, the document's own claim — written the day the row was created |
 
 **`expected_source` is the field that makes a failure diagnosable**, and it is the
-one most often left out. Without it a row asserts that *something* came back, and
-three different failures collapse into one boolean:
+one most often left out. It is also the field's only name. Where another page says
+*the intended chunk*, the thing it means is this field, and the phrase to write is
+"the intended chunk — `expected_source` in the query set"; the schema above owns the
+definition, and nothing else defines it. Without it a row asserts that *something*
+came back, and three different failures collapse into one boolean:
 
 ```
 nothing came back                → the corpus, the wording, or the gate
@@ -101,10 +125,35 @@ This repository's own suite is the illustration, and it is an illustration of th
 gap: the two committed negatives in `rag/KnowledgeBaseTest.java` are a cake recipe
 and a request to write a Python script, both plainly out of domain. What such rows
 are worth is in the measurement recorded in `rag/SkillAwareQueryRouter.java`'s
-javadoc — a third out-of-domain question, a football result measured but never
-added to the suite, scored **0.7342** against a relevant question's **0.7299**.
-Even the far negatives sat inside the relevant band. Those two rows are the floor;
-that suite has no near-miss half yet.
+javadoc — a third out-of-domain question, a football result, scored **0.7342**
+against a relevant question's **0.7299**. Even the far negatives sat inside the
+relevant band. Those two rows are the floor; that suite has no near-miss half yet.
+
+**That football question is in the suite. It is a pinned probe, not a negative
+row** — and the distinction is the point, not a technicality. It sits at
+`KnowledgeBaseTest.java:109` inside `theScoreDistributionsOverlap`, which is
+assertion 3 below: a second retriever at `minScore` 0.0 and k of 1, asserting the
+irrelevant score stays **above** the relevant one. It could not have been made a
+negative row instead. The shipped gate is `agentic.rag.min-score: 0.72`
+(`application.yml:562`), 0.7342 clears it, and a row asserting emptiness through the
+shipped path would have been red the day it was written. The two questions that
+*are* rows score 0.7058 and 0.6826 — under the gate, which is the only reason they
+can assert anything.
+
+So the two assertions measure different things and neither substitutes for the
+other. **Assertion 2 can only ever report *above the gate or below it*, and
+assertion 3 exists because the numbers that decide whether any gate can work live
+below the gate, where assertion 2 is blind** — and here the worst irrelevant
+question turned out to sit above it. Read as a missing negative row, this
+measurement says "somebody forgot to add a test". Read correctly, it says no
+threshold on this corpus separates relevant from irrelevant, which is the reason
+`SkillAwareQueryRouter` exists at all. A near-miss half is still owed; a fourth far
+negative is not what is missing.
+
+One further gap in the same file, since it is the reason the near-miss half is not a
+detail: `anUnrelatedQuestionRetrievesNothing` calls the retriever directly, so
+neither committed negative carries a `routing_input` through the shipped router at
+all.
 
 Four kinds of near-miss, all of them in the product's words:
 
@@ -195,6 +244,13 @@ the document. A question written by the person who wrote the document reuses the
 document's vocabulary and matches by construction — a rigged green, and the same
 failure `writing-retrievable-knowledge` names for its own question list.
 
+**This list is this skill's, and it is the only one.** The four sources below are in
+priority order and the order is part of the definition — it is why traffic outranks
+the documents' own claims, which is the whole defence against a rigged green.
+Another document may point at this section by name; it may not print a second list,
+because two lists that differ at the fourth entry are two skills quietly disagreeing
+about where a question is allowed to come from.
+
 In priority order:
 
 | Source | What it gives you | What it cannot give you |
@@ -206,14 +262,18 @@ In priority order:
 
 Then vary each base question, because one phrasing tests one phrasing:
 
+Every cell in the right-hand column is one of the four layers enumerated below,
+under *When a question that should hit does not* — that is the only sense the word
+carries here:
+
 | Axis | The shape | The layer it can break |
 |---|---|---|
-| paraphrase | different content words, same intent | vocabulary — the failure `writing-retrievable-knowledge` fixes by putting the user's words in the document |
-| the terse typed form | no verb, no punctuation, three words | whether matching survives without the sentence around it |
-| misspelling, missing accents, wrong plural | one character off | tag `evasion` — `agentic-evals` asserts that family row by row rather than averaging it in |
-| abbreviation, and its expansion | both forms, at least once each | vocabulary, in the place a corpus most often has only one of the two |
-| the other language the product serves | the same question, wholly in it | whether the corpus covers that language at all — a whole-language failure is a content finding, not a row finding |
-| the polite wrapper | "could you please tell me…" around the same content words | usually nothing. See below |
+| paraphrase | different content words, same intent | **vocabulary** — the failure `writing-retrievable-knowledge` fixes by putting the user's words in the document |
+| the terse typed form | no verb, no punctuation, three words | **vocabulary**, stripped bare: whether matching survives on the content words with no sentence around them |
+| misspelling, missing accents, wrong plural | one character off | **vocabulary**. Tag it `evasion` — a family is a tag an assertion selects on, never a layer — and `agentic-evals` asserts that family row by row rather than averaging it in |
+| abbreviation, and its expansion | both forms, at least once each | **vocabulary**, in the place a corpus most often has only one of the two |
+| the other language the product serves | the same question, wholly in it | **the corpus** — whether it covers that language at all. A whole-language failure is a content finding, not a row finding |
+| the polite wrapper | "could you please tell me…" around the same content words | **none**, which is exactly why it is a duplicate. See below |
 
 **A variant earns a row when it could fail while its base row passes, and you can
 name the layer it would fail at.** If you cannot name the layer, it is a duplicate:
@@ -235,15 +295,32 @@ runtime and no resolution.
 
 ## When a question that should hit does not
 
-**Four layers can fail, and only one of them is fixed by editing the document.**
-Two further verdicts are not layers at all — the fact was never migrated, and the
-row itself is wrong — which is why the table below has six rows. Diagnose before
-you touch anything; each verdict ends in a hand-off, not in a fix:
+**Four layers can fail, and they are these four:**
+
+1. **the corpus** — the fact is not in it at all
+2. **the chunk boundary** — the fact is in it, and the chunk the ingestion produced
+   around that fact cannot stand alone
+3. **the vocabulary** — the chunk is whole, and it is in the team's words while the
+   question is in the user's
+4. **the threshold or the router** — the chunk ranks first with the gate open, and
+   the path the application ships returns nothing anyway
+
+**That is what *layer* means on this page, in `DIAGNOSIS.md`, and in any document
+that points here: a place a retrieval can fail.** It is never a category of writing
+defect — a document that over-claims, or buries its subject in a pronoun, has a
+defect, and the defect is repaired at the chunk-boundary or vocabulary layer. Naming
+the defect a layer puts five or six things in a set that has four, and the diagnosis
+table stops being exhaustive.
+
+Only one of the four is fixed by editing the document. Two further verdicts are not
+layers at all — the fact was never migrated, and the row itself is wrong — which is
+why the table below has six rows. Diagnose before you touch anything; each verdict
+ends in a hand-off, not in a fix:
 
 | Verdict | The observation that produces it | Whose ground the fix is |
 |---|---|---|
 | the fact is not in the corpus at all | it is not in the source documents | `writing-retrievable-knowledge` — write it |
-| …and it is still in the prompt | it is in the standing text, never migrated | `prompt-to-corpus-migration` — this is its step 1, not a test failure |
+| …and it is still in the prompt | it is in the standing text, never migrated | `prompt-to-corpus-migration` — this is its step 1, not a test failure. A model cannot load that skill: ask the user to run it, which they invoke by name |
 | the chunk boundary orphaned it | it is there, and the produced chunk holding it cannot stand alone | `writing-retrievable-knowledge` |
 | the vocabulary is the team's, not the user's | the chunk is whole, and is not in the top ranks even with the gate open | `writing-retrievable-knowledge` |
 | the threshold or the router discarded it | it ranks first with the gate open, and the shipped path returns nothing | `retrieval-that-earns-its-place` |
@@ -334,7 +411,7 @@ script:
 | whether to retrieve at all, what belongs in the corpus, where the threshold sits, the router's signal, whether retrieved text is stored in chat memory | `retrieval-that-earns-its-place` |
 | how the splitter cuts, what makes a chunk stand alone, how a document is worded so the user's phrasing matches it | `writing-retrievable-knowledge` |
 | deterministic versus live, what the build gates on, how many rows a gate needs, an LLM judge, and the rule for when the row is the thing that is wrong | `agentic-evals` |
-| content sitting in a prompt that should be in the corpus, and when the prompt text may finally be deleted | `prompt-to-corpus-migration` |
+| content sitting in a prompt that should be in the corpus, and when the prompt text may finally be deleted | `prompt-to-corpus-migration` — a model cannot load it; ask the user to run it, which they invoke by name |
 | an absent control at a seam — no output guardrail, a catalogue that loads eleven of twelve entries | `agentic-codebase-audit` |
 
 ## Done when
@@ -343,7 +420,7 @@ Run in order; done is the right-hand column.
 
 | # | Check | Done when |
 |---|---|---|
-| 1 | Find the question list that already exists | you extended `writing-retrievable-knowledge`'s list or `prompt-to-corpus-migration`'s acceptance list — there is one list in the repository, not three |
+| 1 | Find the question list that already exists | you extended `writing-retrievable-knowledge`'s list or `prompt-to-corpus-migration`'s acceptance list — there is one list in the repository, not three, and it is committed beside the corpus. Where the acceptance list is the one to extend and does not exist yet, a model cannot produce it: ask the user to run `prompt-to-corpus-migration`, which they invoke by name, and this row stays open until they have |
 | 2 | Read the retrieval configuration you are asserting against | top-k, the threshold, the embedding model and whether a router exists are written down with the file each came from, including any the library defaults and nobody set |
 | 3 | Write the positive rows | each names an `expected_source` and the `routing_input` a real turn carries; no row asserts merely that something came back |
 | 4 | Write the negative half | every row is in the product's own vocabulary, names which emptiness it asserts, and every tool in the catalogue has been walked for the question it serves; no absurdity stands in for a near-miss |
@@ -351,7 +428,7 @@ Run in order; done is the right-hand column.
 | 6 | Pin the distribution | the lowest relevant top score and the highest irrelevant one are asserted, measured with the gate open, and the assertion says what a flip means |
 | 7 | Decide where the suite runs and what it gates | decided by the embedding model, sized off `agentic-evals`'s `SIZING.md`, and the gate written as a count wherever the negative half is under about twenty rows |
 | 8 | Run it through the shipped path | the router and threshold the application ships; the only open-gate call in the file is the distribution probe, and a comment says why |
-| 9 | Diagnose every failure before editing anything | `DIAGNOSIS.md` ran, the verdict names the layer that failed, and the fix went to the skill that owns that layer — no document was edited on a hunch |
+| 9 | Diagnose every failure before editing anything | `DIAGNOSIS.md` ran, the verdict names which of the four layers failed, and the fix went to the skill that owns that layer — no document was edited on a hunch. Where the verdict is *never migrated*, the owner is `prompt-to-corpus-migration` and a model cannot hand off to it: ask the user to run it, which they invoke by name |
 | 10 | Check both directions | every corpus document is some positive row's `expected_source`, and every `expected_source` names a document that exists |
 | 11 | Commit the set beside the corpus | rows in a stable order, each with its provenance; any edited row in its own commit with its reason |
 

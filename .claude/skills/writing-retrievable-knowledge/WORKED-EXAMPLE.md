@@ -5,9 +5,11 @@ drafting a first section and the rules in [`SKILL.md`](SKILL.md) need a shape.
 
 The domain is invented and neutral: the assistant of a public library, whose
 corpus is the library's own rules. The splitter numbers below — **600 characters,
-100 of overlap, cuts at structure, three chunks per answer** — are borrowed from
-this repository's own splitter and retrieval settings purely to make the example
-concrete. Read your own before applying any of it.
+no overlap, cuts at structure, three chunks per answer** — are borrowed from this
+repository's own splitter and retrieval settings purely to make the example
+concrete, with the overlap zeroed so that one cut is visible end to end.
+*What 100 of overlap would have done* below puts the repository's real setting
+back and says what it changes. Read your own before applying any of it.
 
 ## Before
 
@@ -27,28 +29,55 @@ budget, so nothing here is a length problem. It still fails.
 
 ## The chunk the model was given
 
-The section is third in the document. The splitter packs whole sections into a
-segment until the next one will not fit, then descends to finer granularity for
-the run that overflows — so a structural splitter still cuts inside a paragraph,
-and here the boundary landed just after the heading:
+The section is third in the document. The splitter works **paragraph by
+paragraph**, packing them into a segment until the next one will not fit and then
+flushing — and a Markdown heading set off by a blank line **is a paragraph of its
+own**. The two shorter sections above leave the open segment holding 454
+characters; `## Renewal policy` is 17, so it fits and is appended, closing the
+segment at 473. The 410-character paragraph under it does not fit, the segment
+flushes there, and the paragraph becomes the whole of the next chunk:
 
 ```
-It is applied automatically at the end of the term, provided that no other
-patron has placed a hold on the title and that the account is in good standing
-as described above. Where this is not possible, the item must be returned by
-the due date printed on the receipt, to avoid the accrual of overdue charges.
+Our circulation system allows patrons to extend the borrowing period of most
+items in the collection. It is applied automatically at the end of the term,
+provided that no other patron has placed a hold on the title and that the
+account is in good standing as described above. Where this is not possible,
+the item must be returned by the due date printed on the receipt, to avoid the
+accrual of overdue charges.
 ```
 
-Which cut it was does not matter. **Every cut of that section produces a passage
-that cannot stand alone**, and one of them is what the user's question will draw.
+410 characters in which the word *renew* never appears and the rule being stated
+is "it". This is not a pathological cut and nothing overflowed: it is the boundary
+the structural
+strategy was choosing on purpose, on a section that stayed comfortably inside the
+budget the whole time. **The section's length would never have warned you**, and
+neither would reading the document top to bottom.
 
-## Why it does not retrieve, layer by layer
+## What 100 of overlap would have done
+
+Put this repository's real overlap back — 600 characters with 100 of overlap — and
+this particular chunk is rescued. The overlap is taken as whole sentences from the
+end of the flushed segment, `## Renewal policy` is the last of them, so it rides
+forward and the next chunk opens with its own heading: 429 characters rather than
+410.
+
+That is what *insurance against a bad cut* means in [`SKILL.md`](SKILL.md) — and
+insurance is all it is. The same page calls overlap "never a licence to write
+across" a cut, and says of the heading itself: "never rely on it travelling with
+the paragraph under it." Here the insurance happened to pay. It is
+conditional on three things the writer does not control: an overlap budget large
+enough to hold the heading, a splitter that takes its overlap from the end of the
+previous segment at all, and the heading being the last thing in that segment. The
+rest of this page is what the section has to survive when the rescue does not come
+— and the rewrite below survives the cut rather than depending on being spared it.
+
+## Why it does not retrieve, defect by defect
 
 The user typed: *"can I keep this book longer or do I have to bring it back"*.
 
-| Layer | What went wrong |
+| Writing defect | What went wrong |
 |---|---|
-| subject | The subject of the chunk is "it". The noun it stands for — the extension of a borrowing period — is in the heading, which the cut left behind. The passage is about nothing |
+| subject | The section explains renewing a loan. The word *renewal* occurs once, in the heading the cut left behind; inside the chunk the thing being explained is "it". A passage about renewing a loan that never says *loan* or *renew* is a passage about nothing |
 | first sentence | The section opens with "Our circulation system allows patrons to…". Preamble is what the section is matched on, and preamble is what it matches |
 | vocabulary | The document says *circulation*, *patron*, *hold*, *overdue charges*. The user says *keep it longer*, *bring it back*, *reserved*, *fine*. Not one content word meets |
 | cross-reference | "as described above" points at a good-standing rule in another chunk, which will not be retrieved alongside this one. The condition on the answer is unreachable from the answer |
@@ -70,15 +99,24 @@ due on the date printed on the receipt and a late fee — the fines on your
 account — starts the day after.
 ```
 
-461 characters (`wc -m`): 31 more than the original, 7% longer, and still one
-segment. **Rich did not mean bigger.** It meant that the words a user types are in
-the text, the subject is named where the cut can reach it, and the exception is
-answered in the same chunk as the rule.
+461 characters (`wc -m`): 31 more than the original, 7% longer, and still inside
+the 600-character budget. **Rich did not mean bigger.** It meant that the words a
+user types are in the text, the subject is named where the cut can reach it, and
+the exception is answered in the same chunk as the rule.
+
+**The cut does not change; what arrives does.** Run the rewritten document through
+the same splitter at the same settings and the boundary lands in exactly the same
+place — the question-heading packs onto the segment above, the paragraph starts the
+next chunk, headless as before. That chunk is 417 characters and it opens *"A loan
+renews for another three weeks, automatically, on its due date."* 410 characters
+that never named their subject became 417 that answer the question, at the same
+boundary, from a splitter nobody reconfigured.
 
 What each change bought:
 
 - **"A loan"** replaces "it", in the first sentence and again in the third. Cut this
-  section anywhere and the surviving half still says what it is about.
+  section anywhere — including at the heading boundary that orphaned the original —
+  and the surviving half still says what it is about.
 - **The answer is the first clause.** "Renews for another three weeks,
   automatically, on its due date" is what carries the section in the embedding.
 - **Both vocabularies are present**: *renew* and *keep it longer*; *reserved* rather
@@ -105,7 +143,11 @@ else has reserved does not renew, so it becomes late on its due date."*
 ## This rewrite is a hypothesis
 
 Nothing above proves the new section retrieves for the question that failed. Reading
-a document is not evidence about an embedding. Hand it to `corpus-retrieval-tests`,
-which turns "can I keep this book longer" into a row naming the chunk it must return,
-and which owns the diagnosis if it still does not — chunk boundary, vocabulary,
-threshold or router, in that order.
+a document is not evidence about an embedding, and neither is a chunk boundary you
+have watched land where you wanted it. Ask the user to run `corpus-retrieval-tests`,
+which they invoke by name — a model cannot load it, so nothing said here reaches it
+on its own. That skill turns "can I keep this book longer" into a row carrying the
+question, the intended chunk — `expected_source` in the query set — and the
+negatives, and it owns the diagnosis when the row still fails — which of the four
+layers missed: corpus, chunk boundary, vocabulary, threshold-or-router, in that
+order.

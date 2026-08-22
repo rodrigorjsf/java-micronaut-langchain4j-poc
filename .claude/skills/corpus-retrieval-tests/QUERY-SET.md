@@ -80,10 +80,13 @@ Read the negative half as four different assertions rather than four synonyms fo
   row most likely to break on an embedding-model change.
 
 Three of the eight positives are variants — `renew-002` through `renew-004` — and
-each names a layer it can break: the Spanish the library serves, the terse typed
-form, and a misspelling. The misspelling row also carries the `evasion` family, so
-`agentic-evals`'s rule applies and it is asserted individually rather than averaged
-in.
+each names the layer it can break, in [`SKILL.md`](SKILL.md)'s sense of the word and
+no other. `renew-002` is Spanish, so it breaks at **the corpus**: if the corpus
+carries only the English half, no wording of the query reaches it. `renew-003`, the
+terse typed form, and `renew-004`, a misspelling, both break at **the vocabulary**.
+`renew-004` additionally carries the `evasion` family — a family is a tag an
+assertion selects on, never a layer — so `agentic-evals`'s rule applies and it is
+asserted individually rather than averaged in.
 
 `fines-002` is **not** a variant, although it shares a document with `fines-001`. A
 second question-intent against the same section is a base row, and that is the axis

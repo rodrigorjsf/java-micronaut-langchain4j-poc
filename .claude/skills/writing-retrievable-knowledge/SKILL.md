@@ -1,6 +1,6 @@
 ---
 name: writing-retrievable-knowledge
-description: Write a document so that one retrieved chunk of it answers the user alone. Use when adding a file to a retrieval corpus, when writing or rewriting a knowledge document, when a question that should match a document does not, when deciding how to break a document into headings and sections for a splitter, when a retrieved passage arrives meaning nothing on its own, or when the corpus is in the team's vocabulary and the users are not. For whether the content belongs in a corpus at all, its threshold and its router, use retrieval-that-earns-its-place; for content sitting in a prompt that should move, prompt-to-corpus-migration; for proving the finished document actually retrieves, corpus-retrieval-tests.
+description: Write a document so that one retrieved chunk of it answers the user alone. Use when adding a file to a retrieval corpus, when writing or rewriting a knowledge document, when a question that should match a document does not, when deciding how to break a document into headings and sections for a splitter, when a retrieved passage arrives meaning nothing on its own, or when the corpus is in the team's vocabulary and the users are not. For whether the content belongs in a corpus at all, its threshold and its router, use retrieval-that-earns-its-place; for content sitting in a prompt that should move, ask the user to run prompt-to-corpus-migration, and for proving the finished document actually retrieves, corpus-retrieval-tests — both of which they invoke by name.
 ---
 
 # Writing a document that retrieves
@@ -22,7 +22,7 @@ any one of its pieces, read alone, is worth retrieving.
 | you are rewriting an existing document to retrieve better | [`WORKED-EXAMPLE.md`](WORKED-EXAMPLE.md) |
 | the document carries a table, a numbered list or a code sample | *Structures that do not survive a cut* |
 | you are not sure this content belongs in a corpus at all | `retrieval-that-earns-its-place` — that decision comes before this page |
-| this content is currently in a system prompt | `prompt-to-corpus-migration` — audit and plan first, write second |
+| this content is currently in a system prompt | ask the user to run `prompt-to-corpus-migration`, which they invoke by name — audit and plan first, write second |
 
 This page decides nothing about retrieval configuration. It **reads** the
 configuration and writes against it. Choosing the threshold or the router belongs
@@ -45,9 +45,10 @@ is loaded and written to the store for `split`, `chunk_size`, `chunk_overlap`,
   answers the question and you go and read the service's setting. Guessing here is
   how a corpus gets written to 1,000 characters and ingested at 250.
 
-(On a migration run these numbers are already in `prompt-to-corpus-migration`'s
-ledger. Take them from there rather than reading them twice — and still settle the
-unit question below, which a ledger entry may not record.)
+(On a migration run — one the user starts, since `prompt-to-corpus-migration` is not
+a skill a model can load — these numbers are already in that skill's ledger. Take
+them from there rather than reading them twice, and still settle the unit question
+below, which a ledger entry may not record.)
 
 **Ask which unit it counts.** `512` in one framework is tokens; `600` in another is
 characters. English prose is commonly quoted at roughly four characters per token —
@@ -123,7 +124,7 @@ single sentence it needs and nothing else.
 
 → [`WORKED-EXAMPLE.md`](WORKED-EXAMPLE.md) — open when rewriting a section that does
 not retrieve: one badly written section in a neutral domain, the chunk it produced,
-the five layers of the failure named one at a time, and the rewrite.
+the five writing defects named one at a time, and the rewrite.
 
 ## One question per section, answered in the first sentence
 
@@ -166,25 +167,28 @@ Put the user's phrasing into the document on purpose:
 - the **terse form** somebody types at speed, without punctuation or a verb;
 - the **question itself**, as a heading or as a sentence in the section.
 
-Where to get those words, cheapest first: **real query logs**, where they exist and
-privacy allows; the **support inbox** — ticket subject lines are the user's own
-phrasing, unedited; your own **tools' failure messages**, because users quote those
-back verbatim; and the **labels in the interface** the user was looking at when the
-question formed.
+**Where those words come from is one priority-ordered list, and
+`corpus-retrieval-tests` owns it.** Read it there rather than from a second copy on
+this page: two copies drift, and the one you would be reading is the wrong one. What
+this page needs from that list is only the property that makes it work — the wording
+is somebody else's.
 
-When you have none of those, write the question list yourself and then have
+Where this project has none of the sources that list names, write the questions
+yourself and then have
 somebody who has not read the document write twenty more. Questions written by the
 document's author reuse the document's vocabulary and match by construction — a
 rigged green, the same one `authoring-agent-skills` warns about for skill
 descriptions.
 
-**That question list is shared, and its ownership is split.** You build it here to
-know what to write and to check coverage in both directions — or, on a migration
-run, you extend the acceptance questions `prompt-to-corpus-migration` already
-wrote, rather than starting a second list nobody reconciles. `corpus-retrieval-tests`
-turns the same list into rows — a positive question with the chunk it must retrieve
-and the negatives — and owns the diagnosis when a row fails. Commit the list with
-the document; do not write assertions in this pass.
+**There is one question set, it has one home, and it has one owner.** It is committed
+beside the corpus, and `corpus-retrieval-tests` owns its schema. You build it here to
+know what to write and to check coverage in both directions — or, on a migration run,
+you extend the acceptance questions `prompt-to-corpus-migration` already wrote into
+that same set, rather than starting a second list nobody reconciles. Later,
+`corpus-retrieval-tests` turns each question into a row — the question, the intended
+chunk (`expected_source` in the query set) and the negatives — and owns the diagnosis
+when a row fails. Commit the questions with the document in this pass; do not write
+assertions.
 
 ## Structures that do not survive a cut
 
@@ -245,12 +249,20 @@ turns out to be.
 
 ## Where this sits in the order of work
 
+**Three skills, four steps, one order, and it does not commute.**
+
 | Step | Skill | What it produces |
 |---|---|---|
-| audit and plan | `prompt-to-corpus-migration` | content in the wrong place, and where each piece goes |
-| write the document | this page | the document, and the question list beside it |
-| prove it answers | `corpus-retrieval-tests` | rows that pass, and a diagnosis when they do not |
-| delete the text from the prompt | `prompt-to-corpus-migration` | a smaller prompt — **only after the rows pass** |
+| audit and plan | `prompt-to-corpus-migration` — ask the user to run it, which they invoke by name | content in the wrong place, and where each piece goes |
+| write the document | this page | the document, and the question set beside it |
+| prove it answers | `corpus-retrieval-tests` — ask the user to run it, which they invoke by name | rows that pass, and a diagnosis when they do not |
+| delete the text from the prompt | `prompt-to-corpus-migration` again — the user's run, not yours | a smaller prompt — **only after the rows pass** |
+
+**This page is the only one of the four steps a model can start.**
+`prompt-to-corpus-migration` and `corpus-retrieval-tests` both carry
+`disable-model-invocation: true`, so nothing a model emits reaches either of them.
+Steps 1, 3 and 4 happen when the user runs those skills by name — a model that
+reports one of them done has reported something it could not have done.
 
 Deleting the prompt text before the rows pass is how a capability disappears with
 nothing red. And some content is never migrated at all: a rule that applies to
@@ -268,9 +280,9 @@ Run in order; done is the right-hand column.
 | 3 | Delete everything above each section and read it alone | the subject noun is named in the section, no pronoun points outside it, and no cross-reference asks the chunk to follow something it cannot |
 | 4 | Read only the first sentence of every section | it answers the question, and it contains words a user would actually type |
 | 5 | Read the sections against each other | no two restate the same explanation; each carries a distinct fact under its repeated subject |
-| 6 | Check the question list against the document in both directions | every question reaches a section and every section is reached by a question; the list is committed beside the document for `corpus-retrieval-tests` |
-| 7 | Ask where the question wording came from | some of it is from turns written by somebody who did not write the document — logs, tickets, tool failure messages — and not only from you |
+| 6 | Check the question set against the document in both directions | every question reaches a section and every section is reached by a question; the set is committed beside the corpus, in the schema `corpus-retrieval-tests` owns |
+| 7 | Ask where the question wording came from | some of it came from the sources named in `corpus-retrieval-tests`' priority-ordered list — turns written by somebody who did not write the document — and not only from you |
 | 8 | Find every table, list, code sample and document-wide qualifier | each fits inside one segment with its header, stem or explanation, or has been rewritten as sentences that stand alone |
 | 9 | Ask of each claim what makes it true | each names a checkable thing in the system; nothing in the document is a fact nobody owns |
 | 10 | Settle whether metadata is embedded here | settled by reading the ingest path or by the two-chunk comparison, and every word that must match is in the chunk text regardless |
-| 11 | Hand the document to `corpus-retrieval-tests` | a positive row exists for each question and passes. Reading the document is not evidence that it retrieves — this row is the only one that closes the work |
+| 11 | Ask the user to run `corpus-retrieval-tests`, which they invoke by name | a positive row exists for each question, naming the intended chunk as its `expected_source`, and passes. Reading the document is not evidence that it retrieves; this row is the only one that closes the work, and it is not a row a model can close from here |

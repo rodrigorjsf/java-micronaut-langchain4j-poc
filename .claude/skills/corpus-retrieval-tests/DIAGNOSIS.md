@@ -1,9 +1,12 @@
 # Which layer failed
 
 Open this the moment a row fails, and before editing anything. A question that
-should retrieve and does not has four causes with four different fixes and four
-different owners, and they are indistinguishable from the failing assertion alone.
-The rules live in [`SKILL.md`](SKILL.md); this is the procedure.
+should retrieve and does not fails at one of the four layers [`SKILL.md`](SKILL.md)
+names — **the corpus, the chunk boundary, the vocabulary, or the
+threshold-or-router** — four causes with four different fixes and four different
+owners, indistinguishable from the failing assertion alone. *Layer* means those four
+and nothing else, here as there. The rules live in [`SKILL.md`](SKILL.md); this is
+the procedure.
 
 **Run the probes in order.** Each one is cheap, each one prints something you can
 paste into the commit or the issue, and each one removes a layer from suspicion.
@@ -39,7 +42,7 @@ grep -rin "renew\|due date" <corpus directory>
 | What you see | Verdict | Hand it to |
 |---|---|---|
 | no hit anywhere | **the fact is not in the corpus** | `writing-retrievable-knowledge` — write the section |
-| no hit, but the fact is in the system prompt | **never migrated** | `prompt-to-corpus-migration` — this is its step 1, not a test failure |
+| no hit, but the fact is in the system prompt | **never migrated** | `prompt-to-corpus-migration` — its step 1, not a test failure. A model cannot load that skill: ask the user to run it, which they invoke by name |
 | a hit | continue to probe 2 | |
 
 The second row is the one people miss on a migration run, and it looks exactly
@@ -78,13 +81,14 @@ was fine.
 
 Build a second retriever over the **same store and the same embedding model**, with
 no minimum score and a large k — ten, or the whole store on a small corpus. Run the
-failing question through it and print rank, score and source for every hit. The
-scores below are invented along with the domain — read your own:
+failing question through it and print rank, score and source for every hit, and mark
+the intended chunk — `expected_source` in the query set, which is the field's only
+name. The scores below are invented along with the domain — read your own:
 
 ```
 rank  score   source
 1     0.74    fines.md
-2     0.72    renewals.md      <- the intended chunk
+2     0.72    renewals.md      <- the intended chunk (the row's expected_source)
 3     0.69    holds.md
 ```
 
