@@ -108,16 +108,16 @@ class LangfuseScoreWriterTest {
     @Test
     @DisplayName("an explicitly targeted score carries every field the Scores API documents")
     void anExplicitlyTargetedScoreIsComplete() {
-        writer.record(TARGET, Score.categorical("triage_outcome", "ANSWERED")
-                .withComment("in scope, two tools ran"));
+        writer.record(TARGET, Score.categorical("triage_decision", "IN_SCOPE")
+                .withComment("asked about the weather"));
 
         assertThat(scores.awaitNext().body())
                 .containsEntry("traceId", TARGET.traceId())
                 .containsEntry("observationId", TARGET.observationId())
-                .containsEntry("name", "triage_outcome")
-                .containsEntry("value", "ANSWERED")
+                .containsEntry("name", "triage_decision")
+                .containsEntry("value", "IN_SCOPE")
                 .containsEntry("dataType", "CATEGORICAL")
-                .containsEntry("comment", "in scope, two tools ran")
+                .containsEntry("comment", "asked about the weather")
                 // The spans carry this too. A score filed under a different environment
                 // from its trace is invisible behind Langfuse's environment filter: the
                 // trace is listed, its evaluation is not, and it reads as a lost write.
