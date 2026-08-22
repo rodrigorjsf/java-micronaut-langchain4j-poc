@@ -92,8 +92,15 @@ agentic:
     credentials:
       # Placeholders resolve straight from the environment, so the untracked .env
       # that Docker Compose loads is the only place a key ever lives.
-      google-api-key: ${GOOGLE_API_KEY:``}
-      openai-api-key: ${OPENAI_API_KEY:``}
+      #
+      # `${VAR:}` and NOT `${VAR:``}`. The second spelling looks like an escaped empty
+      # default and is not one: with the variable unset it resolves to the two-character
+      # string `` , which is not blank. ProviderCredentials.has() then answers true for a
+      # key that does not exist, MissingCredentialsException never fires, and instead of
+      # "set it in the untracked .env" at startup the first user gets a 400 from the
+      # provider. Pinned by ConfigurationPlaceholderTest.
+      google-api-key: ${GOOGLE_API_KEY:}
+      openai-api-key: ${OPENAI_API_KEY:}
 
     models:
       judge:
@@ -192,23 +199,22 @@ agentic:
     # could keep a child and drop its root would produce orphans.
     sample-rate: ${AGENTIC_TRACE_SAMPLE_RATE:1.0}
 
-    # Deliberately ABSENT rather than defaulted to an empty placeholder. `${VAR:``}`
-    # does not resolve to "nothing" — it resolves to the two-character string `` , which
-    # is not blank, so an exporter is built and the OpenTelemetry SDK rejects it with
-    # "OTLP endpoint must be a valid URL". Every bean that needs an HTTP client then
-    # fails to instantiate, which is how one unset environment variable took out 42
-    # tests that have nothing to do with tracing.
-    #
-    # Micronaut binds environment variables to property names on its own, so these are
-    # set without appearing here at all:
-    #
-    #   AGENTIC_OBSERVABILITY_OTLP_ENDPOINT        -> agentic.observability.otlp.endpoint
-    #   AGENTIC_OBSERVABILITY_LANGFUSE_HOST        -> agentic.observability.langfuse.host
-    #   AGENTIC_OBSERVABILITY_LANGFUSE_PUBLIC_KEY  -> agentic.observability.langfuse.public-key
-    #   AGENTIC_OBSERVABILITY_LANGFUSE_SECRET_KEY  -> agentic.observability.langfuse.secret-key
-    #   AGENTIC_OBSERVABILITY_RELEASE              -> agentic.observability.release
-    #
-    # compose.observability.yaml sets them; docs/07-observability.md explains them.
+    # An empty default is written `${VAR:}`. The spelling `${VAR:``}` looks like the same
+    # thing and is not: it resolves to the two-character string `` , the exporter is built
+    # on it, and the OpenTelemetry SDK refuses with "OTLP endpoint must be a valid URL" —
+    # taking down every bean that needs an HTTP client with it.
+    release: ${AGENTIC_RELEASE:}
+
+    otlp:
+      # An OpenTelemetry collector. Blank means no collector and no connection attempt.
+      endpoint: ${AGENTIC_OBSERVABILITY_OTLP_ENDPOINT:}
+
+    langfuse:
+      # A Langfuse instance, reached directly. All three must be non-blank for the
+      # exporter to be built at all — see LangfuseOtlpSettings.
+      host: ${AGENTIC_OBSERVABILITY_LANGFUSE_HOST:}
+      public-key: ${AGENTIC_OBSERVABILITY_LANGFUSE_PUBLIC_KEY:}
+      secret-key: ${AGENTIC_OBSERVABILITY_LANGFUSE_SECRET_KEY:}
 
   aws:
     endpoint: ${AWS_ENDPOINT_URL:`http://localhost:4566`}
