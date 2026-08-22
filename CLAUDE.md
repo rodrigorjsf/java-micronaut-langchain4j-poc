@@ -102,6 +102,7 @@ When something fails repeatedly, when User has to re-explain, or when a workarou
 - Hand-off to a user-invoked skill must say "ask the user to run it".
 - Recursive splitters pack the next heading on; run one before printing a chunk.
 - Micronaut empty default is `${VAR:}`; `${VAR:``}` yields the literal two backticks.
+- "Unresolved compilation problem" at runtime = stale IDE classes; `./mvnw clean`.
 
 
 

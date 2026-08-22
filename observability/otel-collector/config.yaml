@@ -40,6 +40,27 @@ processors:
     send_batch_size: 8192
     timeout: 5s
 
+  # Strips the prompt and the completion before anything is stored here.
+  #
+  # The application exports the SAME spans to Langfuse and to this collector, and those
+  # spans carry the user's message, the system prompt and whatever a public API returned.
+  # Langfuse is where that content is meant to be read; Tempo is where latency and shape
+  # are read, and it has no view that renders a prompt. Keeping the payload in both would
+  # double the places a conversation lives for no reader's benefit.
+  #
+  # If you want the content in Tempo too, delete this processor from the pipeline below —
+  # and know that you are doing it.
+  attributes/strip-payloads:
+    actions:
+      - key: langfuse.observation.input
+        action: delete
+      - key: langfuse.observation.output
+        action: delete
+      # The OpenTelemetry GenAI convention's own payload carriers, in case an upstream
+      # library starts emitting them.
+      - pattern: ^gen_ai\.(prompt|completion)
+        action: delete
+
 connectors:
   # Turns spans into RED metrics without the application emitting a single metric.
   span_metrics:
@@ -103,8 +124,12 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [memory_limiter, batch]
+      # strip-payloads before batch: the batch processor is the last thing that should
+      # touch a span, and a redaction that runs after batching is a redaction that can be
+      # skipped when a batch is flushed early.
+      processors: [memory_limiter, attributes/strip-payloads, batch]
       # span_metrics is an EXPORTER here and a RECEIVER in the metrics pipeline below.
+      # It reads dimensions, never payloads, so the stripping above costs it nothing.
       exporters: [otlp_grpc/tempo, span_metrics]
     metrics:
       receivers: [otlp, span_metrics]

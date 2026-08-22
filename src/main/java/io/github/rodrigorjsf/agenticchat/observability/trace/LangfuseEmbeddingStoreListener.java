@@ -80,6 +80,12 @@ public class LangfuseEmbeddingStoreListener implements EmbeddingStoreListener {
 
     private final AgentTracer tracer;
 
+    /**
+     * No {@code ObservationContentPolicy}: nothing this listener writes is content. The
+     * input is a threshold, a result cap and a vector dimension; the output is how many
+     * matches survived and the range they scored in. All of it is measurement, and a
+     * deployment with capture off still needs it to argue about its own threshold.
+     */
     public LangfuseEmbeddingStoreListener(AgentTracer tracer) {
         this.tracer = tracer;
     }

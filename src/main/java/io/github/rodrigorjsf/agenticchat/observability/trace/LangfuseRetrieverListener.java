@@ -81,7 +81,14 @@ public class LangfuseRetrieverListener implements ContentRetrieverListener {
      */
     private static final String OBSERVATION_KEY = "agentic.observation.retrieval";
 
-    /** Filterable, so "which turns retrieved nothing" is a query rather than a scan. */
+    /**
+     * Filterable, so "which turns retrieved nothing" is a query rather than a scan.
+     *
+     * <p>The same number is deliberately written into the output as well. Metadata is what
+     * Langfuse filters on and the output is what a person reads, and a reader who opens one
+     * observation should not have to look at a second field to learn how many segments the
+     * list under their cursor holds.
+     */
     private static final String SEGMENTS = "segments";
 
     /**
@@ -162,10 +169,12 @@ public class LangfuseRetrieverListener implements ContentRetrieverListener {
         var output = new LinkedHashMap<String, Object>();
         output.put(SEGMENTS, results.size());
         output.put("results", results);
-        // Not passed through ObservationContentPolicy: every field here is a score, an
-        // identifier or a length. Retrieving nothing is not an error either, so an empty
-        // result is written as an empty list rather than raised to a WARNING level — the
-        // threshold doing its job looks exactly like this.
+        // Deliberately NOT passed through ObservationContentPolicy: every field here is a
+        // score, an identifier or a length, and none of it is the retrieved text. A
+        // deployment that turns capture off still has to be able to argue about its own
+        // threshold, and the scores are the only thing that argument is made of.
+        // Retrieving nothing is not an error either, so an empty result is an empty list
+        // rather than a WARNING — the threshold doing its job looks exactly like this.
         observation.output(output);
     }
 

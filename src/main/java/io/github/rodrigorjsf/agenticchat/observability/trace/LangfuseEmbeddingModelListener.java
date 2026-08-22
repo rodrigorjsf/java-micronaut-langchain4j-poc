@@ -87,6 +87,10 @@ public class LangfuseEmbeddingModelListener implements EmbeddingModelListener {
     /**
      * How many texts this call embedded. Filterable, and it is what separates the one
      * boot-time ingestion of the corpus from the single-query embeddings that follow.
+     *
+     * <p>It doubles as the key of the same count inside the batch input, on purpose: the
+     * batch shape has to name the number it carries, and naming it anything else would put
+     * two spellings of one quantity into the same span.
      */
     private static final String INPUTS = "inputs";
 
@@ -170,6 +174,9 @@ public class LangfuseEmbeddingModelListener implements EmbeddingModelListener {
             return;
         }
         List<Embedding> embeddings = response.content();
+        // Two integers derived from the call, so not subject to the content policy: with
+        // capture off a trace still shows that an embedding happened and how big it was.
+        // The vectors themselves are never written — 384 floats no reader interprets.
         observation.output(outputOf(embeddings));
 
         var usage = TokenUsageDetails.of(response.tokenUsage());

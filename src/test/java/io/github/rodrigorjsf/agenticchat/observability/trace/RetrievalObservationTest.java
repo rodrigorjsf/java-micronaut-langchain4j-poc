@@ -127,7 +127,12 @@ class RetrievalObservationTest {
         assertThat(retrieval.get(LangfuseAttributes.OBSERVATION_TYPE)).isEqualTo("retriever");
         assertThat(retrieval.get(LangfuseAttributes.OBSERVATION_INPUT)).isEqualTo("\"alpha\"");
         assertThat(retrieval.get(LangfuseAttributes.OBSERVATION_OUTPUT))
-                .contains("\"segments\":1", "\"score\":1.0", "\"source\":\"sobre-o-assistente.md\"");
+                .contains("\"segments\":1", "\"source\":\"sobre-o-assistente.md\"")
+                // Exactly 1.0: identical vectors give a dot product of 1.0 over norms of
+                // exactly 1.0, and (cs + 1) / 2 keeps it there. The pattern allows for the
+                // JSON encoder writing an integral double either way; the value is the point,
+                // not its spelling.
+                .containsPattern("\"score\":1(\\.0)?[,}]");
 
         // The threshold in force, which EmbeddingStoreContentRetriever resolves per query and
         // publishes no getter for — the search request is the only place it surfaces.
