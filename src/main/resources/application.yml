@@ -42,6 +42,23 @@ micronaut:
         descriptions: true
         step: PT1M
 
+# ---------------------------------------------------------------------------
+# OpenTelemetry.
+#
+# The turn is the ROOT observation, not the HTTP request. Langfuse v4 has no separate
+# trace entity — a trace is a group of observations correlated by trace id — and it
+# expects the overall request and response on the root. Left to itself, the Micronaut
+# server filter would put `POST /api/chat` above the turn, and the root would carry
+# neither the user's message nor the reply, one level above the only observation that
+# has them.
+#
+# The exclusion is for this route only. /api/chat/capabilities, /health and /prometheus
+# keep their server spans; they have no turn to be the root of.
+# ---------------------------------------------------------------------------
+otel:
+  exclusions:
+    - /api/chat
+
 endpoints:
   health:
     enabled: true
@@ -138,6 +155,60 @@ agentic:
         input-per-million: 0.15
         cached-input-per-million: 0.075
         output-per-million: 0.60
+
+  # ---------------------------------------------------------------------------
+  # Observability.
+  #
+  # Nothing here is on by default, and that is deliberate: the default build needs no
+  # network, no Docker and no API key, so an exporter configured out of the box would
+  # have every test run open a connection to a collector that is not there.
+  #
+  # Two destinations, both optional and independent:
+  #   otlp.endpoint    an OpenTelemetry collector, which is where the fan-out to
+  #                    Langfuse, Tempo and the span metrics belongs
+  #   langfuse.*       a Langfuse instance directly, so the simplest useful setup does
+  #                    not require running a collector at all
+  #
+  # See compose.observability.yaml and docs/07-observability.md.
+  # ---------------------------------------------------------------------------
+  observability:
+    # Langfuse filters and its alert rules key off this. `default` is Langfuse's own
+    # default environment name.
+    environment: ${AGENTIC_ENVIRONMENT:`default`}
+    # The application version, on every observation so a regression can be attributed
+    # to the deploy that caused it.
+    version: ${AGENTIC_VERSION:`0.1`}
+
+    # Span input and output carry the user's message, the system prompt and whatever a
+    # public API returned. That is the entire point of tracing an agent — a trace with
+    # no content shows the shape of a turn and nothing about it — and it is also where
+    # observability becomes a data-protection decision, so it is a switch rather than
+    # an assumption. Contribute a ContentRedactor bean to mask a field rather than
+    # turning the whole thing off.
+    capture-content: ${AGENTIC_CAPTURE_CONTENT:true}
+
+    # Head sampling, applied at the root and inherited by every child. Trace-level on
+    # purpose: Langfuse needs a root span to build a trace at all, so a sampler that
+    # could keep a child and drop its root would produce orphans.
+    sample-rate: ${AGENTIC_TRACE_SAMPLE_RATE:1.0}
+
+    # Deliberately ABSENT rather than defaulted to an empty placeholder. `${VAR:``}`
+    # does not resolve to "nothing" — it resolves to the two-character string `` , which
+    # is not blank, so an exporter is built and the OpenTelemetry SDK rejects it with
+    # "OTLP endpoint must be a valid URL". Every bean that needs an HTTP client then
+    # fails to instantiate, which is how one unset environment variable took out 42
+    # tests that have nothing to do with tracing.
+    #
+    # Micronaut binds environment variables to property names on its own, so these are
+    # set without appearing here at all:
+    #
+    #   AGENTIC_OBSERVABILITY_OTLP_ENDPOINT        -> agentic.observability.otlp.endpoint
+    #   AGENTIC_OBSERVABILITY_LANGFUSE_HOST        -> agentic.observability.langfuse.host
+    #   AGENTIC_OBSERVABILITY_LANGFUSE_PUBLIC_KEY  -> agentic.observability.langfuse.public-key
+    #   AGENTIC_OBSERVABILITY_LANGFUSE_SECRET_KEY  -> agentic.observability.langfuse.secret-key
+    #   AGENTIC_OBSERVABILITY_RELEASE              -> agentic.observability.release
+    #
+    # compose.observability.yaml sets them; docs/07-observability.md explains them.
 
   aws:
     endpoint: ${AWS_ENDPOINT_URL:`http://localhost:4566`}

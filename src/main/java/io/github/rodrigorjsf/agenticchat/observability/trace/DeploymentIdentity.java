@@ -1,6 +1,5 @@
 package io.github.rodrigorjsf.agenticchat.observability.trace;
 
-import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Value;
 import jakarta.inject.Singleton;
 
