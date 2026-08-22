@@ -385,7 +385,7 @@ naming the skill that owns its **doctrine**, then asks probes that establish
 
 | Neighbour | Way | The discriminator |
 |---|---|---|
-| `agentic-service-composition`, `agentic-tool-boundary`, `conversation-memory-and-compaction`, `agentic-evals`, `llm-cost-observability`, `subagent-context-isolation` | hands to | **fact versus doctrine**, one seam each. The probe records what the code does; the named skill says what it should have been. The audit never argues |
+| `agentic-service-composition`, `agentic-tool-boundary`, `conversation-memory-and-compaction`, `agentic-evals`, `llm-cost-observability`, `subagent-context-isolation` | hands to | **fact versus doctrine.** One seam each, except `agentic-service-composition`, which takes two — model access and prompt assembly. The probe records what the code does; the named skill says what it should have been. The audit never argues |
 | `llm-triage-gate`, `prompt-injection-layers`, `retrieval-that-earns-its-place` | hands to | the same split at the seams that share a probe set — *whether* to fail open, how the layers are ordered, whether this codebase should retrieve at all |
 | `progressive-tool-disclosure`, `reviewing-agent-tools-and-skills` | hands to | **the tool seam splits two ways.** Routing quality goes to the sweep, disclosure economics to that page; the audit keeps only the inventory |
 | `prompt-to-corpus-migration` | both ways | **absent control versus present content.** The audit's prompt-assembly seam scores whether configuration or user data reaches the standing instructions; whether the content *belongs* there is the migration's question, and **a model cannot load it: ask the user to run it, which they invoke by name.** The migration reads the audit's prompt-assembly row in the other direction, and a row naming two assembly points tells it there are two containers before it starts |
@@ -513,7 +513,7 @@ that is configured never seems to run.
 | `progressive-tool-disclosure` | hands to | **the schema price** a merged service pays for capabilities it never calls |
 | `retrieval-that-earns-its-place` | both ways | **the embedder as a role** — resolve it to a model other than the one that built the index and nothing errors, and the threshold measured there is measuring noise |
 | `agentic-evals` | both ways | **wiring versus behaviour.** Answering an in-scope turn is behaviour, so it is an eval case, not a composition rule |
-| `agentic-codebase-audit` | handed by | **doctrine for four separate seams**, the largest single deferral in that file |
+| `agentic-codebase-audit` | handed by | **doctrine for two separate seams** — model access and prompt assembly — the largest single deferral in that file |
 
 ### `conversation-memory-and-compaction`
 
@@ -701,7 +701,7 @@ measured nothing. The second gate is inside step 1: a blind comparison names a
 winner only when the same side wins **both** orders. If it does not, there is no
 winner, and reporting one is the self-assessment the loop exists to remove.
 
-**No step in this chain is typed by a person** — all three skills are model-invoked,
+**No step in this chain is typed by a person** — every skill it names is model-invoked,
 and that absence is checked, not overlooked. The one thing the chain cannot supply
 from this repository is the *harness runner*: which tool fans out, where state
 survives a session, how a run resumes. `gauntlet-loop` defers those to a runner

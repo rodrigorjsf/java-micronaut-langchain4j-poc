@@ -55,10 +55,10 @@ comfortably inside the budget the whole time. **The section's length would never
 neither would reading the document top to bottom.
 
 **And the last-section stipulation only flatters the result.** A renewal section is
-almost never the last thing in a document. Put the *What happens if I return a book
-late?* section below it — the one this page adds later — and the flush leaves 188
-characters of headroom, into which that section's 40-character heading fits and is
-packed on behind the paragraph. The chunk is then 452 characters that still never
+almost never the last thing in a document. Put one more section of the same
+document below it — `## Why did my renewal not go through?`, 37 characters — and
+the flush leaves 188 characters of headroom, into which that heading fits and is
+packed on behind the paragraph. The chunk is then 449 characters that still never
 say *renew*, now carrying the heading of the section they are **not** about. The
 packing only ever runs one way: it makes the chunk longer and the subject no
 clearer.
@@ -85,7 +85,7 @@ conditional on three things the writer does not control: an overlap budget large
 enough to hold the heading, a splitter that takes its overlap from the end of the
 previous segment at all, and the heading being the last thing in that segment. The
 first is the one that decides it — measured, a heading of 118 characters against an
-overlap budget of 100 closes the segment at 573 and the overlap comes back empty,
+overlap budget of 100 closes the segment at 574 and the overlap comes back empty,
 so the next chunk is the same 410 characters, headless. The
 rest of this page is what the section has to survive when the rescue does not come
 — and the rewrite below survives the cut rather than depending on being spared it.
@@ -129,10 +129,10 @@ place — the question-heading packs onto the segment above, the paragraph start
 next chunk, headless as before. That chunk is 417 characters and it opens *"A loan
 renews for another three weeks, automatically, on its due date."* 410 characters
 that never named their subject became 417 that answer the question, at the same
-boundary, from a splitter nobody reconfigured. Restore the late-return section and
-both figures gain the same 42 characters of packed-on heading — 452 before, 459
-after — which changes neither the boundary nor the point: the rewrite survives the
-cut, and the original never did.
+boundary, from a splitter nobody reconfigured. Put the following section back and both
+figures gain the same 39 characters of packed-on heading — 449 before, 456 after —
+which changes neither the boundary nor the point: the rewrite survives the cut, and
+the original never did.
 
 What each change bought:
 
@@ -149,9 +149,11 @@ What each change bought:
 - **The heading is the question**, so it matches whether or not the splitter carries
   headings into chunks — and if it does carry them, it matches twice.
 
-## The trap on the next section down
+## The trap in the section next door
 
-The document also needs *"What happens if I return a book late?"*. The pull is to
+The corpus also needs *"What happens if I return a book late?"* — whether as a
+section further down this document or as a document of its own changes nothing
+here, because both are chunks competing for the same three slots. The pull is to
 restate the renewal rule there for completeness, and that is the failure described
 under *Repeat the subject, not the explanation* in [`SKILL.md`](SKILL.md): two
 sections saying the same thing both match the renewal question, both take a slot of
