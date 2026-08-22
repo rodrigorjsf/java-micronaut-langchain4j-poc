@@ -68,6 +68,14 @@ public interface Observation extends AutoCloseable {
      */
     Observation genAi(String system, String operationName, String requestModel);
 
+    /**
+     * Declares this observation the head of its trace.
+     *
+     * <p>Only the turn does this. Langfuse reads two different attributes for it depending
+     * on which ingestion path the deployment runs, so both are written.
+     */
+    Observation asTraceRoot();
+
     ObservationRef ref();
 
     @Override

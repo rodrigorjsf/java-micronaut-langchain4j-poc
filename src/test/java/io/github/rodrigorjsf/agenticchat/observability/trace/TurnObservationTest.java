@@ -123,6 +123,22 @@ class TurnObservationTest {
     }
 
     @Test
+    @DisplayName("the turn says outright that it is the head of the trace")
+    void theTurnMarksItselfAsTheTraceRoot() {
+        models.model("judge").replyWith(verdict("IN_SCOPE", "GENERAL_QUESTION"));
+        models.model("agent").replyWith("ok");
+
+        turns.handle(new ConversationId("conversa-5"), "bom dia");
+
+        // Langfuse's root predicate is `parent_span_id = '' OR is_app_root = true`, and the
+        // second write path reads a different key with a string comparison. Both are set,
+        // because which path runs is a property of the Langfuse deployment.
+        var attributes = root().getAttributes().asMap();
+        assertThat(attributes).containsEntry(LangfuseAttributes.INTERNAL_IS_APP_ROOT, true);
+        assertThat(attributes).containsEntry(LangfuseAttributes.INTERNAL_AS_ROOT, "true");
+    }
+
+    @Test
     @DisplayName("everything the turn does hangs under the root, so the trace is one tree")
     void everyObservationOfTheTurnIsInTheSameTrace() {
         models.model("judge").replyWith(verdict("IN_SCOPE", "GENERAL_QUESTION"));

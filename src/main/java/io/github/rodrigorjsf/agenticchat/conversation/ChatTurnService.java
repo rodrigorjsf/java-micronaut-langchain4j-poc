@@ -94,6 +94,10 @@ public class ChatTurnService {
                 .build();
         try (var ignored = TurnContext.open(turnAttributes);
              var observation = tracer.start(TRACE_NAME, ObservationType.AGENT)) {
+            // Not redundant with the server-span exclusion. Langfuse decides what a root is
+            // with `parent_span_id = '' OR is_app_root = true`; saying it outright keeps the
+            // trace headed if that exclusion is removed or if another traced service calls in.
+            observation.asTraceRoot();
             observation.input(content.capture(message));
             var turn = observe(observation, conversationId, message);
             observation.output(content.capture(turn.reply()));

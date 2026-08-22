@@ -59,6 +59,26 @@ public final class LangfuseAttributes {
     public static final AttributeKey<String> COMPLETION_START_TIME =
             AttributeKey.stringKey("langfuse.observation.completion_start_time");
 
+    /**
+     * Marks this observation as the head of its trace, for the v4 events write path.
+     *
+     * <p>Langfuse decides what a root is with a query-time predicate:
+     * {@code parent_span_id = '' OR is_app_root = true}. Our root usually satisfies the
+     * first half — the HTTP server span is excluded for {@code /api/chat}, so the turn has
+     * no OTLP parent. Setting this as well means the trace still has a head if that
+     * exclusion is ever removed, or if this service is called by another traced one.
+     */
+    public static final AttributeKey<Boolean> INTERNAL_IS_APP_ROOT =
+            AttributeKey.booleanKey("langfuse.internal.is_app_root");
+
+    /**
+     * The same statement for the dual/legacy write path, which compares
+     * {@code String(attribute) === "true"} instead. Both are set because which path runs
+     * is a property of the Langfuse deployment, not of this application.
+     */
+    public static final AttributeKey<String> INTERNAL_AS_ROOT =
+            AttributeKey.stringKey("langfuse.internal.as_root");
+
     private static final String OBSERVATION_METADATA_PREFIX = "langfuse.observation.metadata.";
     private static final String TRACE_METADATA_PREFIX = "langfuse.trace.metadata.";
 

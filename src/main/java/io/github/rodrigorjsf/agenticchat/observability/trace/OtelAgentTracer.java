@@ -147,6 +147,13 @@ public class OtelAgentTracer implements AgentTracer {
         }
 
         @Override
+        public Observation asTraceRoot() {
+            span.setAttribute(LangfuseAttributes.INTERNAL_IS_APP_ROOT, true);
+            span.setAttribute(LangfuseAttributes.INTERNAL_AS_ROOT, "true");
+            return this;
+        }
+
+        @Override
         public ObservationRef ref() {
             var context = span.getSpanContext();
             return new ObservationRef(context.getTraceId(), context.getSpanId());
