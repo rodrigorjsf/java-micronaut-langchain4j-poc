@@ -1,6 +1,8 @@
 ALWAYS keep `caveman` and `ponytail` skill enabled in ultra mode
 Always remember to consult the advisor when facing MEDIUM or HIGH complex resoning.
 
+ALL code implementations MUST be done using the skill `/mattpocock-skills:tdd`
+
 ## Documentation
 
 Study deliverable: docs are living, not write-once.
@@ -60,7 +62,7 @@ After any substantive implementation in this repository, before declaring the wo
 
 1. Make the deliverable durable first (write the file, save, commit if appropriate).
 2. Call `advisor()` for a second-opinion review of the change.
-3. Run `/code-review` on the diff and resolve any P0/P1 findings before stopping.
+3. Run `/mattpocock-skills:code-review` on the diff and resolve any P0/P1 findings before stopping.
 
 ## Agent skills
 
