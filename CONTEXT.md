@@ -149,6 +149,34 @@ model id; roles are resolved by `ChatModelRegistry` from configuration. This is
 what makes per-role cost and latency separately measurable, and what makes
 swapping a model a deployment decision.
 
+### Observability
+
+**Observation** — one unit of work being traced, in Langfuse's vocabulary. Not a
+synonym for span: a span is the OpenTelemetry record, an observation is what
+Langfuse makes of it, and the mapping is a set of `langfuse.*` attributes this
+codebase writes deliberately. Represented by `Observation`, opened through
+`AgentTracer`, and closed exactly once — Langfuse does not deduplicate a span id it
+has already accepted.
+
+**Observation type** — what kind of work an observation represents: `agent`,
+`chain`, `generation`, `tool`, `guardrail`, `retriever`, `embedding`, `span`,
+`event`, `evaluator`. Load-bearing rather than descriptive. A trace holding only
+`span`, `event` and `generation` gets no agent graph, and only `generation` and
+`embedding` carry usage and cost.
+
+**Turn attributes** — what is true of a whole turn rather than of one step in it:
+the trace name, the session, the environment, the release. Copied onto every span
+by `TurnAttributesSpanProcessor`, because Langfuse v4 queries observations and an
+attribute that lives only on the root is unavailable when filtering its children.
+
+**Seam** — a point where the framework already tells us something happened, so
+that observing it costs no code in the thing observed. Every layer here has one; the
+turn is the single exception, and it is the root.
+
+**Score** — an evaluation attached to one observation, written over the Scores API
+and never over OTLP. It is the only part of the Langfuse data model that is not a
+span, and the reason is that scores aggregate across traces where attributes do not.
+
 ---
 
 ## Bounded contexts, and what may depend on what
@@ -164,7 +192,8 @@ swapping a model a deployment decision.
 | `tools.*` | tool implementations over external data sources | `tools.http`, `skills` |
 | `rag` | corpus ingestion, retrieval, routing | `skills` |
 | `memory` | chat memory stores | `infra` |
-| `llm` | model construction by role | `infra.config` |
+| `llm` | model construction by role | `infra.config`, `observability` |
+| `observability` | token accounting, cost, tracing seams, scores | — |
 | `infra` | AWS and Valkey clients, configuration, clock | — |
 
 Two rules, enforced by ArchUnit rather than by convention:
@@ -174,8 +203,11 @@ Two rules, enforced by ArchUnit rather than by convention:
    made `agent` and `tools` mutually dependent. The fix was to recognise that the
    trip-briefing tool is the *workflow's adapter*, not a data source, and move it
    beside the workflow — which is why a tool lives under `agent.workflow`.
-2. **`infra` and `skills` depend on nothing above them.** They are the bottom of
-   the graph.
+2. **`infra`, `skills` and `observability` depend on nothing above them.** They are
+   the bottom of the graph. `observability` is there on purpose: a tracing layer that
+   depended on the pipeline it observes would be a cycle waiting to happen, and it is
+   why `AgentTracer` is an interface the other packages import rather than a set of
+   calls into them.
 
 ---
 

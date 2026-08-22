@@ -65,6 +65,15 @@ in-process and starting a real Valkey container for the cache.
 ./scripts/check-skill-docs.py     # skill directories vs docs/06-skills.md, both ways
 ```
 
+Traces are optional and off by default. Two profiles, one at a time — the two stacks
+together do not fit beside the app on 7 GB:
+
+```bash
+docker compose -f compose.observability.yaml --profile langfuse up -d  # :3000, the LLM view
+docker compose -f compose.observability.yaml --profile grafana  up -d  # :3001, the service view
+./scripts/check-observability-stack.sh --down                          # pushes a real trace, reads the metric names back
+```
+
 ## What is in it
 
 | | |
@@ -77,6 +86,7 @@ in-process and starting a real Valkey container for the cache.
 | **Memory** | Valkey in front of DynamoDB, with compaction that never drops a skill activation |
 | **Sub-agents** | a composed workflow — resolve, then two lookups in parallel, then summarise — used for context isolation, not for org charts |
 | **Cost** | every token and every dollar tagged by role, with cached-token counts read from the provider |
+| **Observability** | one OpenTelemetry substrate, two readers: Langfuse for prompts, usage, cost and scores; Grafana for rate, errors and duration. Every layer is a listener seam, so no span is started anywhere in the pipeline it describes |
 
 ## When this design applies
 
@@ -106,6 +116,9 @@ Also:
   the tests enforce.
 - **[`docs/adr/`](docs/adr/README.md)** — one record per decision, with the
   measurement behind it.
+- **[`docs/07-observability.md`](docs/07-observability.md)** — what one turn looks
+  like from the outside, the twelve seams that produce it, and the failure modes that
+  are silent.
 - **[`docs/06-skills.md`](docs/06-skills.md)** — the catalogue of
   [`.claude/skills/`](.claude/skills/): what each skill is for, the situation that
   sends you to it, and who fires it. Written to be project-agnostic, so the

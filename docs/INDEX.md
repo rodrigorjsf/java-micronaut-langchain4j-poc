@@ -17,6 +17,7 @@ material is usually in what a measurement overturned, not in what it confirmed.
 | 4 | [Operations](04-operations.md) | Running it, the local AWS emulator, metrics, cost |
 | 5 | [Evaluation](05-evaluation.md) | How a prompt change is proved not to have broken anything |
 | 6 | [Skills](06-skills.md) | Every skill under `.claude/skills/`, what it is for, and the situation that sends you to it |
+| 7 | [Observability](07-observability.md) | What one turn looks like from the outside — Langfuse, Grafana, and the seams that produce both |
 
 ## Two other places to look
 
@@ -42,6 +43,10 @@ Three ADRs carry findings that changed the design rather than confirming it:
 - [0004 — floci](adr/0004-floci-as-the-aws-and-cache-substrate.md): two traps in
   the local AWS emulator, each of which produces a failure that looks like a
   different problem entirely.
+- [0011 — observability](adr/0011-opentelemetry-as-the-observability-substrate.md):
+  a context probe found every trip-briefing sub-agent opening its own **root trace**,
+  and building the cost path surfaced Gemini reasoning tokens billed but counted
+  nowhere.
 
 ## Reusable pieces
 
