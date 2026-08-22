@@ -23,7 +23,7 @@ class ScoreTest {
     void eachFactorySetsItsDataType() {
         assertThat(Score.numeric("latency_ms", 912).dataType()).isEqualTo(Score.DataType.NUMERIC);
         assertThat(Score.bool("answered", true).dataType()).isEqualTo(Score.DataType.BOOLEAN);
-        assertThat(Score.categorical("outcome", "ANSWERED").dataType())
+        assertThat(Score.categorical("triage_decision", "IN_SCOPE").dataType())
                 .isEqualTo(Score.DataType.CATEGORICAL);
         assertThat(Score.text("critique", "reads well").dataType()).isEqualTo(Score.DataType.TEXT);
     }
@@ -50,9 +50,9 @@ class ScoreTest {
         var numeric = Score.numeric("latency_ms", 912);
         assertThat(numeric.stringValue()).isNull();
 
-        var categorical = Score.categorical("outcome", "REFUSED");
+        var categorical = Score.categorical("triage_decision", "OUT_OF_SCOPE");
         assertThat(categorical.numericValue()).isNull();
-        assertThat(categorical.wireValue()).isEqualTo("REFUSED");
+        assertThat(categorical.wireValue()).isEqualTo("OUT_OF_SCOPE");
     }
 
     @Test
@@ -94,7 +94,7 @@ class ScoreTest {
     @DisplayName("a score with no name is refused: the name is a literal at the call site")
     void anUnnamedScoreIsRefused() {
         assertThatIllegalArgumentException().isThrownBy(() -> Score.numeric("  ", 1));
-        assertThatIllegalArgumentException().isThrownBy(() -> Score.categorical(null, "ANSWERED"));
+        assertThatIllegalArgumentException().isThrownBy(() -> Score.categorical(null, "IN_SCOPE"));
     }
 
     @Test
@@ -110,7 +110,7 @@ class ScoreTest {
     @Test
     @DisplayName("a categorical or text score with no value is refused")
     void anEmptyStringValuedScoreIsRefused() {
-        assertThatIllegalArgumentException().isThrownBy(() -> Score.categorical("outcome", " "));
+        assertThatIllegalArgumentException().isThrownBy(() -> Score.categorical("triage_decision", " "));
         assertThatIllegalArgumentException().isThrownBy(() -> Score.text("critique", null));
     }
 
@@ -126,10 +126,10 @@ class ScoreTest {
     @Test
     @DisplayName("a comment is carried without disturbing the value")
     void aCommentDoesNotDisturbTheValue() {
-        var commented = Score.categorical("outcome", "REFUSED").withComment("out of scope");
+        var commented = Score.categorical("triage_decision", "OUT_OF_SCOPE").withComment("no tool covers legal advice");
 
-        assertThat(commented.comment()).isEqualTo("out of scope");
-        assertThat(commented.wireValue()).isEqualTo("REFUSED");
+        assertThat(commented.comment()).isEqualTo("no tool covers legal advice");
+        assertThat(commented.wireValue()).isEqualTo("OUT_OF_SCOPE");
         assertThat(commented.dataType()).isEqualTo(Score.DataType.CATEGORICAL);
         assertThatCode(() -> Score.numeric("latency_ms", 912).withComment(null))
                 .doesNotThrowAnyException();
