@@ -286,9 +286,9 @@ the migration does with each verdict:
 |---|---|
 | the corpus layer — the fact is in no document, and the probe finds it only in the prompt | the document was never written for this fact, so this is a migration that did not happen rather than a test failure — back to step 1. `corpus-retrieval-tests` hands that verdict back to this skill by name |
 | the document is at fault — chunk boundary or vocabulary | back to step 1. The block stays in the prompt meanwhile and the branch does not merge half-done |
-| the retrieval layer is at fault — threshold-or-router | **stop migrating** and fix the layer first (`retrieval-that-earns-its-place`). Every further block loaded onto a layer that cannot route multiplies one defect |
+| the retrieval layer is at fault — threshold or router — **and a signal for this class of turn exists**, so the layer had something to route on and got it wrong | **stop migrating** and fix the layer first (`retrieval-that-earns-its-place`). Every further block loaded onto a layer that cannot route multiplies one defect |
 | the acceptance row was wrong | fix the row, re-run, **and record the edit in the ledger** — a row edited until it passed is honest only when the edit is visible |
-| nothing recognises the turn at all | return the block to the **stays** side of the test above and record why. This is a result, not a failure: question 2 answered "yes" on paper and "no" in practice |
+| the router declined and **no signal for this class of turn exists** — nothing in the turn distinguishes the ones that need this block from the ones that do not | return the block to the **stays** side of the test above and record why. This is a result, not a failure: question 2 answered "yes" on paper and "no" in practice. The layer is not at fault and there is nothing to fix, which is what separates this row from the one above |
 
 ## The plan, and the committed ledger
 

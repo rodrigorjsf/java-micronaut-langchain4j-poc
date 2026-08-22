@@ -102,7 +102,7 @@ wrote down at check 2 of `SKILL.md`'s closing table.
 | the intended chunk ranks inside top-k with a score above the threshold, and the shipped path still returned nothing | **the router** — continue to probe 4 to confirm | `retrieval-that-earns-its-place` |
 | the intended chunk ranks just outside the shipped top-k | **a neighbour took the slot.** Read the chunk that outranked it: usually two sections restate the same explanation and both match | `writing-retrievable-knowledge` |
 
-The example above is the fourth row and then the first: `renewals.md` is reachable,
+The example above is the first row: `renewals.md` is reachable,
 but `fines.md` outscores it on a question about keeping a book longer, which says
 the renewal section is not carrying the user's words.
 

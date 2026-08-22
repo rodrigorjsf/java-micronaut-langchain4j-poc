@@ -168,8 +168,9 @@ Put the user's phrasing into the document on purpose:
 - the **question itself**, as a heading or as a sentence in the section.
 
 **Where those words come from is one priority-ordered list, and
-`corpus-retrieval-tests` owns it.** Read it there rather than from a second copy on
-this page: two copies drift, and the one you would be reading is the wrong one. What
+`corpus-retrieval-tests` owns it** — a skill a model cannot load, so ask the user to
+run corpus-retrieval-tests, which they invoke by name. Read the list there rather
+than from a second copy on this page: two copies drift, and the one you would be reading is the wrong one. What
 this page needs from that list is only the property that makes it work — the wording
 is somebody else's.
 
@@ -281,7 +282,7 @@ Run in order; done is the right-hand column.
 | 4 | Read only the first sentence of every section | it answers the question, and it contains words a user would actually type |
 | 5 | Read the sections against each other | no two restate the same explanation; each carries a distinct fact under its repeated subject |
 | 6 | Check the question set against the document in both directions | every question reaches a section and every section is reached by a question; the set is committed beside the corpus, in the schema `corpus-retrieval-tests` owns |
-| 7 | Ask where the question wording came from | some of it came from the sources named in `corpus-retrieval-tests`' priority-ordered list — turns written by somebody who did not write the document — and not only from you |
+| 7 | Ask where the question wording came from | some of it came from the sources named in `corpus-retrieval-tests`' priority-ordered list — a skill a model cannot load, so ask the user to run corpus-retrieval-tests, which they invoke by name — turns written by somebody who did not write the document, and not only from you |
 | 8 | Find every table, list, code sample and document-wide qualifier | each fits inside one segment with its header, stem or explanation, or has been rewritten as sentences that stand alone |
 | 9 | Ask of each claim what makes it true | each names a checkable thing in the system; nothing in the document is a fact nobody owns |
 | 10 | Settle whether metadata is embedded here | settled by reading the ingest path or by the two-chunk comparison, and every word that must match is in the chunk text regardless |

@@ -412,7 +412,7 @@ script:
 | how the splitter cuts, what makes a chunk stand alone, how a document is worded so the user's phrasing matches it | `writing-retrievable-knowledge` |
 | deterministic versus live, what the build gates on, how many rows a gate needs, an LLM judge, and the rule for when the row is the thing that is wrong | `agentic-evals` |
 | content sitting in a prompt that should be in the corpus, and when the prompt text may finally be deleted | `prompt-to-corpus-migration` — a model cannot load it; ask the user to run it, which they invoke by name |
-| an absent control at a seam — no output guardrail, a catalogue that loads eleven of twelve entries | `agentic-codebase-audit` |
+| an absent control at a seam — no output guardrail, a catalogue that loads eleven of twelve entries | `agentic-codebase-audit` — a model cannot load it either; ask the user to run it, which they invoke by name |
 
 ## Done when
 
