@@ -69,17 +69,24 @@ Put this repository's real overlap back — 600 characters with 100 of overlap �
 this particular chunk is rescued, still on the last-section reading. The overlap is
 taken as whole sentences from the end of the flushed segment, `## Renewal policy`
 is the last of them, so it rides forward and the next chunk opens with its own
-heading: 429 characters rather than 410.
+heading: 429 characters rather than 410. Exactly 429 also depends on something
+the page has not stipulated: the overlap is filled backwards from the end of the
+flushed segment, so once the 17-character heading is in it, whatever sentence
+precedes the heading rides too if it fits in what is left. Measured, a preceding
+sentence of 81 characters produces a 511-character chunk opening on the previous
+section's prose. 429 is the case where nothing else fits — which is the ordinary
+case, and not a thing anybody arranged.
 
 That is what *insurance against a bad cut* means in [`SKILL.md`](SKILL.md) — and
 insurance is all it is. The same page calls overlap "never a licence to write
 across" a cut, and says of the heading itself: "never rely on it travelling with
 the paragraph under it." Here the insurance happened to pay. It is
-conditional on four things the writer does not control: an overlap budget large
+conditional on three things the writer does not control: an overlap budget large
 enough to hold the heading, a splitter that takes its overlap from the end of the
-previous segment at all, the heading being the last thing in that segment, and the
-overlap being taken in units that fit — one that carries whole sentences rescues
-nothing when the sentence before the heading is itself longer than the budget. The
+previous segment at all, and the heading being the last thing in that segment. The
+first is the one that decides it — measured, a heading of 118 characters against an
+overlap budget of 100 closes the segment at 573 and the overlap comes back empty,
+so the next chunk is the same 410 characters, headless. The
 rest of this page is what the section has to survive when the rescue does not come
 — and the rewrite below survives the cut rather than depending on being spared it.
 
