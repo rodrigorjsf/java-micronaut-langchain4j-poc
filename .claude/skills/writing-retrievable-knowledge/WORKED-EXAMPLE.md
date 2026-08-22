@@ -35,7 +35,9 @@ flushing — and a Markdown heading set off by a blank line **is a paragraph of 
 own**. The two shorter sections above leave the open segment holding 454
 characters; `## Renewal policy` is 17, so it fits and is appended, closing the
 segment at 473. The 410-character paragraph under it does not fit, the segment
-flushes there, and the paragraph becomes the whole of the next chunk:
+flushes there, and — **taking the renewal section as the document's last, which
+every figure on this page assumes** — the paragraph becomes the whole of the next
+chunk:
 
 ```
 Our circulation system allows patrons to extend the borrowing period of most
@@ -48,26 +50,36 @@ accrual of overdue charges.
 
 410 characters in which the word *renew* never appears and the rule being stated
 is "it". This is not a pathological cut and nothing overflowed: it is the boundary
-the structural
-strategy was choosing on purpose, on a section that stayed comfortably inside the
-budget the whole time. **The section's length would never have warned you**, and
+the structural strategy was choosing on purpose, on a section that stayed
+comfortably inside the budget the whole time. **The section's length would never have warned you**, and
 neither would reading the document top to bottom.
+
+**And the last-section stipulation only flatters the result.** A renewal section is
+almost never the last thing in a document. Put the *What happens if I return a book
+late?* section below it — the one this page adds later — and the flush leaves 188
+characters of headroom, into which that section's 40-character heading fits and is
+packed on behind the paragraph. The chunk is then 452 characters that still never
+say *renew*, now carrying the heading of the section they are **not** about. The
+packing only ever runs one way: it makes the chunk longer and the subject no
+clearer.
 
 ## What 100 of overlap would have done
 
 Put this repository's real overlap back — 600 characters with 100 of overlap — and
-this particular chunk is rescued. The overlap is taken as whole sentences from the
-end of the flushed segment, `## Renewal policy` is the last of them, so it rides
-forward and the next chunk opens with its own heading: 429 characters rather than
-410.
+this particular chunk is rescued, still on the last-section reading. The overlap is
+taken as whole sentences from the end of the flushed segment, `## Renewal policy`
+is the last of them, so it rides forward and the next chunk opens with its own
+heading: 429 characters rather than 410.
 
 That is what *insurance against a bad cut* means in [`SKILL.md`](SKILL.md) — and
 insurance is all it is. The same page calls overlap "never a licence to write
 across" a cut, and says of the heading itself: "never rely on it travelling with
 the paragraph under it." Here the insurance happened to pay. It is
-conditional on three things the writer does not control: an overlap budget large
+conditional on four things the writer does not control: an overlap budget large
 enough to hold the heading, a splitter that takes its overlap from the end of the
-previous segment at all, and the heading being the last thing in that segment. The
+previous segment at all, the heading being the last thing in that segment, and the
+overlap being taken in units that fit — one that carries whole sentences rescues
+nothing when the sentence before the heading is itself longer than the budget. The
 rest of this page is what the section has to survive when the rescue does not come
 — and the rewrite below survives the cut rather than depending on being spared it.
 
@@ -110,7 +122,10 @@ place — the question-heading packs onto the segment above, the paragraph start
 next chunk, headless as before. That chunk is 417 characters and it opens *"A loan
 renews for another three weeks, automatically, on its due date."* 410 characters
 that never named their subject became 417 that answer the question, at the same
-boundary, from a splitter nobody reconfigured.
+boundary, from a splitter nobody reconfigured. Restore the late-return section and
+both figures gain the same 42 characters of packed-on heading — 452 before, 459
+after — which changes neither the boundary nor the point: the rewrite survives the
+cut, and the original never did.
 
 What each change bought:
 
