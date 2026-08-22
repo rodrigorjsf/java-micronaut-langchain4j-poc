@@ -113,3 +113,10 @@ An in-process embedding model can take seconds to load. Load it eagerly at boot;
 lazily, one unlucky user pays the entire cold start on a request that looked like
 everyone else's. `agentic-service-composition` carries the measured figure and
 the reason eager beats lazy for more than latency.
+
+## Content already sitting in a prompt
+
+The material this document sends to the corpus is often already written —
+sitting in the standing prompt, shipped on every turn whether the turn needs it
+or not. Moving it out is its own procedure, and a model cannot start it: ask the
+user to run prompt-to-corpus-migration, which they invoke by name.
