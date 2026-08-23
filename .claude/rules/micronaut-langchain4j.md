@@ -33,6 +33,15 @@ need for the `google.api.key` transform.
 of the same bean does not pass through the proxy.** An in-class `@Cacheable`
 compiles, runs, and never caches anything. Put the cached method on its own bean.
 
+**An annotated bean the test profile does not select is an annotation nothing
+exercises.** `application-test.yml` sets `agentic.persistence.memory-backend:
+in-memory`, so `WriteThroughChatMemoryStore` — and every `@Observed` on it — is
+absent from the whole default suite, and its advice runs only in Docker. A test
+that wants it has to ask for the backend AND supply the two `@Named` halves;
+`FakeNamedMemoryStores` does that behind `agentic.test.fake-memory-stores`. The
+same applies to any bean whose `@Requires` a profile turns off: the suite stays
+green because the code never ran.
+
 ## Beans and lifecycle
 
 **`@Context` for anything that must exist before something else connects.** The
