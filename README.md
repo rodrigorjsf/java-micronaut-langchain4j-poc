@@ -72,6 +72,16 @@ together do not fit beside the app on 7 GB:
 docker compose -f compose.observability.yaml --profile langfuse up -d  # :3000, the LLM view
 docker compose -f compose.observability.yaml --profile grafana  up -d  # :3001, the service view
 ./scripts/check-observability-stack.sh --down                          # pushes a real trace, reads the metric names back
+./scripts/check-langfuse-ingestion.sh                                  # needs the langfuse profile ALREADY up; it starts nothing
+```
+
+A third check runs the real application beside the collector rather than a synthetic
+payload; it wants ~5.5 GB and a real `GOOGLE_API_KEY` in `.env`. Why that is a different
+question from the two above is
+[§7 · Observability](docs/07-observability.md#the-checks):
+
+```bash
+./scripts/check-app-tracing-e2e.sh --down
 ```
 
 ## What is in it

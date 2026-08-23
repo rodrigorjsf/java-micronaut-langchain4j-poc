@@ -95,7 +95,7 @@ Everything is tagged by **role**, which is the point — see
 
 | Metric | Read it for |
 |---|---|
-| `agentic_llm_tokens_total{role,model,kind}` | where tokens go; `kind=cached_input` is the caching claim |
+| `agentic_llm_tokens_total{role,model,kind}` | where tokens go. The four kinds — `input`, `cached_input`, `output`, `output_reasoning` — are **mutually exclusive**, so `sum by (kind)` is the true total and `cached_input / (input + cached_input)` is the caching claim. `input` is the FRESH input; it stopped including the cached reads when the counters moved onto `TokenUsageDetails` |
 | `agentic_llm_cost_usd_total{role,model}` | spend, decomposed |
 | `agentic_llm_unpriced_calls_total` | **a model with no configured price** — silence here is how a total quietly excludes half the spend |
 | `agentic_triage_decisions_total{decision,intent,source}` | `source=prefilter` vs `model` is the cheap-path hit rate |
