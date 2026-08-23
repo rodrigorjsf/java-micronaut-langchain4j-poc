@@ -153,6 +153,18 @@ public class OtelAgentTracer implements AgentTracer {
         }
 
         @Override
+        public Observation experimentItem(String itemId, Object expectedOutput) {
+            write(LangfuseAttributes.EXPERIMENT_ITEM_ID.getKey(), itemId);
+            // Its OWN span id. See the interface comment for why this is not a parameter.
+            write(LangfuseAttributes.EXPERIMENT_ITEM_ROOT_OBSERVATION_ID.getKey(),
+                    span.getSpanContext().getSpanId());
+            return expectedOutput == null
+                    ? this
+                    : write(LangfuseAttributes.EXPERIMENT_ITEM_EXPECTED_OUTPUT.getKey(),
+                            json.write(expectedOutput));
+        }
+
+        @Override
         public Observation asTraceRoot() {
             span.setAttribute(LangfuseAttributes.INTERNAL_IS_APP_ROOT, true);
             span.setAttribute(LangfuseAttributes.INTERNAL_AS_ROOT, "true");

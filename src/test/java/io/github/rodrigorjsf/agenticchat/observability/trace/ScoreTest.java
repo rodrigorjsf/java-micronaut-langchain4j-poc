@@ -134,4 +134,36 @@ class ScoreTest {
         assertThatCode(() -> Score.numeric("latency_ms", 912).withComment(null))
                 .doesNotThrowAnyException();
     }
+
+    @Test
+    @DisplayName("a correction is the fixed name and data type the Corrections feature reads")
+    void aCorrectionIsNamedOutput() {
+        var correction = Score.correction("Two eggs, not three.");
+
+        // Both halves are fixed by the feature, not by the caller. Langfuse renders a
+        // corrected output only for a score whose name is exactly "output" and whose data
+        // type is CORRECTION; either one spelt differently files an ordinary score that
+        // never appears in the diff view, with no error anywhere.
+        assertThat(correction.name()).isEqualTo("output");
+        assertThat(correction.dataType()).isEqualTo(Score.DataType.CORRECTION);
+        assertThat(correction.wireValue()).isEqualTo("Two eggs, not three.");
+    }
+
+    @Test
+    @DisplayName("a correction is NOT truncated at the TEXT ceiling")
+    void aCorrectionIsNotTruncated() {
+        // A TEXT score is a critique and survives being cut. A correction is the output
+        // the model should have produced, and a cut one is a wrong training example that
+        // reads as a right one. The ceiling belongs to TEXT alone.
+        String long_ = "x".repeat(Score.TEXT_MAX_CHARS + 200);
+
+        assertThat(Score.correction(long_).wireValue()).isEqualTo(long_);
+        assertThat(Score.text("critique", long_).stringValue()).hasSize(Score.TEXT_MAX_CHARS);
+    }
+
+    @Test
+    @DisplayName("an empty correction is a defect at the call site, not a repairable value")
+    void anEmptyCorrectionThrows() {
+        assertThatIllegalArgumentException().isThrownBy(() -> Score.correction("  "));
+    }
 }

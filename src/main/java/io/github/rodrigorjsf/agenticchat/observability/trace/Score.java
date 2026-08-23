@@ -54,6 +54,11 @@ public record Score(String name,
     static final int TEXT_MAX_CHARS = 500;
 
     /**
+     * The name Langfuse matches a corrected output on. Fixed by the feature, not chosen.
+     */
+    static final String CORRECTION_NAME = "output";
+
+    /**
      * The five values the Scores API accepts for {@code dataType}.
      *
      * <p><b>Upper case on the wire</b>, unlike {@link ObservationType}, which Langfuse
@@ -67,9 +72,8 @@ public record Score(String name,
         CATEGORICAL,
         TEXT,
         /**
-         * A human correction entered in the Langfuse UI's annotation queue. Mirrored here
-         * because this enum is a copy of the server's, but no factory produces one: this
-         * application has no path that writes a human's correction.
+         * A corrected output — what the model should have produced. Written by
+         * {@link Score#correction(String)}; see its javadoc for why the name is fixed.
          */
         CORRECTION
     }
@@ -138,6 +142,24 @@ public record Score(String name,
      */
     public static Score text(String name, String value) {
         return new Score(name, DataType.TEXT, null, value, null);
+    }
+
+    /**
+     * The output the model <em>should</em> have produced, in the exact shape Langfuse's
+     * Corrections feature reads: {@code name} is the literal {@code "output"} and the data
+     * type is {@link DataType#CORRECTION}. Neither is the caller's to choose — a
+     * correction filed under any other name is an ordinary score that never reaches the
+     * diff view, and nothing anywhere reports that.
+     *
+     * <p>Not truncated, unlike {@link #text}. A cut critique is still a critique; a cut
+     * correction is a wrong answer that reads as a right one, and its whole purpose is to
+     * become a fine-tuning example.
+     *
+     * <p>Contract read 2026-08-23 from
+     * {@code https://langfuse.com/docs/observability/features/corrections}.
+     */
+    public static Score correction(String correctedOutput) {
+        return new Score(CORRECTION_NAME, DataType.CORRECTION, null, correctedOutput, null);
     }
 
     /**

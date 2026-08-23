@@ -79,8 +79,56 @@ public final class LangfuseAttributes {
     public static final AttributeKey<String> INTERNAL_AS_ROOT =
             AttributeKey.stringKey("langfuse.internal.as_root");
 
+    // --- Experiments. Langfuse has no experiment entity on the wire: a run is a set of
+    // --- ordinary traces, one per item, that carry the same experiment id. Every one of
+    // --- these therefore belongs on EVERY span of EVERY item trace, exactly like the
+    // --- trace-level keys above. Read 2026-08-23 from
+    // --- https://langfuse.com/integrations/native/opentelemetry/experiments
+    public static final AttributeKey<String> EXPERIMENT_ID =
+            AttributeKey.stringKey("langfuse.experiment.id");
+    public static final AttributeKey<String> EXPERIMENT_NAME =
+            AttributeKey.stringKey("langfuse.experiment.name");
+    public static final AttributeKey<String> EXPERIMENT_DATASET_ID =
+            AttributeKey.stringKey("langfuse.experiment.dataset.id");
+    public static final AttributeKey<String> EXPERIMENT_DESCRIPTION =
+            AttributeKey.stringKey("langfuse.experiment.description");
+    public static final AttributeKey<String> EXPERIMENT_ITEM_ID =
+            AttributeKey.stringKey("langfuse.experiment.item.id");
+    /**
+     * The dataset version, for a Langfuse-MANAGED dataset only.
+     *
+     * <p>Nothing in this application populates it, and that is correct rather than
+     * unfinished: the eval rows are local fixtures, and Langfuse's own guide says not to
+     * set an item version for local data. It is named here because it is part of the wire
+     * contract a managed-dataset run would need, and because a constant is cheaper to find
+     * than the sentence explaining its absence.
+     *
+     * <p>{@code langfuse.experiment.item.metadata.*} is absent for the stronger reason: it
+     * had a helper with no callers, which is machinery rather than coverage.
+     */
+    public static final AttributeKey<String> EXPERIMENT_ITEM_VERSION =
+            AttributeKey.stringKey("langfuse.experiment.item.version");
+
+    /**
+     * The span id of the item trace's root, on the root itself and on its children.
+     *
+     * <p>Not a value a caller can supply correctly — it is the id of a span that does not
+     * exist until it has been started — which is why {@code Observation.experimentItem}
+     * derives it rather than accepting it.
+     */
+    public static final AttributeKey<String> EXPERIMENT_ITEM_ROOT_OBSERVATION_ID =
+            AttributeKey.stringKey("langfuse.experiment.item.root_observation_id");
+
+    /**
+     * What the row says the answer should have been. The item ROOT only: it describes the
+     * row, not the model call, the tool call or the guardrail underneath it.
+     */
+    public static final AttributeKey<String> EXPERIMENT_ITEM_EXPECTED_OUTPUT =
+            AttributeKey.stringKey("langfuse.experiment.item.expected_output");
+
     private static final String OBSERVATION_METADATA_PREFIX = "langfuse.observation.metadata.";
     private static final String TRACE_METADATA_PREFIX = "langfuse.trace.metadata.";
+    private static final String EXPERIMENT_METADATA_PREFIX = "langfuse.experiment.metadata.";
 
     /**
      * Langfuse only filters on TOP-LEVEL metadata keys. An ordinary OpenTelemetry
@@ -93,5 +141,9 @@ public final class LangfuseAttributes {
 
     public static AttributeKey<String> traceMetadata(String key) {
         return AttributeKey.stringKey(TRACE_METADATA_PREFIX + key);
+    }
+
+    public static AttributeKey<String> experimentMetadata(String key) {
+        return AttributeKey.stringKey(EXPERIMENT_METADATA_PREFIX + key);
     }
 }
