@@ -1892,8 +1892,8 @@ the script exists.
 | Feature | 4.16.0 | 3.80.0 | What a 3.x reader must do |
 |---|---|---|---|
 | OTLP endpoint accepts the payload | yes | 200 | nothing — the OTLP door is the same door |
-| the trace arrives | yes | yes, stored id `3164386235373930…` | look the trace up by session id, not by the id you sent, if you are pushing OTLP/JSON by hand |
-| OTLP/**JSON** trace ids | normalised | **hex-encoded a second time**: sent `1d8b57907edc…`, stored `316438623537…` | irrelevant to any application using the OTLP protobuf exporter. See the note at the end of this section |
+| the trace arrives | yes | yes, stored id `6261306436353664…` | look the trace up by session id, not by the id you sent, if you are pushing OTLP/JSON by hand |
+| OTLP/**JSON** trace ids | normalised | **hex-encoded a second time**: sent `ba0d656da15f…`, stored `626130643635…` | irrelevant to any application using the OTLP protobuf exporter. See the note at the end of this section |
 
 **Observation types — the ten Langfuse names, and what this version stored**
 
