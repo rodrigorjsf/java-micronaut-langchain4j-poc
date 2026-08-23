@@ -254,13 +254,32 @@ TAGS=$(curl -sS -H "Authorization: $AUTH" "$HOST/api/public/traces/${STORED_TRAC
 [[ "$USER_ID" == "compat-user" ]] && ok "langfuse.user.id survives" || gap "userId read back as '$USER_ID'"
 [[ "$TAGS" == "3x,compat" ]] && ok "langfuse.trace.tags survive" || gap "tags read back as '$TAGS'"
 
+echo "==> the trace root, which is a predicate and not a stored flag"
+# Asserted here because 4.16.0's harness asserts it and requirement 5 is "every feature
+# already implemented". This project writes BOTH spellings — the boolean
+# langfuse.internal.is_app_root for the v4 events path and the string
+# langfuse.internal.as_root for the legacy one — precisely because which path runs is a
+# property of the deployment. 3.x is the deployment that runs the legacy one.
+ROOT_ID=$(jq -r '.data[] | select(.name=="chat-turn") | .id' <<<"$OBS" 2>/dev/null | head -1)
+ROOT_PARENT=$(jq -r '.data[] | select(.name=="chat-turn") | .parentObservationId // "null"' <<<"$OBS" 2>/dev/null | head -1)
+TRACE_NAME=$(curl -sS -H "Authorization: $AUTH" "$HOST/api/public/traces/${STORED_TRACE}" 2>/dev/null | jq -r '.name // ""')
+if [[ "$ROOT_PARENT" == "null" ]]; then ok "the turn observation has no parent, so it heads the trace"; else gap "the turn's parent is '$ROOT_PARENT'"; fi
+if [[ "$TRACE_NAME" == "chat-turn" ]]; then
+  ok "langfuse.trace.name survives — the trace is named, not anonymous"
+else
+  gap "the trace name reads '$TRACE_NAME'; on 3.x a trace is a real entity and this is where its name lives"
+fi
+
 echo "==> scores  (all three data types this project writes)"
 for spec in "triage_confidence|0.93|NUMERIC" "triage_decision|IN_SCOPE|CATEGORICAL" "output|corrigido|CORRECTION"; do
   IFS='|' read -r name value dtype <<<"$spec"
   if [[ "$dtype" == "NUMERIC" ]]; then json_value="$value"; else json_value="\"$value\""; fi
+  # observationId, not traceId alone. This project attaches every score to an OBSERVATION,
+  # because an observation-level evaluator matches an observation and does not read its
+  # siblings — so "scores work on 3.x" is only true if THIS shape is accepted.
   code=$(curl -sS -o /dev/null -w '%{http_code}' -X POST "$HOST/api/public/scores" \
     -H 'Content-Type: application/json' -H "Authorization: $AUTH" \
-    -d "{\"traceId\":\"${STORED_TRACE}\",\"name\":\"${name}\",\"value\":${json_value},\"dataType\":\"${dtype}\"}")
+    -d "{\"traceId\":\"${STORED_TRACE}\",\"observationId\":\"${ROOT_ID}\",\"name\":\"${name}\",\"value\":${json_value},\"dataType\":\"${dtype}\"}")
   if [[ "$code" =~ ^2 ]]; then
     ok "a $dtype score is accepted ($code)"
   elif [[ "$dtype" == "CORRECTION" ]]; then
@@ -269,6 +288,19 @@ for spec in "triage_confidence|0.93|NUMERIC" "triage_decision|IN_SCOPE|CATEGORIC
     bad "a $dtype score answered $code"
   fi
 done
+
+SCORE_TARGET=""
+for _ in $(seq 1 15); do
+  SCORE_TARGET=$(curl -sS -H "Authorization: $AUTH" "$HOST/api/public/scores?traceId=${STORED_TRACE}&limit=10" 2>/dev/null \
+    | jq -r '[.data[] | select(.name=="triage_confidence")][0].observationId // ""')
+  [[ -n "$SCORE_TARGET" ]] && break
+  sleep 3
+done
+if [[ -n "$ROOT_ID" && "$SCORE_TARGET" == "$ROOT_ID" ]]; then
+  ok "a score attaches to the OBSERVATION, not only to the trace"
+else
+  gap "the score read back on observation '$SCORE_TARGET', expected the turn '$ROOT_ID' — observation-level evaluators would have nothing to match"
+fi
 
 echo "==> experiments"
 EXP=$(curl -sS -H "Authorization: $AUTH" "$HOST/api/public/observations?limit=50&name=experiment-item" 2>/dev/null \

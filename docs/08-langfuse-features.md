@@ -1813,7 +1813,7 @@ failure, meaning this script or that server is broken, moves its exit code.
 ### The measured differences
 
 Every line of the recorded run appears below, grouped the way the script's own output is
-grouped: 35 results, of which 19 matched 4.16.0 and 16 are differences. Values are copied
+grouped: 38 results, of which 22 matched 4.16.0 and 16 are differences. Values are copied
 from the run, not restated.
 
 **API surface — what a v4-shaped client would call**
@@ -1867,6 +1867,13 @@ from the run, not restated.
 | `langfuse.user.id` | survives | survives | — |
 | `langfuse.trace.tags` | survive | survive | compare them sorted; Langfuse returns them in its own order |
 
+**Trace identity**
+
+| Feature | 4.16.0 | 3.80.0 | What a 3.x reader must do |
+|---|---|---|---|
+| the turn observation heads the trace | `isRootObservation: true` | no parent, and on 3.x a trace is still a real entity | nothing. This project writes both root spellings — the boolean `langfuse.internal.is_app_root` for the v4 events path and the string `langfuse.internal.as_root` for the legacy one — and 3.x is the deployment that runs the legacy one |
+| `langfuse.trace.name` | survives | survives | — |
+
 **Scores — all three data types this project writes**
 
 | Feature | 4.16.0 | 3.80.0 | What a 3.x reader must do |
@@ -1874,6 +1881,7 @@ from the run, not restated.
 | a `NUMERIC` score | accepted | accepted (200) | — |
 | a `CATEGORICAL` score | accepted | accepted (200) | — |
 | `dataType: "CORRECTION"` | accepted | **rejected, HTTP 400**, "No matching discriminator" | `Score.correction()` has no counterpart here. File the corrected output as a `TEXT` score and lose the diff view and the fine-tuning export, or upgrade |
+| a score attached to an **observation** rather than to the trace | the score's subject is the observation | same — the score reads back on the observation id it was posted with | nothing. This is what `LangfuseScoreWriter` does and it is what an observation-level evaluator needs; it survives |
 
 **Experiments**
 
