@@ -18,6 +18,7 @@ material is usually in what a measurement overturned, not in what it confirmed.
 | 5 | [Evaluation](05-evaluation.md) | How a prompt change is proved not to have broken anything |
 | 6 | [Skills](06-skills.md) | Every skill under `.claude/skills/`, what it is for, and the situation that sends you to it |
 | 7 | [Observability](07-observability.md) | What one turn looks like from the outside — Langfuse, Grafana, and the seams that produce both |
+| 8 | [Wiring Langfuse features](08-langfuse-features.md) | The other direction — pick a feature, get the attributes it needs, the code that writes them, and what 3.80.0 does with it |
 
 ## Two other places to look
 

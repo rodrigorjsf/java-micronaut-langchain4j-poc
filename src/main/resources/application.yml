@@ -52,12 +52,43 @@ micronaut:
 # neither the user's message nor the reply, one level above the only observation that
 # has them.
 #
-# The exclusion is for this route only. /api/chat/capabilities, /health and /prometheus
-# keep their server spans; they have no turn to be the root of.
+# The health probe and the metrics scrape are excluded for a DIFFERENT reason, and it is
+# not tidiness. A server span with no parent is a trace, so a liveness probe polled every
+# few seconds does not sit beside the real traffic — it becomes the traffic. Measured on
+# this project's own Langfuse instance: of the 37 observations the containerised
+# application had ever exported, all 37 were `GET /health` and none was a conversation.
+#
+# Excluded HERE and not in the collector: the application exports to Langfuse directly, so
+# a probe span dropped by a collector processor still arrives at Langfuse. This is the only
+# place that covers both readers.
+#
+# These are regexes matched with Matcher.matches() — a FULL match — so `/health` alone
+# would not exclude `/health/liveness`, which is the path a Kubernetes probe actually calls.
+#
+# /api/chat/capabilities and /api/chat/history keep their server spans: they are real
+# traffic, and neither has a turn to be the root of.
+# ---------------------------------------------------------------------------
+#
+# /api/public/.* is matched on the PATH and is blind to the host, which is a real limitation
+# and not an oversight: Micronaut's exclusion predicate is given the request path and nothing
+# else. It is safe here because this project serves nothing under /api/public and no tool in
+# the catalogue has a path beginning that way — checked, not assumed. A tool whose upstream
+# did would silently lose its client span, so the day one is added, narrow this to the two
+# endpoints the score writer and the exporter actually call.
+#
+# /api/public/.* is LANGFUSE's own API, called by this application's score writer over an
+# instrumented Micronaut HTTP client. Without it every POST /api/public/scores becomes a
+# root span, which becomes a trace, which is exported to Langfuse — telemetry about
+# telemetry, filed beside the conversations. Measured on a six-turn run against a real
+# instance: 10 traces named `POST`, each one a score write, none of them work the
+# application did. This project serves nothing under /api/public.
 # ---------------------------------------------------------------------------
 otel:
   exclusions:
     - /api/chat
+    - /health.*
+    - /prometheus
+    - /api/public/.*
 
 endpoints:
   health:
@@ -194,9 +225,10 @@ agentic:
     # turning the whole thing off.
     capture-content: ${AGENTIC_CAPTURE_CONTENT:true}
 
-    # Head sampling, applied at the root and inherited by every child. Trace-level on
-    # purpose: Langfuse needs a root span to build a trace at all, so a sampler that
-    # could keep a child and drop its root would produce orphans.
+    # Head sampling. The ratio is a pure function of the trace id, so every span of one
+    # trace gets the same decision without anything having to enforce it — see the comment
+    # in TracingDefaults for why the sampler is parent-based anyway, and for the mechanism
+    # this comment used to claim and that does not exist.
     sample-rate: ${AGENTIC_TRACE_SAMPLE_RATE:1.0}
 
     # An empty default is written `${VAR:}`. The spelling `${VAR:``}` looks like the same

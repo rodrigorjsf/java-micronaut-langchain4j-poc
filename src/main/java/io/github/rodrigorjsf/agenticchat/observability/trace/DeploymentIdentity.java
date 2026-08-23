@@ -20,7 +20,14 @@ public class DeploymentIdentity {
 
     public DeploymentIdentity(
             @Value("${agentic.observability.environment:default}") String environment,
-            @Value("${agentic.observability.version:${micronaut.application.version:0.1}}") String version,
+            // NOT a nested default. `${agentic.observability.version:${micronaut.application.version:0.1}}`
+            // reads as "fall back to the build version", and Micronaut resolves it to the value
+            // followed by a stray `}` — the inner placeholder's closing brace, left as a literal.
+            // It does that whether or not the outer property is set, so it is not a broken
+            // fallback, it is a corrupted value: 37 observations on a real instance carried
+            // version "0.1}". application.yml supplies this key unconditionally, so the fallback
+            // was never reachable anyway.
+            @Value("${agentic.observability.version:0.1}") String version,
             @Value("${agentic.observability.release:}") String release) {
         this.environment = environment;
         this.version = version;

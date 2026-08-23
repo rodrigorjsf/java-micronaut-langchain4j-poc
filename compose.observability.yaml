@@ -178,7 +178,14 @@ services:
 
   langfuse-minio:
     profiles: ["langfuse"]
-    image: minio/minio:latest
+    # Pinned, for the reason the ClickHouse comment gives at length: a floating tag is how
+    # a self-hosted stack breaks on a morning nobody changed anything, and this file argues
+    # that in writing 190 lines up while `latest` sat here. This is not a guess at a good
+    # version — it is the version every measurement in docs/08-langfuse-features.md was
+    # taken against, read off the image that was actually running:
+    #   docker inspect minio/minio:latest --format '{{json .Config.Labels}}'
+    #     -> "release": "RELEASE.2025-09-07T16-13-09Z"
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
     container_name: agentic-langfuse-minio
     restart: always
     entrypoint: sh
@@ -292,6 +299,199 @@ services:
         limits:
           memory: 2G
 
+  # ==================== Langfuse 3.80.0 profile (compatibility) ====================
+  #
+  #   docker compose -f compose.observability.yaml --profile langfuse3 up -d
+  #   LANGFUSE_HOST=http://localhost:3002 ./scripts/check-langfuse-ingestion.sh
+  #
+  # WHY IT EXISTS. 4.16.0 is this project's Langfuse and nothing here changes that. This
+  # profile answers a different question: which of the integrations built against 4.16.0
+  # still work on the last OSS 3.x, for a reader who is pinned to it. It is a MEASUREMENT
+  # RIG, not a second deployment — the answers live in docs/08-langfuse-features.md and
+  # the assertions live in the same check-langfuse-ingestion.sh the v4 profile uses, run
+  # against a different LANGFUSE_HOST.
+  #
+  # NOT co-runnable with the langfuse profile, and not by accident: each stack is roughly
+  # 4 GB and this machine has under 6 GB free. The comparison is two sequential runs of
+  # one harness, diffed from their recorded output. Distinct container names, distinct
+  # volumes and port 3002 exist so that a mistaken `up` FAILS on a port clash rather than
+  # quietly writing v3 rows into v4's ClickHouse.
+  #
+  # Trimmed from langfuse/langfuse's own docker-compose.yml at tag v3.80.0, read
+  # 2026-08-23 from
+  # https://raw.githubusercontent.com/langfuse/langfuse/v3.80.0/docker-compose.yml
+  # Two deliberate departures from upstream, both recorded because they are the parts a
+  # copy gets wrong:
+  #   - upstream pins clickhouse-server to NOTHING (bare `clickhouse/clickhouse-server`,
+  #     i.e. latest). A floating tag is how migration 39 broke the v4 profile on 25.3, so
+  #     this one is pinned to the tag measured to work.
+  #   - the init variables are set rather than left empty, so the keys are the same two
+  #     the v4 profile uses and one harness reaches both.
+
+  langfuse3-postgres:
+    profiles: ["langfuse3"]
+    image: postgres:17
+    container_name: agentic-langfuse3-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${LANGFUSE_POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - langfuse3-postgres-data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  langfuse3-clickhouse:
+    profiles: ["langfuse3"]
+    image: clickhouse/clickhouse-server:25.12
+    container_name: agentic-langfuse3-clickhouse
+    restart: always
+    user: "101:101"
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD:-clickhouse}
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    volumes:
+      - langfuse3-clickhouse-data:/var/lib/clickhouse
+      - langfuse3-clickhouse-logs:/var/log/clickhouse-server
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  langfuse3-minio:
+    profiles: ["langfuse3"]
+    # Pinned, for the reason the ClickHouse comment gives at length: a floating tag is how
+    # a self-hosted stack breaks on a morning nobody changed anything, and this file argues
+    # that in writing 190 lines up while `latest` sat here. This is not a guess at a good
+    # version — it is the version every measurement in docs/08-langfuse-features.md was
+    # taken against, read off the image that was actually running:
+    #   docker inspect minio/minio:latest --format '{{json .Config.Labels}}'
+    #     -> "release": "RELEASE.2025-09-07T16-13-09Z"
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    container_name: agentic-langfuse3-minio
+    restart: always
+    entrypoint: sh
+    command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: ${LANGFUSE_MINIO_PASSWORD:-miniosecret}
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - langfuse3-minio-data:/data
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  langfuse3-redis:
+    profiles: ["langfuse3"]
+    image: docker.io/valkey/valkey:8-alpine
+    container_name: agentic-langfuse3-redis
+    restart: always
+    command: >
+      --requirepass ${LANGFUSE_REDIS_PASSWORD:-myredissecret}
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 3s
+      timeout: 10s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  langfuse3-worker:
+    profiles: ["langfuse3"]
+    image: docker.io/langfuse/langfuse-worker:3.80.0
+    container_name: agentic-langfuse3-worker
+    restart: always
+    depends_on: &langfuse3-deps
+      langfuse3-postgres:
+        condition: service_healthy
+      langfuse3-minio:
+        condition: service_healthy
+      langfuse3-redis:
+        condition: service_healthy
+      langfuse3-clickhouse:
+        condition: service_healthy
+    environment: &langfuse3-env
+      DATABASE_URL: postgresql://postgres:${LANGFUSE_POSTGRES_PASSWORD:-postgres}@langfuse3-postgres:5432/postgres
+      SALT: ${LANGFUSE_SALT:-mysalt}
+      ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
+      TELEMETRY_ENABLED: "false"
+      CLICKHOUSE_MIGRATION_URL: clickhouse://langfuse3-clickhouse:9000
+      CLICKHOUSE_URL: http://langfuse3-clickhouse:8123
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD:-clickhouse}
+      CLICKHOUSE_CLUSTER_ENABLED: "false"
+      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
+      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: minio
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${LANGFUSE_MINIO_PASSWORD:-miniosecret}
+      LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://langfuse3-minio:9000
+      LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+      LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
+      LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_MEDIA_UPLOAD_REGION: auto
+      LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: minio
+      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${LANGFUSE_MINIO_PASSWORD:-miniosecret}
+      LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://langfuse3-minio:9000
+      LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
+      LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
+      REDIS_HOST: langfuse3-redis
+      REDIS_PORT: "6379"
+      REDIS_AUTH: ${LANGFUSE_REDIS_PASSWORD:-myredissecret}
+      REDIS_TLS_ENABLED: "false"
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  langfuse3-web:
+    profiles: ["langfuse3"]
+    image: docker.io/langfuse/langfuse:3.80.0
+    container_name: agentic-langfuse3-web
+    restart: always
+    depends_on: *langfuse3-deps
+    ports:
+      - "3002:3000"
+    environment:
+      <<: *langfuse3-env
+      NEXTAUTH_URL: http://localhost:3002
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-mysecret}
+      LANGFUSE_INIT_ORG_ID: agentic
+      LANGFUSE_INIT_ORG_NAME: Agentic
+      LANGFUSE_INIT_PROJECT_ID: agentic-chat
+      LANGFUSE_INIT_PROJECT_NAME: agentic-chat
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-pk-lf-0000000000000000000000000000000000}
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-sk-lf-0000000000000000000000000000000000}
+      LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_INIT_USER_EMAIL:-admin@example.com}
+      LANGFUSE_INIT_USER_NAME: admin
+      LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_INIT_USER_PASSWORD:-changemechangeme}
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
 volumes:
   tempo-data:
   prometheus-data:
@@ -300,3 +500,7 @@ volumes:
   langfuse-clickhouse-data:
   langfuse-clickhouse-logs:
   langfuse-minio-data:
+  langfuse3-postgres-data:
+  langfuse3-clickhouse-data:
+  langfuse3-clickhouse-logs:
+  langfuse3-minio-data:

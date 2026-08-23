@@ -68,6 +68,42 @@ class GenerationObservationTest {
     }
 
     @Test
+    @DisplayName("the OpenTelemetry usage attributes are written beside the Langfuse ones")
+    void theGenAiUsageFamilyIsWrittenToo() {
+        // The two conventions fold differently. gen_ai.usage.input_tokens is EVERY prompt
+        // token, cache reads included; Langfuse's buckets are mutually exclusive and split
+        // the same tokens across input and input_cached_tokens. Both are written from the
+        // one TokenUsageDetails, so they cannot disagree.
+        // Map.of directly: TokenUsageDetails' compact constructor does Map.copyOf, so the
+        // insertion order a LinkedHashMap would carry is discarded on the way in.
+        var usage = new TokenUsageDetails(Map.of(
+                "input", 100L, "input_cached_tokens", 900L,
+                "output", 50L, "output_reasoning_tokens", 200L));
+        try (var generation = tracer.start("agent", ObservationType.GENERATION)) {
+            generation.usage(usage);
+        }
+
+        var attributes = exported.getFinishedSpanItems().getFirst().getAttributes();
+        assertThat(attributes.get(GenAiAttributes.USAGE_INPUT_TOKENS)).isEqualTo(1000L);
+        assertThat(attributes.get(GenAiAttributes.USAGE_OUTPUT_TOKENS)).isEqualTo(250L);
+        // And the Langfuse family is untouched by their presence.
+        assertThat(attributes.asMap())
+                .containsEntry(LangfuseAttributes.USAGE_DETAILS, ObservationJson.compact().write(usage.buckets()));
+    }
+
+    @Test
+    @DisplayName("a call that reported no usage writes neither convention")
+    void noUsageWritesNeitherConvention() {
+        try (var generation = tracer.start("agent", ObservationType.GENERATION)) {
+            generation.usage(TokenUsageDetails.of(null));
+        }
+
+        var attributes = exported.getFinishedSpanItems().getFirst().getAttributes();
+        assertThat(attributes.get(GenAiAttributes.USAGE_INPUT_TOKENS)).isNull();
+        assertThat(attributes.get(GenAiAttributes.USAGE_OUTPUT_TOKENS)).isNull();
+    }
+
+    @Test
     @DisplayName("cost details are ingested rather than left for Langfuse to infer")
     void costIsIngested() {
         try (var generation = tracer.start("agent", ObservationType.GENERATION)) {

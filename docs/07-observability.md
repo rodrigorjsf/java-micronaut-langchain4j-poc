@@ -156,6 +156,14 @@ real: `agent`, `chain`, `span`, `generation`, `tool`, `guardrail`, `embedding`, 
 enum with no producer at all, which is a different thing from a type this application has no
 use for.
 
+**Nine of them, on a request path.** That sentence is about the repository and it has been
+read as being about production traffic. `evaluator`'s only producer is `ExperimentRun`,
+whose only callers are under `src/test` and run under `-Pevals`; no served turn reaches it.
+Measured **[verified]**: six real turns against a self-hosted 4.16.0 produced 100
+observations spanning nine types and no `EVALUATOR` row. Copy this design and never run an eval, and your traces
+hold nine — which is enough for everything the agent graph needs, because it needs one.
+[Chapter 8](08-langfuse-features.md) has the census.
+
 **Why two of them are `event` and not `span`.** An event is a decision taken at an instant,
 not work with a duration. N guardrail observations in a turn say a guardrail ran N times;
 none of them says the second run exists *because* the first asked for it, and the causal link
@@ -628,11 +636,19 @@ capture off still has to be able to argue about its own retrieval threshold.
 **Log correlation.** Traces and logs are not joined. It is a small change —
 `micronaut-tracing` ships a Logback appender installer — and it has not been made.
 
-**`gen_ai.usage.*`.** The descriptive GenAI attributes are set beside the Langfuse ones for
-Tempo and the span metrics; the usage family is not, because Langfuse normalises it by
-subtracting cache reads from input and this application has already done that subtraction.
-Sending both is how a cache hit gets counted twice.
+**`gen_ai.usage.*` — this paragraph used to say the opposite, and measurement is why.**
+**[verified]**
+The usage family was left unset on the reasoning that Langfuse normalises it by subtracting
+cache reads from input, so sending both would count a cache hit twice. Pushed at a real
+4.16.0, that is not what happens: a generation carrying both families reads back with the
+Langfuse buckets intact, byte for byte the same as one carrying only
+`langfuse.observation.usage_details`. The `langfuse.*` namespace takes precedence, as it
+does for every other attribute. Both are now written, from one `TokenUsageDetails`, and the
+reason is not symmetry — Langfuse **3.80.0 ignores `usage_details` entirely** and reads usage
+only from `gen_ai.usage.*`, so without them every token count and every cost on that version
+reads zero on a trace that otherwise looks perfect. See
+[chapter 8](08-langfuse-features.md).
 
 ---
 
-← [6 · Skills](06-skills.md) | [Back to the index](INDEX.md) →
+← [6 · Skills](06-skills.md) | [8 · Wiring Langfuse features](08-langfuse-features.md) →

@@ -64,9 +64,19 @@ public class TracingDefaults {
         // change that has not been made; see chapter 7.
         properties.put("otel.logs.exporter", "none");
 
-        // Sampling is a trace-level decision taken at the root, which is what Langfuse needs:
-        // it requires a root span to build a trace, so a sampler that could drop the root and
-        // keep a child would produce orphans.
+        // parentbased_traceidratio, and the reason is NOT the one that used to be written
+        // here. This comment claimed a bare ratio sampler "could drop the root and keep a
+        // child"; it cannot. TraceIdRatioBasedSampler.shouldSample is a pure function of the
+        // trace id and the ratio — the SDK's own comment says the decision holds "even for
+        // child spans" — so within one process every span of a trace already gets the same
+        // answer.
+        //
+        // What parent-based actually adds is the remote case: it honours an incoming W3C
+        // `sampled` flag instead of re-deciding with THIS service's ratio. Two services at
+        // 0.5 that each decide for themselves keep a quarter of the traces whole and cut
+        // three quarters somewhere in the middle. Nothing calls this application today, so
+        // this is insurance — but it is the correct insurance, and the sentence that used
+        // to justify it was a mechanism that does not exist.
         properties.put("otel.traces.sampler", "parentbased_traceidratio");
         properties.put("otel.traces.sampler.arg", Double.toString(sampleRate));
 

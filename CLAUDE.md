@@ -43,7 +43,8 @@ Every script carries a `WHAT / WHY / WHEN / HOW` header comment; read it before 
 | [`check-observability-stack.sh`](scripts/check-observability-stack.sh) | after editing anything under `observability/` or bumping an image tag — pushes a real trace through the collector, reads the derived metric names back, and reads the provisioned alert rules, contact point and notification policy back out of Grafana |
 | [`check-langfuse-ingestion.sh`](scripts/check-langfuse-ingestion.sh) | after changing anything under `observability/trace/` or upgrading Langfuse — pushes a real trace, real scores, a CORRECTION and an experiment-shaped trace into a running instance and reads every one back |
 | [`check-alert-rule-claims.sh`](scripts/check-alert-rule-claims.sh) | after editing `observability/grafana/provisioning/alerting/alert-rules.yaml` — asserts the one claim a YAML linter cannot check, and reproduces it with a `promtool` unit test on the real PromQL engine |
-| [`check-app-tracing-e2e.sh`](scripts/check-app-tracing-e2e.sh) | after changing `compose.yaml`, the collector config, `TracingDefaults` or any seam — runs the REAL app in Docker, sends one REAL turn, and reads it back out of Tempo and Prometheus |
+| [`check-app-tracing-e2e.sh`](scripts/check-app-tracing-e2e.sh) | after changing `compose.yaml`, the collector config, `TracingDefaults` or any seam — runs the REAL app in Docker, sends SIX REAL turns, and reads them back out of Tempo and Prometheus |
+| [`check-langfuse-3x-compat.sh`](scripts/check-langfuse-3x-compat.sh) | after changing anything under `observability/trace/`, and before editing the compatibility table in `docs/08-langfuse-features.md` — measures what Langfuse 3.80.0 does with every integration built against 4.16.0, and reports a difference as a GAP rather than a failure |
 
 **Standing rule — export repeatable procedures.** Whenever you hit a multi-step procedure that is
 deterministic and likely to recur (release, registry verification, a gating/render check, an
@@ -114,8 +115,16 @@ When something fails repeatedly, when User has to re-explain, or when a workarou
 - `check-langfuse-ingestion.sh` needs Langfuse already up; it starts nothing.
 - Workflow concurrency caps at CPUs-2; on 4 CPUs only 2 agents run.
 - Background command piped to `tail -N` shows nothing until it exits.
-- Deleting floci's Valkey child by hand desyncs its state; wipe `floci-data`.
+- Any floci teardown desyncs its Valkey child; wipe `floci-data` before `up`.
 - `docker compose down` then `up` on one profile can orphan the network; prune it.
+- Micronaut nested placeholder default `${a:${b:x}}` leaks the inner `}` into the value.
+- Micronaut `otel.exclusions` regexes are FULL matches; `/health` misses `/health/liveness`.
+- `otel.exclusions` feeds the HTTP CLIENT filter too, not only the server one.
+- Micronaut `InterceptPhase.CACHE` (-100) wraps `TRACE` (-80): `@Observed` misses cache hits.
+- `pkill -f <pattern>` kills this session's own shell when the pattern is in its command line.
+- Langfuse 3.80.0 knows only SPAN/GENERATION/EVENT; every richer type stores as SPAN.
+- Langfuse 3.80.0 reads usage from `gen_ai.usage.*` only, never `usage_details`.
+- Langfuse OTLP/JSON on 3.80.0 re-hexes the traceId string; protobuf is unaffected.
 
 
 

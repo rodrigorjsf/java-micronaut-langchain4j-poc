@@ -1,6 +1,8 @@
 package io.github.rodrigorjsf.agenticchat.triage;
 
 import io.github.rodrigorjsf.agenticchat.guardrail.input.TextNormalizer;
+import io.github.rodrigorjsf.agenticchat.observability.trace.AgentTracer;
+import io.github.rodrigorjsf.agenticchat.observability.trace.ObservationContentPolicy;
 import io.github.rodrigorjsf.agenticchat.observability.trace.ObservationType;
 import io.github.rodrigorjsf.agenticchat.observability.trace.Observed;
 import io.github.rodrigorjsf.agenticchat.observability.trace.Score;
@@ -51,13 +53,19 @@ public class TriageService {
     private final MeterRegistry meters;
 
     private final ScoreWriter scores;
+    private final AgentTracer tracer;
+    private final ObservationContentPolicy content;
 
     public TriageService(CachedTriageJudge judge,
                          MeterRegistry meters,
-                         ScoreWriter scores) {
+                         ScoreWriter scores,
+                         AgentTracer tracer,
+                         ObservationContentPolicy content) {
         this.scores = scores;
         this.judge = judge;
         this.meters = meters;
+        this.tracer = tracer;
+        this.content = content;
     }
 
     @Observed(value = "triage", type = ObservationType.CHAIN, captureResult = true)
@@ -72,7 +80,7 @@ public class TriageService {
 
         var sample = Timer.start(meters);
         try {
-            var verdict = judge.classify(normalized);
+            var verdict = judged(normalized);
             sample.stop(meters.timer("agentic.triage.latency", "outcome", "ok"));
             count(verdict, "model");
             score(verdict);
@@ -91,6 +99,57 @@ public class TriageService {
     }
 
     /**
+     * The judge call, as an observation a reader can open.
+     *
+     * <p>Before this existed the judge left two scores and nothing else. Scores are the
+     * right shape for an aggregate — an average confidence, every turn under 0.7 — and the
+     * wrong shape for the question a reader actually opens a trace to ask, which is what
+     * this judge saw and what it answered. That was reachable only by inferring it from a
+     * number, and on a cached turn there was no model call underneath to infer it from
+     * either.
+     *
+     * <p><b>Opened here and not as an {@code @Observed} on {@link CachedTriageJudge#classify}</b>,
+     * which is where it belongs conceptually and where it would not work. Both annotations
+     * are {@code @Around} advice, and Micronaut orders advice by interceptor phase:
+     * {@code InterceptPhase.CACHE} is -100 and {@code TRACE} is -80, so caching wraps
+     * tracing. A cache HIT returns from the outer interceptor and the inner one never
+     * runs — the annotation would compile, the miss path would look right, and the cached
+     * path, which is the common one and the whole reason this method exists, would produce
+     * nothing at all. Opening the span at the call site is order-independent.
+     *
+     * <p>{@code SPAN}, not {@code GENERATION}, and the cached path is the reason. A
+     * remembered verdict involves no model, and a generation carrying no tokens and no
+     * model name is a zero-cost call that never happened — Langfuse would render it as
+     * one. When the judge does reach the model, {@code LangfuseChatModelListener} nests a
+     * real generation inside this span; when the cache answers, this span stands alone,
+     * and the absence of a child is what says so.
+     */
+    private TriageVerdict judged(String normalized) {
+        try (var observation = tracer.start("triage-judge", ObservationType.SPAN)) {
+            // The judge takes TWO arguments and this records one of them, deliberately.
+            // TriageJudge.classify(text, skills) is also handed the skills index, which is
+            // fixed for the lifetime of the process — it is what makes the rendered system
+            // prompt byte-identical on every request, which is what a provider's prompt
+            // cache keys on. Writing it here would put the same constant on every judge
+            // span in every trace and tell a reader nothing they could not read once. What
+            // varies per turn, and what the verdict is an opinion about, is this text. The
+            // full prompt is on the GENERATION underneath on a cache miss; on a cache hit
+            // no prompt was rendered at all, because no model was asked.
+            observation.input(content.capture(normalized));
+            try {
+                var verdict = judge.classify(normalized);
+                observation.output(content.capture(verdict));
+                return verdict;
+            } catch (RuntimeException e) {
+                // Recorded on the observation and rethrown: triage() fails open above, and
+                // a fail-open that leaves no mark is a judge that appears never to have run.
+                observation.failed(e);
+                throw e;
+            }
+        }
+    }
+
+    /**
      * The judge's own opinion, written where a human annotation and an offline evaluator
      * write theirs.
      *
@@ -105,10 +164,10 @@ public class TriageService {
      * ran.
      */
     private void score(TriageVerdict verdict) {
-        // The single-argument overload attaches to the CURRENT observation, which inside
-        // this method is the triage one. Resolving it here instead would re-implement
-        // ScoreWriter.record(Score) and give this class an AgentTracer it has no other use
-        // for.
+        // The single-argument overload attaches to the CURRENT observation, which at this
+        // point is the triage chain — score() is called after judged() has closed its own
+        // observation, so the scores land on the step that owns the decision rather than
+        // on the judge call inside it.
         scores.record(Score.numeric("triage_confidence", verdict.confidence())
                 .withComment(verdict.intent().name()));
         // Categorical, so it groups rather than averages. Averaging IN_SCOPE and
