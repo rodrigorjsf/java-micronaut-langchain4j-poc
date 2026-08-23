@@ -1824,7 +1824,7 @@ failure, meaning this script or that server is broken, moves its exit code.
 ### The measured differences
 
 Every line of the recorded run appears below, grouped the way the script's own output is
-grouped: 38 results, of which 22 matched 4.16.0 and 16 are differences. Values are copied
+grouped: 41 results, of which 24 matched 4.16.0 and 17 are differences. Values are copied
 from the run, not restated.
 
 **Every row below is [verified].** The whole table is the read-back of one run of
@@ -1842,6 +1842,7 @@ the script exists.
 | legacy Observations API | present | 200 | this is the read path on 3.x |
 | legacy Traces API | present | 200 | usable, and on 3.x a trace is still an entity — `GET /api/public/traces/{id}` answers, which on a v4 events-only deployment it does not |
 | legacy Scores API | present | 200 | this is the read path on 3.x |
+| `GET /api/public/scores?traceId=` | filters | **does not filter.** It accepts the parameter, answers 200, and returns every score in the project | filter client-side on each row's `traceId`. This one is a trap rather than a limitation: a harness that trusts the parameter reads another run's score and reports confident nonsense about this one |
 
 **Ingestion**
 
@@ -1867,6 +1868,7 @@ the script exists.
 | `memory-compacted`, sent `event` | EVENT | EVENT | — |
 | `answer-relevance`, sent `evaluator` | EVALUATOR | **SPAN** — accepted and discarded | as above |
 | an observation outside span/event/generation exists | yes | **no** | **the agent graph cannot draw on this version.** Nothing in the payload fixes it; it needs a newer Langfuse |
+| **nesting** — the judge span under the triage chain | preserved | preserved | nothing. The types collapse and the tree does not, which is worth knowing: the trace is still navigable, it is only unlabelled |
 
 **Payload fidelity**
 
@@ -1899,6 +1901,7 @@ the script exists.
 | a `CATEGORICAL` score | accepted | accepted (200) | — |
 | `dataType: "CORRECTION"` | accepted | **rejected, HTTP 400**, "No matching discriminator" | `Score.correction()` has no counterpart here. File the corrected output as a `TEXT` score and lose the diff view and the fine-tuning export, or upgrade |
 | a score attached to an **observation** rather than to the trace | the score's subject is the observation | same — the score reads back on the observation id it was posted with | nothing. This is what `LangfuseScoreWriter` does and it is what an observation-level evaluator needs; it survives |
+| a score's `environment` | kept | kept | nothing. A score that lost it would be hidden in a project that filters by environment, which is how an eval run's scores would vanish |
 
 **Experiments**
 

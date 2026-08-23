@@ -211,6 +211,18 @@ do
   fi
 done
 
+# NESTING, which is the half the types cannot fix. Even where 4.16.0 and 3.80.0 disagree
+# about what an observation IS, they must agree about what it is UNDER — the graph's edges
+# and the trace tree both come from the parent links, and a version that flattened them
+# would render every turn as a list with the right names in the wrong order.
+JUDGE_PARENT=$(jq -r '.data[] | select(.name=="triage-judge") | .parentObservationId // ""' <<<"$OBS" 2>/dev/null | head -1)
+TRIAGE_ID=$(jq -r '.data[] | select(.name=="triage") | .id // ""' <<<"$OBS" 2>/dev/null | head -1)
+if [[ -n "$TRIAGE_ID" && "$JUDGE_PARENT" == "$TRIAGE_ID" ]]; then
+  ok "nesting survives — the judge span sits under the triage chain"
+else
+  gap "the judge span's parent is '$JUDGE_PARENT', expected the triage observation '$TRIAGE_ID'"
+fi
+
 GRAPHABLE=$(jq -r '[.data[].type] | map(select(. as $t | ["SPAN","EVENT","GENERATION"] | index($t) | not)) | length' <<<"$OBS" 2>/dev/null || echo 0)
 if [[ "$GRAPHABLE" -ge 1 ]]; then
   ok "the trace carries $GRAPHABLE graph-eligible observations — the agent graph can draw"
@@ -279,7 +291,7 @@ for spec in "triage_confidence|0.93|NUMERIC" "triage_decision|IN_SCOPE|CATEGORIC
   # siblings — so "scores work on 3.x" is only true if THIS shape is accepted.
   code=$(curl -sS -o /dev/null -w '%{http_code}' -X POST "$HOST/api/public/scores" \
     -H 'Content-Type: application/json' -H "Authorization: $AUTH" \
-    -d "{\"traceId\":\"${STORED_TRACE}\",\"observationId\":\"${ROOT_ID}\",\"name\":\"${name}\",\"value\":${json_value},\"dataType\":\"${dtype}\"}")
+    -d "{\"traceId\":\"${STORED_TRACE}\",\"observationId\":\"${ROOT_ID}\",\"name\":\"${name}\",\"value\":${json_value},\"dataType\":\"${dtype}\",\"environment\":\"compat\"}")
   if [[ "$code" =~ ^2 ]]; then
     ok "a $dtype score is accepted ($code)"
   elif [[ "$dtype" == "CORRECTION" ]]; then
@@ -289,17 +301,43 @@ for spec in "triage_confidence|0.93|NUMERIC" "triage_decision|IN_SCOPE|CATEGORIC
   fi
 done
 
-SCORE_TARGET=""
+# `?traceId=` IS IGNORED ON 3.x, and finding that out is why this filters in jq instead.
+# The legacy scores endpoint accepts the parameter, answers 200, and returns every score in
+# the project — so `[0]` is whichever score the server felt like listing first, which on a
+# second run of this script is a score from the FIRST run. That produced two confident
+# false differences ("the score attached to the wrong observation", "the score lost its
+# environment") about a version that had done neither. The trace id is on every row, so the
+# filter belongs here.
+SCORE_ROW='null'
 for _ in $(seq 1 15); do
-  SCORE_TARGET=$(curl -sS -H "Authorization: $AUTH" "$HOST/api/public/scores?traceId=${STORED_TRACE}&limit=10" 2>/dev/null \
-    | jq -r '[.data[] | select(.name=="triage_confidence")][0].observationId // ""')
-  [[ -n "$SCORE_TARGET" ]] && break
+  SCORE_ROW=$(curl -sS -H "Authorization: $AUTH" "$HOST/api/public/scores?limit=100" 2>/dev/null \
+    | jq -c --arg t "$STORED_TRACE" '[.data[] | select(.traceId==$t and .name=="triage_confidence")][0] // null')
+  [[ "$SCORE_ROW" != "null" && -n "$SCORE_ROW" ]] && break
   sleep 3
 done
+SCORE_TARGET=$(jq -r '.observationId // ""' <<<"$SCORE_ROW" 2>/dev/null)
+
+SCORE_FILTERED=$(curl -sS -H "Authorization: $AUTH" "$HOST/api/public/scores?traceId=${STORED_TRACE}&limit=100" 2>/dev/null \
+  | jq -r --arg t "$STORED_TRACE" '[.data[] | select(.traceId != $t)] | length')
+if [[ "${SCORE_FILTERED:-0}" -eq 0 ]]; then
+  ok "GET /api/public/scores?traceId= filters, as on 4.16.0"
+else
+  gap "GET /api/public/scores?traceId= does NOT filter here — it answered 200 with $SCORE_FILTERED score(s) from other traces. Filter client-side on the row's traceId"
+fi
 if [[ -n "$ROOT_ID" && "$SCORE_TARGET" == "$ROOT_ID" ]]; then
   ok "a score attaches to the OBSERVATION, not only to the trace"
 else
   gap "the score read back on observation '$SCORE_TARGET', expected the turn '$ROOT_ID' — observation-level evaluators would have nothing to match"
+fi
+
+# `environment` is on the score body LangfuseScoreWriter builds, and it is not decoration:
+# Langfuse's environment filter is applied to scores as well as to observations, so a score
+# that arrives without one can be invisible in a project that filters.
+SCORE_ENV=$(jq -r '.environment // ""' <<<"$SCORE_ROW" 2>/dev/null)
+if [[ "$SCORE_ENV" == "compat" ]]; then
+  ok "a score keeps its environment, so it is not hidden by the environment filter"
+else
+  gap "the score's environment reads '$SCORE_ENV', expected 'compat'"
 fi
 
 echo "==> experiments"

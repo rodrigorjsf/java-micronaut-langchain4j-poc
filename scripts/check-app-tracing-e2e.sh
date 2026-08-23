@@ -215,6 +215,28 @@ else
     fi
   done
 
+  # MEMORY, by name and not by type. `memory-read` and `memory-write` are typed `span`,
+  # which is also what the judge observation and the framework's client spans are typed —
+  # so "the trace contains a span" proves nothing about the memory layer. The write-through
+  # store is the seam a follower is most likely to forget to observe, and a turn that never
+  # touched conversation memory is a turn whose next question starts from nothing.
+  for want in memory-read memory-write; do
+    if echo "$TRACE" | jq -e --arg n "$want" '[.. | objects | select(.name? == $n)] | length > 0' >/dev/null 2>&1; then
+      ok "the turn produced a '$want' observation"
+    else
+      fail "no '$want' observation — the conversation memory seam did not fire"
+    fi
+  done
+
+  # The compaction CHAIN runs on every turn; the `memory-compacted` EVENT fires only on the
+  # turns that actually crossed the token trigger, which a short run need not reach. Asserting
+  # the chain is asserting the seam; asserting the event would be asserting the traffic.
+  if echo "$TRACE" | jq -e '[.. | objects | select(.name? == "memory-compaction")] | length > 0' >/dev/null 2>&1; then
+    ok "the compaction chain ran and was observed"
+  else
+    fail "no memory-compaction observation — compactIfNeeded is not being observed"
+  fi
+
   # The judge, which before this existed left two scores and no observation at all. Its
   # input and output are stripped out of Tempo by the collector, so what is asserted here is
   # that the observation EXISTS; that it carries the verdict is asserted against Langfuse in
