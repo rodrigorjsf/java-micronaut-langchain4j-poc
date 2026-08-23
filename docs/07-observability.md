@@ -631,7 +631,9 @@ four or five times. Measured over the six-turn run whose census is in
 [chapter 8](08-langfuse-features.md) **[verified]**: 700 KB of that run's
 959 KB of observation payload was the memory layer, **73%**, with a largest single payload
 of 24.8 KB. Most of that is the system prompt, which lives in the conversation as its first
-message and is therefore re-sent on every read and every write.
+message and is therefore re-sent on every read and every write. Read the 73% as a fact about
+*this* application rather than about the memory layer: the ratio is the prompt size times the
+store calls per turn, so a shorter prompt or a longer conversation moves it.
 
 That is the price of being able to answer *what history did the model see on this turn?*,
 and it is charged in one place: `agentic.observability.capture-content: false` removes it

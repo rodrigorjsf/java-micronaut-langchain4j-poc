@@ -802,7 +802,9 @@ for exactly that reason.
 **What it costs [verified].** Over the six-turn run in the census above, the memory layer was
 699,999 bytes of the run's 958,842 bytes of observation payload — **73%** — with a largest
 single payload of 24.8 KB. Most of it is the system prompt, which lives in the conversation as
-its first message and is therefore re-sent on every read and every write. There is no separate
+its first message and is therefore re-sent on every read and every write — so the 73% is a
+fact about this application's prompt, not a constant of the design. Halve the prompt and the
+share falls with it; hold a longer conversation and it climbs. There is no separate
 size cap and that is deliberate: a byte ceiling would cut a conversation mid-object and leave
 an unparseable fragment behind. The lever is
 `agentic.observability.capture-content: false`, which removes it along with every other
