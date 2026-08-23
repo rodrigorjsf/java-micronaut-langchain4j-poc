@@ -1,0 +1,461 @@
+# The four things this stack watches while nobody is watching it.
+#
+# Schema: Grafana 13.2.0 (the image tag in compose.observability.yaml; /api/health reports
+# version 13.2.0, commit f681b1359f). Field list read 2026-08-23 from
+# https://grafana.com/docs/grafana/latest/alerting/set-up/provision-alerting-resources/file-provisioning/
+#
+# THE `data` SHAPE BELOW WAS NOT WRITTEN BY HAND. The docs describe `data` as "a list of
+# query objects that should be obtained through the API", which is a warning: it is Grafana's
+# internal query model, it differs per expression type, and a wrong field is skipped in
+# silence. So one rule was POSTed to /api/v1/provisioning/alert-rules on this exact Grafana
+# and read back through /api/v1/provisioning/alert-rules/export?format=yaml, and the
+# three-node shape it returned is what every rule here copies:
+#
+#   A  the PromQL, datasourceUid: prometheus, instant: true
+#   B  reduce/last   over A   (collapses the series to one number per label set)
+#   C  threshold     over B   (the alert condition; `condition: C` names it)
+#
+# Do not replace C with a `classic_conditions` node. It still parses, and it puts the
+# threshold somewhere the UI's rule editor cannot show.
+#
+# ---------------------------------------------------------------------------------------
+# METRIC NAMES ARE THE FAILURE MODE HERE, NOT THRESHOLDS.
+#
+# Every name below was read off the running stack through the SCRAPE path (Prometheus's
+# /api/v1/query, not the collector's /metrics), because the two can disagree and only the
+# first is what a rule sees. Two traps this caught:
+#
+#   * The collector's OWN telemetry carries NO `_total` suffix.
+#     `otelcol_exporter_sent_spans` is TYPE counter and is spelt exactly that, while
+#     `promhttp_metric_handler_errors_total` beside it does have the suffix — the OTel Go
+#     exporter and promhttp disagree inside one endpoint. `..._send_failed_spans_total`
+#     would have matched nothing, for ever, with no error anywhere.
+#
+#   * The span-metrics histogram is `_duration_milliseconds_`, not `_duration_seconds_`.
+#     The unit is pinned to `ms` in the collector's span_metrics connector precisely because
+#     it is part of the metric NAME, so rule 3's threshold is in MILLISECONDS. Written in
+#     seconds it is off by a thousand and never fires.
+#
+# ---------------------------------------------------------------------------------------
+# WHY EVERY RANGE IS [5m] EXCEPT THE SPEND RULE.
+#
+# The span_metrics connector sets `metrics_expiration: 5m`: a series disappears entirely
+# five minutes after the last matching span. A [10m] window over a span metric therefore
+# averages across a gap it cannot see, so the window is matched to the expiration instead.
+# The consequence, stated plainly: rules 2 and 3 CANNOT fire on an idle stack, because their
+# series stop existing. That is correct — an idle stack has no failing turns — but it means
+# a green rule 2 is not evidence that turns are succeeding, only that none are failing.
+#
+# The application's Micrometer counters (rule 4) do not expire that way, so that rule uses a
+# window sized for a spend rate rather than for the connector.
+#
+# ---------------------------------------------------------------------------------------
+# noDataState / execErrState — CHOSEN PER RULE, NOT COPIED.
+#
+# All four use `noDataState: OK`, and each for its own reason (given at the rule). The rules
+# differ on `execErrState`, which is the axis that is actually reachable here:
+#
+#   rule 1  execErrState: Alerting  — this is the designated escalation. If the query path
+#                                     itself is broken, the export-failure detector is blind,
+#                                     and a blind silent-hole detector IS the silent hole.
+#   rules 2/3 execErrState: Error   — surfaces as a DatasourceError instance, visible without
+#                                     claiming that turns are failing or slow. It also means a
+#                                     typo in their PromQL is loud rather than permanently green.
+#   rule 4  execErrState: OK        — DELIBERATELY THE OPPOSITE OF RULE 1. A spend rate is a
+#                                     budget signal, not an availability signal; it may never
+#                                     page for a broken query, because rule 1 already does,
+#                                     and paging twice for one broken Prometheus is how a
+#                                     reader learns to ignore both.
+#
+# RESIDUAL LIMITATION, since `noDataState: OK` is not free: if the `otel-collector-internal`
+# scrape job is ever removed from prometheus.yml, rule 1 goes quiet instead of red. The guard
+# would be a fifth rule on `up{job="otel-collector-internal"} == 0`, and the brief allows four.
+
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: agentic-observability
+    # Same folder as the provisioned dashboard, so a red alert and the panel that explains it
+    # are one click apart. The alert provisioner creates the folder if the dashboard
+    # provisioner has not yet.
+    folder: Agentic chat
+    # Every `for` below is a multiple of this.
+    interval: 1m
+    rules:
+
+      # ============================================================================
+      # 1. Spans are being dropped on the way out of the collector.
+      #
+      # The most valuable rule available on this stack, because it is the only failure
+      # here that looks EXACTLY like health: a broken Tempo leg produces no error in the
+      # application, no gap in the dashboard, and no trace in Tempo — just a quiet stack.
+      #
+      # THE SERIES DOES NOT EXIST YET. `otelcol_exporter_send_failed_spans` is absent from
+      # the collector's /metrics until the first failure; `otelcol_exporter_sent_spans`
+      # beside it is present. That absence is why `noDataState` must be OK — anything else
+      # makes this rule fire the moment the stack starts and never stop, which is a rule
+      # everyone mutes by the second day. OK on no data is not free, though, and the next
+      # paragraph is what it costs.
+      #
+      # WHAT THIS RULE DETECTS IS REPEATED OR SUSTAINED EXPORT FAILURE. WHAT IT CANNOT SEE
+      # IS A FIRST-AND-ONLY INCREMENT.
+      #
+      # Measured on a throwaway otel/opentelemetry-collector-contrib:0.159.0 +
+      # prom/prometheus:v3.14.0 pair, and reproduced deterministically on the PromQL engine
+      # by `check-alert-rule-claims.sh` beside this file: `rate()` is last-minus-first over
+      # the samples it finds and invents no zero for the time before the series existed, so
+      # a counter that APPEARS at 3 and then stops yields 0, not 3. `increase()` is
+      # `rate * window` and returns 0 for the identical reason — swapping the function does
+      # not fix this. Three states are therefore all green here:
+      #
+      #     series absent                          no data     ->  OK
+      #     series present, one sample in window   no data     ->  OK   (rate needs two)
+      #     series present, flat                   0           ->  not > 0
+      #
+      # The concrete miss: the collector restarts, Tempo permanently rejects the first batch
+      # (a permanent error is not retried, so the counter increments exactly once), N spans
+      # are lost for ever — and this rule stays green, with `noDataState: OK` and `for: 2m`
+      # both doing exactly what they say. So do not read a green rule 1 as "nothing was
+      # dropped"; read it as "nothing is dropping repeatedly". The stronger claim is one
+      # command away and is not this rule's job:
+      # `docker exec agentic-otel-collector wget -qO- localhost:8888/metrics | grep
+      # send_failed_spans` prints nothing whatsoever when there has been no failure.
+      #
+      # The only expression that would catch a first-and-only increment is the absolute
+      # value, `sum by (exporter) (otelcol_exporter_send_failed_spans) > 0`. It is not used,
+      # and its cost is the reason: a counter never decreases, so one failure at any point
+      # in a collector's life holds this rule red until that collector is restarted. That is
+      # a latch, not an alert — it would page once for a fault that is already over and then
+      # stay red through every later fault, and the paragraph above about `noDataState`
+      # would stop being true as well. Sustained loss is the case worth waking someone for;
+      # a one-off is the case worth reading the counter for.
+      #
+      # `for: 2m` is the shortest of the four, on purpose: dropped spans are data that no
+      # longer exists anywhere, and there is no such thing as an acceptable background rate.
+      # The other three are proportions and budgets, which need longer to mean anything.
+      # ============================================================================
+      - uid: agentic-span-export-failing
+        title: Spans are being dropped before they reach Tempo
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              editorMode: code
+              instant: true
+              range: false
+              intervalMs: 1000
+              maxDataPoints: 43200
+              # `by (exporter)` so the alert names the broken leg rather than the fact that
+              # one exists. One instance per exporter; the policy groups them back together.
+              expr: sum by (exporter) (rate(otelcol_exporter_send_failed_spans[5m]))
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              reducer: last
+              expression: A
+              datasource:
+                type: __expr__
+                uid: __expr__
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params:
+                      - 0
+              datasource:
+                type: __expr__
+                uid: __expr__
+              intervalMs: 1000
+              maxDataPoints: 43200
+        noDataState: OK
+        execErrState: Alerting
+        for: 2m
+        annotations:
+          summary: The collector is failing to export spans, so traces are being lost silently.
+          description: >-
+            Exporter {{ $labels.exporter }} is dropping spans. Nothing upstream reports an
+            error for this, so assume trace data is missing for as long as it lasts. Check
+            the destination is up and reachable first — `docker compose -f
+            compose.observability.yaml --profile grafana ps tempo` — then read the reason
+            with `docker logs agentic-otel-collector 2>&1 | grep -i "export"`. Compare
+            `otelcol_exporter_sent_spans` against this to see how much is still getting
+            through; a queue that is also full (`otelcol_exporter_queue_size` at
+            `otelcol_exporter_queue_capacity`) means the destination is slow rather than down.
+        labels:
+          severity: critical
+
+      # ============================================================================
+      # 2. Chat turns are failing.
+      #
+      # `chat-turn` is the ONE hand-opened observation in the application
+      # (ChatTurnService); every other span comes from a listener or the @Observed
+      # interceptor. So this is the user-visible outcome, not an internal step.
+      #
+      # A share, not a count: three failures out of four turns and three out of three
+      # thousand are different incidents, and only the ratio tells them apart.
+      #
+      # NO EXPLICIT MINIMUM-VOLUME GUARD, because `for: 10m` already is one. A single
+      # isolated failure holds the ratio up for exactly the 5m rate window and then decays,
+      # which is shorter than `for`, so it cannot fire alone. Sustained failure can.
+      #
+      # 20%, not the conventional 5%, because of small numbers: at this stack's volume one
+      # failure in a 5m window is already 1/N for a small N, and a 5% threshold on a
+      # denominator of 3 is a threshold that fires on every single error.
+      # ============================================================================
+      - uid: agentic-turn-error-rate-high
+        title: More than a fifth of chat turns are failing
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              editorMode: code
+              instant: true
+              range: false
+              intervalMs: 1000
+              maxDataPoints: 43200
+              # status_code takes STATUS_CODE_UNSET / _OK / _ERROR. UNSET is a span that
+              # simply never set a status, so it belongs in the denominator and not the
+              # numerator; the denominator deliberately has no status_code selector at all.
+              expr: >-
+                sum(rate(traces_span_metrics_calls_total{service_name="agenticchat",
+                span_name="chat-turn", status_code="STATUS_CODE_ERROR"}[5m]))
+                /
+                sum(rate(traces_span_metrics_calls_total{service_name="agenticchat",
+                span_name="chat-turn"}[5m]))
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              reducer: last
+              expression: A
+              datasource:
+                type: __expr__
+                uid: __expr__
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params:
+                      - 0.2
+              datasource:
+                type: __expr__
+                uid: __expr__
+              intervalMs: 1000
+              maxDataPoints: 43200
+        # No turns at all is an idle stack, not an outage. See the header: this also means a
+        # green rule 2 never proves that turns are succeeding.
+        noDataState: OK
+        execErrState: Error
+        for: 10m
+        annotations:
+          summary: A fifth or more of chat turns have ended in error for ten minutes.
+          description: >-
+            Users are seeing failures now. Open the trace, do not guess: in Grafana go to
+            Explore -> Tempo and run `{ name="chat-turn" && status=error }`, then read the
+            child span that failed — the twelve seams mean the failing model call, tool call
+            or guardrail is already on the same trace. If the children are clean but the turn
+            is not, suspect the output guardrail exhausting its retries, which surfaces as an
+            OutputGuardrailException and is a 5xx by design. `agentic_llm_errors_total` broken
+            down by `role` separates a provider outage from an application bug.
+        labels:
+          severity: critical
+
+      # ============================================================================
+      # 3. Chat turns are slow.
+      #
+      # p95 rather than an average: an LLM turn's latency distribution has a long tail by
+      # nature, and a mean hides exactly the tail a user complains about.
+      #
+      # THE THRESHOLD IS IN MILLISECONDS — 15000 is fifteen seconds. See the header note on
+      # `_duration_milliseconds_`; written as 15 this rule would fire on every turn over
+      # 15ms, and written as 15 with a seconds-shaped mental model it would look right.
+      #
+      # `sum by (le)` collapses status_code and every other dimension, which is what
+      # histogram_quantile needs: it takes ONE bucket series set, and buckets split across
+      # label sets give a quantile of a distribution that never existed.
+      # ============================================================================
+      - uid: agentic-turn-latency-p95-high
+        title: Chat turns are taking more than fifteen seconds
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              editorMode: code
+              instant: true
+              range: false
+              intervalMs: 1000
+              maxDataPoints: 43200
+              expr: >-
+                histogram_quantile(0.95, sum by (le) (rate(
+                traces_span_metrics_duration_milliseconds_bucket{service_name="agenticchat",
+                span_name="chat-turn"}[5m])))
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              reducer: last
+              expression: A
+              datasource:
+                type: __expr__
+                uid: __expr__
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params:
+                      - 15000
+              datasource:
+                type: __expr__
+                uid: __expr__
+              intervalMs: 1000
+              maxDataPoints: 43200
+        # An idle stack has no buckets to quantile over. Note that histogram_quantile returns
+        # NaN rather than nothing when the buckets exist but have not moved, and NaN is not
+        # greater than 15000, so a flat stack is quiet either way.
+        noDataState: OK
+        execErrState: Error
+        for: 10m
+        annotations:
+          summary: 95th-percentile chat-turn latency is above fifteen seconds.
+          description: >-
+            Find out WHICH part is slow before changing anything — the turn contains the
+            triage call, the agent call and every tool call, and they have different fixes.
+            Click an exemplar on the latency panel to jump straight to a slow trace, or run
+            `{ name="chat-turn" && duration > 15s }` in Explore -> Tempo. If the model calls
+            are the slow part, the per-role MEAN says which role — `sum by (role)
+            (rate(agentic_llm_latency_seconds_sum[5m])) / sum by (role)
+            (rate(agentic_llm_latency_seconds_count[5m]))`. It is a mean and not a p95
+            because that Micrometer timer publishes no buckets, only `_count`, `_sum` and
+            `_max`; the span-metrics histogram above is the only thing here with real
+            percentiles. If the model calls are NOT the slow part, it is a tool call waiting
+            on a third-party API, and the tool span on the same trace names it.
+        labels:
+          severity: warning
+
+      # ============================================================================
+      # 4. LLM spend is running away.
+      #
+      # `agentic_llm_cost_usd_total` is a Micrometer counter (`agentic.llm.cost_usd` in
+      # TokenCostListener, `_total` added by Micrometer's Prometheus naming — the opposite
+      # convention to the collector's own metrics above). It is priced from the same
+      # TokenUsageDetails the Langfuse span uses, so this number and the Langfuse cost are
+      # two views of one computation rather than two opinions.
+      #
+      # `* 3600` turns a per-second rate into DOLLARS PER HOUR, which is the unit the
+      # threshold is actually thought about in. One dollar an hour is not a lot of money; it
+      # is a lot for a study POC on a laptop, which is what this stack is.
+      #
+      # THIS RULE MUST TOLERATE THE APPLICATION BEING OFF. Prometheus scrapes job
+      # `agentic-app` at app:8080, and `up{job="agentic-app"}` is 0 whenever only the
+      # observability profile is running — the normal state. Its series go stale and
+      # rate() returns nothing, so `noDataState: OK` is what stops this rule from screaming
+      # at someone who never started the app. The `[15m]` window is wide for the same
+      # reason: a rate over a window shorter than the app's own uptime is noise.
+      # ============================================================================
+      - uid: agentic-llm-spend-rate-high
+        title: LLM spend is above one dollar an hour
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              editorMode: code
+              instant: true
+              range: false
+              intervalMs: 1000
+              maxDataPoints: 43200
+              # Total, not `by (role)`: a budget is a total. The role breakdown is on the
+              # dashboard, which is where the question "which role" gets asked.
+              expr: sum(rate(agentic_llm_cost_usd_total[15m])) * 3600
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              reducer: last
+              expression: A
+              datasource:
+                type: __expr__
+                uid: __expr__
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params:
+                      - 1
+              datasource:
+                type: __expr__
+                uid: __expr__
+              intervalMs: 1000
+              maxDataPoints: 43200
+        noDataState: OK
+        execErrState: OK
+        for: 15m
+        annotations:
+          summary: The application has been spending more than one dollar an hour on models.
+          description: >-
+            Decide whether this is volume or waste before turning anything off. Break the
+            number down by role on the Agentic chat dashboard — `sum by (role)
+            (rate(agentic_llm_cost_usd_total[15m]))` — because the design expects the judge
+            role to be most of the CALLS and very little of the COST, and the reverse means
+            triage is routing everything to the expensive model. Then check the cache-hit
+            panel: input tokens that should be cached and are not is the cheapest thing to
+            fix. Last, `agentic_llm_unpriced_calls_total` above zero means this number is an
+            UNDERCOUNT, because a model with no entry in the price table contributes nothing
+            to the cost counter — so the spend that triggered this alert is a floor, not a
+            total. Like the export-failure series in rule 1, that counter does not exist
+            until the first unpriced call, so absent and zero mean the same thing.
+        labels:
+          severity: warning
