@@ -1138,8 +1138,13 @@ the policy. `TriageService` hands it a `String`; `LangfuseChatModelListener` han
 `String` and pass anything else through silently does nothing to a generation's input —
 which is the largest payload in the trace and the one carrying the system prompt.
 
-**The chain composes.** The policy loops `redacted = redactor.redact(redacted)`, so each
-bean sees the previous bean's output. A redactor must tolerate an already-masked value and
+**The chain composes, and nothing here fixes its order.** The policy loops
+`redacted = redactor.redact(redacted)`, so each bean sees the previous bean's output — but
+the list is injected, and Micronaut orders an injected collection by `@Order`/`Ordered`, not
+by source position. Two redactors that depend on running in a particular sequence — mask
+then drop, or a cheap filter in front of an expensive one — must say so with `@Order`, or
+they get an unspecified order and a rule that fires half the time. A redactor must tolerate
+an already-masked value and
 must not assume it is first.
 
 **Returning `null` drops the payload entirely**, and that is the right answer when a
@@ -1258,6 +1263,15 @@ The four this project writes, plus the provider's own sum:
 | `output` | completion tokens that are not reasoning |
 | `output_reasoning_tokens` | completion tokens the model spent thinking |
 | `total` | the provider's own total |
+
+**`total` is the one exemption, and it is worth being explicit about** because the rule as
+stated would forbid it: it is a reserved aggregate, not a bucket, and it is expected to be
+the sum of the others. The harness pushes `{"input": 86, "input_cached_tokens": 17817,
+"output": 188, "total": 18091}` — 86 + 17817 + 188 — and Langfuse reads the ingested
+`totalCost` back rather than re-summing. Every OTHER key must be disjoint. The same object
+is treated differently by the two consumers on purpose: `TokenCostListener` SKIPS `TOTAL`
+when incrementing `agentic.llm.tokens`, because a Micrometer counter has no notion of a
+reserved key and counting the sum beside its parts would double every rate on the panel.
 
 Those names are the ones Langfuse's own OpenAI-schema mapping produces, so a model priced by
 Langfuse's built-in definitions and a model priced here agree on what they are naming.
