@@ -604,11 +604,11 @@ application produced 100 observations spanning nine types and **no `EVALUATOR` r
 (`app-on-4.16.0.txt`). The same is true of the `agent`-typed `experiment-item` root that
 `ExperimentRun.item` opens: it exists, and no user request reaches it.
 
-That measurement corrects the reading a hurried eye takes from chapter 7's seam table, which
-says the table "covers all ten of Langfuse's observation types, each produced by something
-real." The claim is true about the repository and false about production traffic, and the
-census wins. If you copy this design and never run an eval, your traces hold nine types, not
-ten — which is enough for everything in this section, because the graph needs one.
+[Chapter 7](07-observability.md) draws the same distinction beside its seam table — that
+table is a claim about the repository and was read as one about production traffic — and
+delegates the census to here. What matters for this section is the consequence: copy this
+design and never run an eval, and your traces hold nine types rather than ten, which is
+enough for everything below, because the agent graph needs one.
 
 ### How this project makes the case impossible to get wrong
 
