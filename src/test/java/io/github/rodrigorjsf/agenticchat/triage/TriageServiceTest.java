@@ -49,7 +49,16 @@ class TriageServiceTest {
         // A no-op score writer: this test is about the triage decision, and the scores it
         // emits have their own test in JudgeScoreTest.
         return new TriageService(cached, meters,
-                new io.github.rodrigorjsf.agenticchat.observability.trace.NoOpScoreWriter());
+                new io.github.rodrigorjsf.agenticchat.observability.trace.NoOpScoreWriter(),
+                // A tracer over the no-op SDK: this test is about the triage DECISION, and
+                // what the judge observation carries is asserted in TriageObservationTest
+                // against a recording SDK.
+                new io.github.rodrigorjsf.agenticchat.observability.trace.OtelAgentTracer(
+                        io.opentelemetry.api.OpenTelemetry.noop().getTracer("triage-service-test"),
+                        new io.github.rodrigorjsf.agenticchat.observability.trace.ObservationJson(
+                                io.micronaut.json.JsonMapper.createDefault())),
+                new io.github.rodrigorjsf.agenticchat.observability.trace.ObservationContentPolicy(
+                        true, java.util.List.of()));
     }
 
     // ------------------------------------------------------------------ greetings
