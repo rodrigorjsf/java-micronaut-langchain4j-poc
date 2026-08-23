@@ -78,7 +78,7 @@ docker compose -f compose.observability.yaml --profile grafana  up -d  # :3001, 
 A fourth profile pins **Langfuse 3.80.0** beside it. It is a measurement rig, not a second
 deployment: 4.16.0 is this project's Langfuse and nothing was removed for 3.x. What a reader
 pinned to the older line actually gets — and the two things that read as zero there — is
-[§8 · Wiring Langfuse features](docs/08-langfuse-features.md#langfuse-3800--what-still-works):
+[§8 · Wiring Langfuse features](docs/08-langfuse-features.md#langfuse-3800-what-still-works):
 
 ```bash
 docker compose -f compose.observability.yaml --profile langfuse3 up -d  # :3002
