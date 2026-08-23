@@ -83,6 +83,18 @@ class TracingExclusionsTest {
     }
 
     @Test
+    @DisplayName("this application's own calls to Langfuse are not traced back to Langfuse")
+    void theScoreWriterIsNotTraced() {
+        // The exclusion list feeds the CLIENT filter as well as the server one, which is the
+        // only reason this works: LangfuseScoreWriter posts over an instrumented Micronaut
+        // HTTP client, and an outbound span with no parent is a root span, which is a trace,
+        // which is exported to Langfuse. Measured on a six-turn run against a real instance:
+        // 10 traces named `POST`, one per score write, filed beside the conversations.
+        assertThat(excluded.test("/api/public/scores")).isTrue();
+        assertThat(excluded.test("/api/public/otel/v1/traces")).isTrue();
+    }
+
+    @Test
     @DisplayName("nothing a user actually calls is excluded by accident")
     void realRoutesAreStillTraced() {
         assertThat(excluded.test("/api/chat/capabilities")).isFalse();

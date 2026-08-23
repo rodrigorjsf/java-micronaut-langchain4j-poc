@@ -68,11 +68,20 @@ micronaut:
 # /api/chat/capabilities and /api/chat/history keep their server spans: they are real
 # traffic, and neither has a turn to be the root of.
 # ---------------------------------------------------------------------------
+#
+# /api/public/.* is LANGFUSE's own API, called by this application's score writer over an
+# instrumented Micronaut HTTP client. Without it every POST /api/public/scores becomes a
+# root span, which becomes a trace, which is exported to Langfuse — telemetry about
+# telemetry, filed beside the conversations. Measured on a six-turn run against a real
+# instance: 10 traces named `POST`, each one a score write, none of them work the
+# application did. This project serves nothing under /api/public.
+# ---------------------------------------------------------------------------
 otel:
   exclusions:
     - /api/chat
     - /health.*
     - /prometheus
+    - /api/public/.*
 
 endpoints:
   health:
