@@ -75,6 +75,16 @@ docker compose -f compose.observability.yaml --profile grafana  up -d  # :3001, 
 ./scripts/check-langfuse-ingestion.sh                                  # needs the langfuse profile ALREADY up; it starts nothing
 ```
 
+A fourth profile pins **Langfuse 3.80.0** beside it. It is a measurement rig, not a second
+deployment: 4.16.0 is this project's Langfuse and nothing was removed for 3.x. What a reader
+pinned to the older line actually gets — and the two things that read as zero there — is
+[§8 · Wiring Langfuse features](docs/08-langfuse-features.md#langfuse-3800--what-still-works):
+
+```bash
+docker compose -f compose.observability.yaml --profile langfuse3 up -d  # :3002
+./scripts/check-langfuse-3x-compat.sh                                   # prints the difference, does not fail on it
+```
+
 A third check runs the real application beside the collector rather than a synthetic
 payload; it wants ~5.5 GB and a real `GOOGLE_API_KEY` in `.env`. Why that is a different
 question from the two above is
@@ -129,6 +139,10 @@ Also:
 - **[`docs/07-observability.md`](docs/07-observability.md)** — what one turn looks
   like from the outside, the twelve seams that produce it, and the failure modes that
   are silent.
+- **[`docs/08-langfuse-features.md`](docs/08-langfuse-features.md)** — the other
+  direction: pick a Langfuse feature, and it tells you the attribute keys it needs, the
+  code in this repository that writes them, and the check that proves it arrived. Ends
+  with the measured 4.16.0 versus 3.80.0 table.
 - **[`docs/06-skills.md`](docs/06-skills.md)** — the catalogue of
   [`.claude/skills/`](.claude/skills/): what each skill is for, the situation that
   sends you to it, and who fires it. Written to be project-agnostic, so the
