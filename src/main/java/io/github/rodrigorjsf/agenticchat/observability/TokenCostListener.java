@@ -4,8 +4,6 @@ import dev.langchain4j.model.chat.listener.ChatModelErrorContext;
 import dev.langchain4j.model.chat.listener.ChatModelListener;
 import dev.langchain4j.model.chat.listener.ChatModelRequestContext;
 import dev.langchain4j.model.chat.listener.ChatModelResponseContext;
-import dev.langchain4j.model.googleai.GoogleAiGeminiTokenUsage;
-import dev.langchain4j.model.openai.OpenAiTokenUsage;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,9 +59,11 @@ public class TokenCostListener implements ChatModelListener {
 
     @Override
     public void onError(ChatModelErrorContext context) {
+        String requestModel = modelNameOf(context.chatRequest() == null
+                ? null : context.chatRequest().modelName());
         meters.counter("agentic.llm.errors",
                 "role", role,
-                "model", modelNameOf(context.chatRequest() == null ? null : context.chatRequest().modelName()),
+                "model", requestModel,
                 "exception", context.error().getClass().getSimpleName()).increment();
     }
 
@@ -72,56 +72,54 @@ public class TokenCostListener implements ChatModelListener {
         var usage = response == null ? null : response.tokenUsage();
         String model = modelNameOf(response == null ? null : response.modelName());
 
-        long input = value(usage == null ? null : usage.inputTokenCount());
-        long output = value(usage == null ? null : usage.outputTokenCount());
-        long cached = cachedTokens(usage);
+        // ONE computation, several emitters. LangfuseChatModelListener writes these same
+        // buckets into langfuse.observation.usage_details and prices them with this same
+        // call, so the Prometheus counter and the Langfuse span are two views of one
+        // number rather than two opinions about it.
+        //
+        // This used to read the raw counts instead, and the two DID disagree: the 4-argument
+        // costOf has no notion of a reasoning token, so a Gemini answer that spent 880
+        // tokens thinking — which Google bills at the output rate and reports BESIDE
+        // candidatesTokenCount — was costed at 1.8e-4 here and 5.32e-4 on the span. The
+        // agent role runs with thinking-level: low, so that was every turn.
+        var details = TokenUsageDetails.of(usage);
 
-        meters.counter("agentic.llm.tokens", "role", role, "model", model, "kind", "input")
-                .increment(input);
-        meters.counter("agentic.llm.tokens", "role", role, "model", model, "kind", "output")
-                .increment(output);
-        if (cached > 0) {
-            meters.counter("agentic.llm.tokens", "role", role, "model", model, "kind", "cached_input")
-                    .increment(cached);
-        }
+        // The buckets are mutually exclusive, which is what makes `sum by (kind)` the true
+        // total and what the dashboard's cache-hit panel already assumes: its denominator
+        // is kind=~"input|cached_input", and that is only a total if the two are disjoint.
+        // TOTAL is skipped for the same reason — it is the provider's own sum, and
+        // counting it beside its parts would double every rate on the panel.
+        details.buckets().forEach((kind, count) -> {
+            if (!TokenUsageDetails.TOTAL.equals(kind)) {
+                meters.counter("agentic.llm.tokens", "role", role, "model", model, "kind", kind)
+                        .increment(count);
+            }
+        });
 
-        var cost = costs.costOf(model, input, output, cached);
+        var cost = costs.costOf(model, details);
         meters.counter("agentic.llm.cost_usd", "role", role, "model", model)
                 .increment(cost.doubleValue());
         if (!costs.isPriced(model)) {
             meters.counter("agentic.llm.unpriced_calls", "role", role, "model", model).increment();
         }
 
-        Object start = context.attributes().get(START_TIME);
-        if (start instanceof Long startNanos) {
-            meters.timer("agentic.llm.latency", "role", role, "model", model)
-                    .record(java.time.Duration.ofNanos(System.nanoTime() - startNanos));
+        var elapsed = elapsed(context.attributes());
+        if (elapsed != null) {
+            meters.timer("agentic.llm.latency", "role", role, "model", model).record(elapsed);
         }
 
-        LOG.debug("LLM call role={} model={} in={} out={} cached={} usd={}",
-                role, model, input, output, cached, cost.toPlainString());
-    }
-
-    /**
-     * Provider-specific, because the base {@code TokenUsage} has no notion of a cache
-     * hit. Reflection-free: both subclasses are on the compile classpath already.
-     */
-    private static long cachedTokens(dev.langchain4j.model.output.TokenUsage usage) {
-        if (usage instanceof OpenAiTokenUsage openAi) {
-            var details = openAi.inputTokensDetails();
-            return details == null ? 0 : value(details.cachedTokens());
-        }
-        if (usage instanceof GoogleAiGeminiTokenUsage gemini) {
-            return value(gemini.cachedContentTokenCount());
-        }
-        return 0;
-    }
-
-    private static long value(Integer count) {
-        return count == null ? 0 : count;
+        LOG.debug("LLM call role={} model={} tokens={} usd={}",
+                role, model, details.buckets(), cost.toPlainString());
     }
 
     private static String modelNameOf(String modelName) {
         return modelName == null || modelName.isBlank() ? "unknown" : modelName;
+    }
+
+    private static java.time.Duration elapsed(java.util.Map<Object, Object> attributes) {
+        Object start = attributes == null ? null : attributes.get(START_TIME);
+        return start instanceof Long startNanos
+                ? java.time.Duration.ofNanos(System.nanoTime() - startNanos)
+                : null;
     }
 }
