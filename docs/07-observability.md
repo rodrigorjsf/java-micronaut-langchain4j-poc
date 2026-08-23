@@ -75,6 +75,7 @@ flowchart TB
     classDef guard fill:#8a3b3b,stroke:#ffb4b4,color:#ffffff
     classDef chain fill:#4a4a52,stroke:#c9c9d1,color:#ffffff
     classDef retr fill:#2f7d4f,stroke:#9ae6b4,color:#ffffff
+    classDef span fill:#3b4a6b,stroke:#a9c1ff,color:#ffffff
 
     ROOT["chat-turn · agent<br/><i>input = the message, output = the reply</i>"]
     TRIAGE["triage · chain"]
@@ -89,6 +90,8 @@ flowchart TB
     TOOL["a tool · tool"]
     G2["output guardrails · guardrail ×3"]
     COMP["memory-compaction · chain"]
+    MEMR["memory-read · retriever<br/><i>output = the conversation it returned</i>"]
+    MEMW["memory-write · span<br/><i>input = the conversation it persisted</i>"]
 
     ROOT --> TRIAGE --> TJ --> JUDGE
     ROOT --> ASSIST
@@ -99,14 +102,23 @@ flowchart TB
     ASSIST --> AGENT
     AGENT --> TOOL
     ASSIST --> G2
+    ASSIST --> MEMR
+    ASSIST --> MEMW
     ROOT --> COMP
+    COMP --> MEMR
 
     class ROOT,TJ,ASSIST agent
     class JUDGE,AGENT gen
     class G1,G2 guard
     class TRIAGE,COMP chain
-    class RETR,SEARCH,EMB retr
+    class RETR,SEARCH,EMB,MEMR retr
+    class MEMW span
 ```
+
+`memory-read` and `memory-write` are drawn once each and fire several times per turn —
+**28 reads and 12 writes across six turns** on the run measured below **[verified]**.
+LangChain4j's `MessageWindowChatMemory` reads the history on every message it adds, so a
+turn touches the store four or five times rather than once.
 
 Two things about this shape are load-bearing.
 
@@ -144,6 +156,8 @@ by virtue of the OpenTelemetry context alone, with no plumbing.
 | embeddings | `EmbeddingModelListener` | `embedding` | `LangfuseEmbeddingModelListener` |
 | RAG retrieval | `ContentRetrieverListener` | `retriever` | `LangfuseRetrieverListener` |
 | vector search | `EmbeddingStoreListener` | `retriever` | `LangfuseEmbeddingStoreListener` |
+| a conversation-memory read | `@Observed` on `WriteThroughChatMemoryStore.getMessages` | `retriever` | the AOP interceptor |
+| a conversation-memory write | `@Observed` on `updateMessages` / `deleteMessages` | `span` | the AOP interceptor |
 | outbound HTTP | Micronaut OTel client filter | `span` | — |
 | a guardrail reprompt | `OutputGuardrailExecuted`, when the result is a reprompt | `event` | `LangfuseGuardrailListener` |
 | a compaction firing | inside the compactor, at the moment it decides | `event` | `ConversationCompactor` |
@@ -609,6 +623,23 @@ default `tracecontext,baggage`.
 Turning capture off does **not** remove a retriever's scores, an embedding's count and
 dimension, or a store search's threshold. None of that is content, and a deployment with
 capture off still has to be able to argue about its own retrieval threshold.
+
+**The conversation is the biggest thing this switch governs, and it is worth knowing by how
+much.** `memory-read` writes the history it returned and `memory-write` writes the history
+it persisted, so a turn puts the whole conversation into the trace once per store call —
+four or five times. Measured over the six-turn run whose census is in
+[chapter 8](08-langfuse-features.md) **[verified]**: 700 KB of that run's
+959 KB of observation payload was the memory layer, **73%**, with a largest single payload
+of 24.8 KB. Most of that is the system prompt, which lives in the conversation as its first
+message and is therefore re-sent on every read and every write.
+
+That is the price of being able to answer *what history did the model see on this turn?*,
+and it is charged in one place: `agentic.observability.capture-content: false` removes it
+along with every other payload. There is deliberately no separate size cap. A byte ceiling
+would cut a conversation mid-object and leave an unparseable fragment in the field — the
+same mistake `max-response-bytes` makes when it is pointed at a projecting endpoint (see
+[chapter 3](03-security.md)) — and a payload you cannot parse is worse than one you chose
+not to send.
 
 ---
 

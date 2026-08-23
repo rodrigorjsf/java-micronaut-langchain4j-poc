@@ -141,34 +141,48 @@ types, so it moves whenever a type is added.
 That the *application's own encoding* reaches Langfuse: neither of the above. The harness
 posts with `Content-Type: application/json` — it exercises OTLP/JSON, which is not the
 encoding the application uses. What proves the protobuf leg is a real run of the real
-application against a real Langfuse **[verified]**. Six turns produced 100 stored
+application against a real Langfuse **[verified]**. Six turns produced 122 stored
 observations, every type the chat path emits mapped correctly:
 
 ```
 STORED       NAME                           N
-AGENT        chat-turn                       4      <- the turn, the trace root
-AGENT        ChatAssistant.chat              3
-AGENT        TriageJudge.classify            3
-CHAIN        triage                          4
+AGENT        chat-turn                       6      <- the turn, the trace root
+AGENT        ChatAssistant.chat              4
+AGENT        TriageJudge.classify            8
+CHAIN        triage                          6
 CHAIN        memory-compaction               3
-SPAN         triage-judge                    4
-SPAN         memory-read                    27
-SPAN         memory-write                   11
+SPAN         triage-judge                    5
+SPAN         memory-write                   12
+RETRIEVER    memory-read                    28
 GENERATION   agent                           7
-GENERATION   judge                           3
-GUARDRAIL    NormalizingInputGuardrail       3
+GENERATION   judge                           4
+GENERATION   judge-fallback                  4
+GUARDRAIL    NormalizingInputGuardrail       4
 GUARDRAIL    InjectionTriageGuardrail        4
 GUARDRAIL    ExfiltrationGuardrail           5
 GUARDRAIL    SystemPromptLeakageGuardrail    5
 GUARDRAIL    VoiceComplianceGuardrail        5
-RETRIEVER    assistant-knowledge             2
-RETRIEVER    embedding-store-search          2
-EMBEDDING    all-minilm-l6-v2-q              2
+RETRIEVER    assistant-knowledge             3
+RETRIEVER    embedding-store-search          3
+EMBEDDING    all-minilm-l6-v2-q              3
 TOOL         activate_skill                  1
 EVENT        guardrail-reprompt              2
                                           ---
-                                          100 observations, 9 of the 10 types
+                                          122 observations, 9 of the 10 types
 ```
+
+Two rows in that capture are worth reading twice.
+
+**`memory-read` is a `RETRIEVER` and `memory-write` is a `SPAN`.** Langfuse defines
+`retriever` as a step that "only looks something up rather than changing state", which is
+what reading a conversation is; `updateMessages` and `deleteMessages` write DynamoDB and
+then Valkey, so they stay `span`. Typing all three alike would have put a write into the
+agent graph wearing a read's label.
+
+**`judge-fallback` is not a defect and not new code.** The primary judge was rate-limited
+during this run — *"Primary judge rate-limited; falling over to the secondary provider"* in
+the application log — and `FailoverTriageJudge` did its job. The census is therefore also a
+picture of the failover path working, which the earlier one did not happen to capture.
 
 Nine, not ten: no chat turn emits an `EVALUATOR`. Its round trip is proved separately, by
 `scripts/check-langfuse-ingestion.sh` — *"ok type EVALUATOR survived the round trip"* — and
@@ -548,7 +562,7 @@ this application's own YAML — and asserts it in both directions: `/health`,
 trap: it fails the moment someone shortens the pattern to `/health`.
 
 The end-to-end evidence is the census **[verified]**. After the exclusion list grew from one entry to four,
-a six-turn run of the real application produced 100 observations across the 20 names in the
+a six-turn run of the real application produced 122 observations across the 21 names in the
 census above, and **no `POST` and no `GET /health` among them**. Reproduce it with
 `./scripts/check-app-tracing-e2e.sh`, which asserts the second half of that directly:
 *"no GET /health trace reached Tempo"*.
@@ -608,7 +622,7 @@ The ten names and their glosses are quoted from
 | `agent` | `AGENT` | "decides on the application flow and can for example use tools with the guidance of a LLM" | `ChatTurnService.handle` → `chat-turn`, the trace root; `LangfuseAiServiceListener.onStarted` → `ChatAssistant.chat` and `TriageJudge.classify` | yes |
 | `tool` | `TOOL` | "a single action that does something, such as a function or API call" | `LangfuseToolListener.observe`, named for the tool the model asked for | yes |
 | `chain` | `CHAIN` | "a link between different application steps, like passing context from a retriever to a LLM call" | `TriageService.triage` and `ConversationCompactor.compactIfNeeded`, both by `@Observed` | yes |
-| `retriever` | `RETRIEVER` | "a data-retrieval step that only looks something up rather than changing state" | `LangfuseRetrieverListener` → `assistant-knowledge`; `LangfuseEmbeddingStoreListener` → `embedding-store-search` | yes |
+| `retriever` | `RETRIEVER` | "a data-retrieval step that only looks something up rather than changing state" | `LangfuseRetrieverListener` → `assistant-knowledge`; `LangfuseEmbeddingStoreListener` → `embedding-store-search`; `@Observed` on `WriteThroughChatMemoryStore.getMessages` → `memory-read` | yes |
 | `embedding` | `EMBEDDING` | "a call to a LLM to generate embeddings … can include model, token usage and costs" | `LangfuseEmbeddingModelListener`, named for the model | yes |
 | `guardrail` | `GUARDRAIL` | "a component that protects against malicious content or jailbreaks" | `LangfuseGuardrailListener.observe`, named for the guardrail class | yes |
 | `evaluator` | `EVALUATOR` | "functions that assess relevance/correctness/helpfulness of a LLM's outputs" | `ExperimentRun.grade` → `grade` | **no — see below** |
@@ -617,7 +631,7 @@ The ten names and their glosses are quoted from
 measurement is what says so.** `ExperimentRun` lives in `src/main`, but its only callers are
 `InjectionEval`, `TriageGoldenSetEval` and `ExperimentRunTest`, all under `src/test`, and all
 of them run under `-Pevals` rather than in a served turn. A six-turn run of the real
-application produced 100 observations spanning nine types and **no `EVALUATOR` row at all** **[verified]**
+application produced 122 observations spanning nine types and **no `EVALUATOR` row at all** **[verified]**
 (`app-on-4.16.0.txt`). The same is true of the `agent`-typed `experiment-item` root that
 `ExperimentRun.item` opens: it exists, and no user request reaches it.
 
@@ -718,9 +732,9 @@ conceptually belongs — would compile, would work on the miss path, and would p
 inner one never runs. The cached path is the common one and the whole reason that method
 exists, so the annotation would go missing on exactly the calls it was added for.
 `TriageService.judged` therefore opens `triage-judge` at the call site instead, which is
-order-independent. The real run confirms both halves: four `triage-judge` spans and three
-`judge` generations across six turns — one cached turn, still visible, still carrying its
-verdict.
+order-independent. The real run confirms both halves: five `triage-judge` spans and eight
+`judge`/`judge-fallback` generations across six turns — the cached turn still visible, still
+carrying its verdict.
 
 The general rule a follower should take from this: an annotation is the right mechanism only
 where no other `@Around` advice sits in an earlier phase. Where one does, or where there is
@@ -735,6 +749,64 @@ zero-cost call that never happened. When the judge does reach the model,
 the span stands alone, and the absence of a child is what says so. `TriageObservationTest`
 asserts all three shapes — the judged turn, the cached turn that "stands alone", and the
 pre-filtered turn that has no judge observation because no judge ran.
+
+#### Choosing the type for a seam of your own: the read is a `retriever`, the write is not
+
+The type is a parameter of the annotation, which makes it easy to set and easy to set wrongly.
+The conversation-memory layer is the worked example, because the two halves of it look alike
+and are not:
+
+```java
+@Observed(value = "memory-read", type = ObservationType.RETRIEVER,
+        captureArguments = true, captureResult = true)
+public List<ChatMessage> getMessages(Object memoryId) { … }
+
+@Observed(value = "memory-write", type = ObservationType.SPAN, captureArguments = true)
+public void updateMessages(Object memoryId, List<ChatMessage> messages) { … }
+```
+
+Langfuse's definition is the whole argument, quoted from
+`https://langfuse.com/docs/observability/features/observation-types`, read 2026-08-23
+`[sourced]`: a retriever "represents a data-retrieval step that **only looks something up
+rather than changing state**, such as a call to a vector store, database, or other knowledge
+source". A conversation read is exactly that. `updateMessages` writes DynamoDB and then
+Valkey, `deleteMessages` removes the conversation, and neither is a lookup — so they stay
+`span`, whose meaning in the enum is "a unit of work with no more specific meaning". None of
+the other nine types describes a store write, and reaching for `tool` because "it is an API
+call" would put a memory write into the tool listing beside the model's own tool calls.
+
+The cost of getting this wrong is not cosmetic. The agent graph is drawn from the types, so a
+write typed `retriever` appears in the picture wearing a read's label, and every filter for
+"retrievals" then counts writes. It ingests cleanly and nothing anywhere goes red.
+
+**Capture is the other half, and this seam is where the default is wrong.** `@Observed`
+captures nothing unless asked, because the arguments of most methods here are the user's
+message. In the memory layer the arguments and the result *are* the conversation, and an
+observation that records "a lookup happened" while withholding what came back cannot answer
+the question people open a trace to ask — *what history did the model see on this turn?* So
+all three methods set the capture flags, and `ObservationContentPolicy` still governs whether
+anything is actually written.
+
+**One trap sits under that, and it is silent.** Micronaut Serde is a compile-time serializer
+and has never been told about LangChain4j's message hierarchy, so the payload of these
+observations would be written by `ObservationJson`'s `toString` fallback:
+`"[UserMessage { contents = [TextContent { text = \"oi\" }] }]"` — a Java rendering wrapped
+in a JSON string, which no reader can parse and which a `contains("oi")` assertion passes on
+just as happily as on the correct output. `ObservationJson` therefore special-cases
+`ChatMessage` through LangChain4j's own `ChatMessageSerializer`, **recursively**: the
+interceptor hands a multi-argument method its arguments as a positional list, so
+`memory-write`'s input arrives as `[memoryId, List<ChatMessage>]` and the conversation is the
+second element rather than the value. `ObservationJsonTest` parses every payload it asserts on,
+for exactly that reason.
+
+**What it costs [verified].** Over the six-turn run in the census above, the memory layer was
+699,999 bytes of the run's 958,842 bytes of observation payload — **73%** — with a largest
+single payload of 24.8 KB. Most of it is the system prompt, which lives in the conversation as
+its first message and is therefore re-sent on every read and every write. There is no separate
+size cap and that is deliberate: a byte ceiling would cut a conversation mid-object and leave
+an unparseable fragment behind. The lever is
+`agentic.observability.capture-content: false`, which removes it along with every other
+payload.
 
 #### `AgentTracer` and `Observation` — an SPI, for code you do not own
 
@@ -821,43 +893,48 @@ a self-hosted Langfuse 4.16.0, read back through the observations API and printe
 `reference-trace-4.16.0.txt`, copied verbatim:
 
 ```
-TRACE 726497a6f2aa547c2452c7561dc7f8cd - 28 observations
-[AGENT] chat-turn in="quem e voce e o que voce sabe fazer?" out="Sou um assistente de serviços de dados públicos brasile
-  [CHAIN] triage out="TriageVerdict[decision=IN_SCOPE, confidence=0.98, inten
-    [SPAN] triage-judge in="quem e voce e o que voce sabe fazer?" out="TriageVerdict[decision=IN_SCOPE, confidence=0.98, inten
-  [AGENT] ChatAssistant.chat in="<turn_context>\nreply_language: pt-BR\nsuggested_skill: out="Sou um assistente de serviços de dados públicos brasile
-    [SPAN] memory-read
-    [RETRIEVER] assistant-knowledge in="<turn_context>\nreply_language: pt-BR\nsuggested_skill: out={"segments":0,"results":[]}
-      [EMBEDDING] all-minilm-l6-v2-q in="<turn_context>\nreply_language: pt-BR\nsuggested_skill: out={"embeddings":1,"dimension":384}
+TRACE f17b7b0ae8ac4eefb2574812ba8add5a - 28 observations
+[AGENT] chat-turn in="quem e voce e o que voce sabe fazer?" out="Sou um assistente de serviços de dados públicos brasil
+  [CHAIN] triage out="TriageVerdict[decision=IN_SCOPE, confidence=0.98, inte
+    [SPAN] triage-judge in="quem e voce e o que voce sabe fazer?" out="TriageVerdict[decision=IN_SCOPE, confidence=0.98, inte
+  [AGENT] ChatAssistant.chat in="<turn_context>\nreply_language: pt-BR\nsuggested_skill out="Sou um assistente de serviços de dados públicos brasil
+    [RETRIEVER] memory-read in="census-1787524822" out=[{"text":"# Role\n\nYou are the assistant of a Brazilia
+    [RETRIEVER] assistant-knowledge in="<turn_context>\nreply_language: pt-BR\nsuggested_skill out={"segments":0,"results":[]}
+      [EMBEDDING] all-minilm-l6-v2-q in="<turn_context>\nreply_language: pt-BR\nsuggested_skill out={"embeddings":1,"dimension":384}
       [RETRIEVER] embedding-store-search in={"min_score":0.72,"max_results":3,"dimensions":384} out={"matches":0}
-    [GUARDRAIL] NormalizingInputGuardrail in="<turn_context>\nreply_language: pt-BR\nsuggested_skill: out={"result":"SUCCESS"}
-    [GUARDRAIL] InjectionTriageGuardrail in="<turn_context>\nreply_language: pt-BR\nsuggested_skill: out={"result":"SUCCESS"}
-    [SPAN] memory-read
-    [SPAN] memory-read
-    [SPAN] memory-read
-    [SPAN] memory-write
-    [GENERATION] agent in=[{"role":"system","content":"# Role\n\nYou are the assis out="Sou um assistente de serviços de dados públicos brasile
-    [SPAN] memory-read
-    [SPAN] memory-write
-    [GUARDRAIL] ExfiltrationGuardrail in="Sou um assistente de serviços de dados públicos brasile out={"result":"SUCCESS"}
-    [GUARDRAIL] SystemPromptLeakageGuardrail in="Sou um assistente de serviços de dados públicos brasile out={"result":"SUCCESS"}
-    [GUARDRAIL] VoiceComplianceGuardrail in="Sou um assistente de serviços de dados públicos brasile out={"result":"FATAL","failures":["Voice profile violated: l
+    [GUARDRAIL] NormalizingInputGuardrail in="<turn_context>\nreply_language: pt-BR\nsuggested_skill out={"result":"SUCCESS"}
+    [GUARDRAIL] InjectionTriageGuardrail in="<turn_context>\nreply_language: pt-BR\nsuggested_skill out={"result":"SUCCESS"}
+    [RETRIEVER] memory-read in="census-1787524822" out=[{"text":"# Role\n\nYou are the assistant of a Brazilia
+    [RETRIEVER] memory-read in="census-1787524822" out=[{"text":"# Role\n\nYou are the assistant of a Brazilia
+    [RETRIEVER] memory-read in="census-1787524822" out=[{"text":"# Role\n\nYou are the assistant of a Brazilia
+    [SPAN] memory-write in=["census-1787524822",[{"text":"# Role\n\nYou are the as
+    [GENERATION] agent in=[{"role":"system","content":"# Role\n\nYou are the assi out="Sou um assistente de serviços de dados públicos brasil
+    [RETRIEVER] memory-read in="census-1787524822" out=[{"text":"# Role\n\nYou are the assistant of a Brazilia
+    [SPAN] memory-write in=["census-1787524822",[{"text":"# Role\n\nYou are the as
+    [GUARDRAIL] SystemPromptLeakageGuardrail in="Sou um assistente de serviços de dados públicos brasil out={"result":"SUCCESS"}
+    [GUARDRAIL] ExfiltrationGuardrail in="Sou um assistente de serviços de dados públicos brasil out={"result":"SUCCESS"}
+    [GUARDRAIL] VoiceComplianceGuardrail in="Sou um assistente de serviços de dados públicos brasil out={"result":"FATAL","failures":["Voice profile violated: 
       [EVENT] guardrail-reprompt
-    [SPAN] memory-read
-    [GENERATION] agent in=[{"role":"system","content":"# Role\n\nYou are the assis out="Sou um assistente de serviços de dados públicos brasile
-    [GUARDRAIL] ExfiltrationGuardrail in="Sou um assistente de serviços de dados públicos brasile out={"result":"SUCCESS"}
-    [GUARDRAIL] SystemPromptLeakageGuardrail in="Sou um assistente de serviços de dados públicos brasile out={"result":"SUCCESS"}
-    [GUARDRAIL] VoiceComplianceGuardrail in="Sou um assistente de serviços de dados públicos brasile out={"result":"SUCCESS"}
+    [RETRIEVER] memory-read in="census-1787524822" out=[{"text":"# Role\n\nYou are the assistant of a Brazilia
+    [GENERATION] agent in=[{"role":"system","content":"# Role\n\nYou are the assi out="Sou um assistente de serviços de dados públicos brasil
+    [GUARDRAIL] SystemPromptLeakageGuardrail in="Sou um assistente de serviços de dados públicos brasil out={"result":"SUCCESS"}
+    [GUARDRAIL] ExfiltrationGuardrail in="Sou um assistente de serviços de dados públicos brasil out={"result":"SUCCESS"}
+    [GUARDRAIL] VoiceComplianceGuardrail in="Sou um assistente de serviços de dados públicos brasil out={"result":"SUCCESS"}
   [CHAIN] memory-compaction
-    [SPAN] memory-read
+    [RETRIEVER] memory-read in="census-1787524822" out=[{"text":"# Role\n\nYou are the assistant of a Brazilia
 
 scores: [('triage_decision', 'IN_SCOPE', 'CATEGORICAL', 'observation'), ('triage_confidence', 0.98, 'NUMERIC', 'observation')]
 ```
 
-Twenty-eight observations, eight types: two `agent`, two `chain`, ten `span`, two
-`generation`, eight `guardrail`, two `retriever`, one `embedding`, one `event`. Fifteen of the
-twenty-eight are outside `span`/`event`/`generation`, so the precondition is met fifteen times
-over, and one would have done.
+Twenty-eight observations, eight types: two `agent`, two `chain`, three `span`, two
+`generation`, eight `guardrail`, nine `retriever`, one `embedding`, one `event`. Twenty-two of
+the twenty-eight are outside `span`/`event`/`generation`, so the precondition is met
+twenty-two times over, and one would have done.
+
+Nine `retriever`s in one turn is not a busy RAG pipeline. Two of them are the RAG pair —
+`assistant-knowledge` and the `embedding-store-search` under it — and the other seven are
+`memory-read`, which LangChain4j calls once per message it adds to the window. Reading the
+type alone will mislead you here; read the name beside it.
 
 Two absences in that trace are worth naming, because a reader comparing it against the
 ten-type table will notice them and should not conclude anything is broken. There is **no
@@ -1062,8 +1139,11 @@ That distinction is visible in the census **[verified]**, and it is the reason n
 "one of each". Across six real turns the application produced three `memory-compaction` chains
 and **zero** `memory-compacted` events — no conversation reached the trigger. The only `EVENT`
 rows in `app-on-4.16.0.txt` are two `guardrail-reprompt`s. The reference trace above shows
-exactly that shape: a `[CHAIN] memory-compaction` with a single `[SPAN] memory-read` child and
-no event under it.
+exactly that shape: a `[CHAIN] memory-compaction` with a single `[RETRIEVER] memory-read`
+child and no event under it. That child is worth a second look for a different reason: it
+carries the conversation as it stood when compaction considered it, so a compacted turn now
+shows the *before* under the chain and the *after* on the `memory-write` the compactor issues
+— the two halves of the cut, in the trace, rather than only the four counts on the event.
 
 **How to know it worked.** For the reprompt, `LangfuseGuardrailListenerTest` carries three
 cases that between them cover the whole contract — *"a reprompt is an event naming the rule it
@@ -1834,7 +1914,7 @@ is `@Tag("evals")` and therefore runs under `-Pevals`, and `InjectionEval`, whic
 under a profile would remove a gate while looking like a speed-up. In the default build
 `InjectionEval` boots a context with no Langfuse credentials, so the `ScoreWriter` is
 `NoOpScoreWriter` and the tracer is OpenTelemetry's own no-op: the code runs, and nothing
-leaves the JVM. Six real turns of the application against 4.16.0 produced 100 observations
+leaves the JVM. Six real turns of the application against 4.16.0 produced 122 observations
 across nine types and no `EVALUATOR` row, which is the expected result and not a defect.
 
 Scores are the other half of grading, and both go to the item **root** rather than to the
@@ -1952,7 +2032,7 @@ the script exists.
 | `agent`, sent `generation` | GENERATION | GENERATION | — |
 | `input-guardrails`, sent `guardrail` | GUARDRAIL | **SPAN** — accepted and discarded | find guardrails by name, or by a prefixed metadata key, since the type will not filter |
 | `voice-compliance`, sent `guardrail` | GUARDRAIL | **SPAN** — accepted and discarded | as above |
-| `knowledge-retrieval`, sent `retriever` | RETRIEVER | **SPAN** — accepted and discarded | as above |
+| `knowledge-retrieval`, sent `retriever` | RETRIEVER | **SPAN** — accepted and discarded | as above. This one costs more on 3.x than it used to: `memory-read` is a `retriever` as well, so on this version the conversation-memory reads and the RAG lookups are all `SPAN` and only the name tells them apart |
 | `embedding`, sent `embedding` | EMBEDDING | **SPAN** — accepted and discarded | see the note below: the real application's embedding span stored as GENERATION on the same version |
 | `open_meteo_forecast`, sent `tool` | TOOL | **SPAN** — accepted and discarded | as above |
 | `memory-compacted`, sent `event` | EVENT | EVENT | — |
