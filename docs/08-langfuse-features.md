@@ -109,10 +109,11 @@ not get its encoding from a property — `TracingDefaults` sets
 `otel.exporter.otlp.protocol = http/protobuf` only inside the branch that configures a
 *collector*. The Langfuse leg is protobuf because of the exporter class this line picks. It
 matters because the two encodings are not equivalent on every Langfuse version: over
-OTLP/**JSON**, Langfuse 3.80.0 hex-encodes the trace-id string it receives a second time, so
-a conventional 32-character id is stored as its own 64-character hex. Over protobuf both
-versions store the id that was sent. The application is unaffected, and it is unaffected
-because of the exporter class rather than by luck.
+OTLP/**JSON**, Langfuse 3.80.0 stores a trace under an id that is not the one that was sent.
+Over protobuf both versions store the id unchanged, so the application is unaffected — and it
+is unaffected because of the exporter class this line picks rather than by luck. The
+mechanism, and why it bites a hand-written probe and nothing else, is in
+[the compatibility section](#langfuse-3800-what-still-works).
 
 **How to know it worked.** Three separate claims, proved by three different things, and
 they must not be allowed to stand in for each other.
@@ -128,9 +129,11 @@ that part is not what distinguishes them.)
 
 That the *server* honours the contract: `scripts/check-langfuse-ingestion.sh` pushes a real
 trace at a running instance and reads it back — 47 assertions on the run recorded for this
-chapter, covering the path, the auth, the type mapping, usage and cost, scores and
-corrections. The number is not a property of the script: most of its assertions come out of
-a loop over the observation types, so it moves whenever a type is added.
+chapter. It is the evidence behind most of the sections that follow, not only this one: the
+path and the auth, all ten observation types and their nesting, levels and status messages,
+usage and cost and which family wins, scores, corrections and experiments. The number is not
+a property of the script: most of its assertions come out of a loop over the observation
+types, so it moves whenever a type is added.
 
 That the *application's own encoding* reaches Langfuse: neither of the above. The harness
 posts with `Content-Type: application/json` — it exercises OTLP/JSON, which is not the
