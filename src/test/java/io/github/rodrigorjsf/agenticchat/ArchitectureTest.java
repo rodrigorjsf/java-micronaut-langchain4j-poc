@@ -64,6 +64,25 @@ class ArchitectureTest {
     }
 
     @Test
+    @DisplayName("observability is the bottom of the dependency graph")
+    void observabilityDependsOnNothingAboveIt() {
+        // Without this rule the claim in CONTEXT.md is a sentence rather than a
+        // constraint: `noPackageCycles` does not catch it, because api, guardrail and
+        // tools do not import observability, so an observability -> tools edge would be a
+        // ONE-WAY dependency and pass. A tracing layer that reached into the pipeline it
+        // observes is exactly the cycle AgentTracer exists to prevent.
+        noClasses().that().resideInAPackage(ROOT + ".observability..")
+                .should().dependOnClassesThat()
+                .resideInAnyPackage(
+                        ROOT + ".api..", ROOT + ".agent..", ROOT + ".conversation..",
+                        ROOT + ".triage..", ROOT + ".guardrail..", ROOT + ".skills..",
+                        ROOT + ".tools..", ROOT + ".rag..", ROOT + ".memory..")
+                .because("every other package imports AgentTracer; a tracing layer that "
+                        + "knew the pipeline back would close the cycle it exists to avoid")
+                .check(classes);
+    }
+
+    @Test
     @DisplayName("the skill catalogue knows nothing about the layers that use it")
     void skillsDependOnNothingAboveIt() {
         noClasses().that().resideInAPackage(ROOT + ".skills..")

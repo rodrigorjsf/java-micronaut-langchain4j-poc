@@ -8,6 +8,8 @@ import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.store.memory.chat.ChatMemoryStore;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.annotation.Value;
+import io.github.rodrigorjsf.agenticchat.observability.trace.Observed;
+import io.github.rodrigorjsf.agenticchat.observability.trace.ObservationType;
 import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -101,6 +103,7 @@ public class ConversationCompactor {
      * Compacts the conversation if it is over budget. Never throws: a failure here
      * must not fail a turn that already succeeded.
      */
+    @Observed(value = "memory-compaction", type = ObservationType.CHAIN)
     public void compactIfNeeded(ConversationId conversationId) {
         try {
             var messages = store.getMessages(conversationId.value());

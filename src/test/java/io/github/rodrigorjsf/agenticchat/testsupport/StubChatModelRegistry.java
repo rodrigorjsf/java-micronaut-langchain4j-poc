@@ -6,6 +6,9 @@ import io.github.rodrigorjsf.agenticchat.llm.ChatModelRegistry;
 import io.github.rodrigorjsf.agenticchat.llm.config.ProviderCredentials;
 import io.github.rodrigorjsf.agenticchat.observability.CostCalculator;
 import io.github.rodrigorjsf.agenticchat.observability.TokenCostListener;
+import io.github.rodrigorjsf.agenticchat.observability.trace.AgentTracer;
+import io.github.rodrigorjsf.agenticchat.observability.trace.LangfuseChatModelListener;
+import io.github.rodrigorjsf.agenticchat.observability.trace.ObservationContentPolicy;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
@@ -24,10 +27,10 @@ import java.util.concurrent.ConcurrentHashMap;
  * separately from what the agent was asked — the distinction the entire triage
  * design rests on.
  *
- * <p>Each scripted model carries the same {@link TokenCostListener} the real
- * registry attaches. Without that the double would be faithful about requests and
- * silently unfaithful about accounting, and the cost metrics would be exercised by
- * nothing.
+ * <p>Each scripted model carries the same listeners the real registry attaches —
+ * {@link TokenCostListener} and {@link LangfuseChatModelListener}. Without them the
+ * double would be faithful about requests and silently unfaithful about accounting and
+ * about tracing, and both would be exercised by nothing.
  */
 @Singleton
 @Replaces(ChatModelRegistry.class)
@@ -49,11 +52,18 @@ public class StubChatModelRegistry extends ChatModelRegistry {
     private final Map<String, ScriptedChatModel> models = new ConcurrentHashMap<>();
     private final MeterRegistry meters;
     private final CostCalculator costs;
+    private final AgentTracer tracer;
+    private final ObservationContentPolicy content;
 
-    public StubChatModelRegistry(MeterRegistry meters, CostCalculator costs) {
-        super(List.of(), STUB_CREDENTIALS, List.of());
+    public StubChatModelRegistry(MeterRegistry meters,
+                                 CostCalculator costs,
+                                 AgentTracer tracer,
+                                 ObservationContentPolicy content) {
+        super(List.of(), STUB_CREDENTIALS, List.of(), meters, costs, tracer, content);
         this.meters = meters;
         this.costs = costs;
+        this.tracer = tracer;
+        this.content = content;
     }
 
     public ScriptedChatModel model(String role) {
@@ -62,7 +72,9 @@ public class StubChatModelRegistry extends ChatModelRegistry {
     }
 
     private List<ChatModelListener> listenersFor(String role) {
-        return List.of(new TokenCostListener(role, meters, costs));
+        return List.of(
+                new TokenCostListener(role, meters, costs),
+                new LangfuseChatModelListener(role, tracer, costs, content));
     }
 
     @Override

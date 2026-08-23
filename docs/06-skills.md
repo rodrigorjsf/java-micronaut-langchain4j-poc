@@ -736,4 +736,4 @@ rows for one skill fails the same way one row for none does.
 
 ---
 
-← [5 · Evaluation](05-evaluation.md) | [Back to the index](INDEX.md) →
+← [5 · Evaluation](05-evaluation.md) | [7 · Observability](07-observability.md) →

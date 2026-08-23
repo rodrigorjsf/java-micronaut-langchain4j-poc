@@ -1,6 +1,10 @@
 package io.github.rodrigorjsf.agenticchat.triage;
 
 import io.github.rodrigorjsf.agenticchat.guardrail.input.TextNormalizer;
+import io.github.rodrigorjsf.agenticchat.observability.trace.ObservationType;
+import io.github.rodrigorjsf.agenticchat.observability.trace.Observed;
+import io.github.rodrigorjsf.agenticchat.observability.trace.Score;
+import io.github.rodrigorjsf.agenticchat.observability.trace.ScoreWriter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import jakarta.inject.Singleton;
@@ -46,11 +50,17 @@ public class TriageService {
     private final CachedTriageJudge judge;
     private final MeterRegistry meters;
 
-    public TriageService(CachedTriageJudge judge, MeterRegistry meters) {
+    private final ScoreWriter scores;
+
+    public TriageService(CachedTriageJudge judge,
+                         MeterRegistry meters,
+                         ScoreWriter scores) {
+        this.scores = scores;
         this.judge = judge;
         this.meters = meters;
     }
 
+    @Observed(value = "triage", type = ObservationType.CHAIN, captureResult = true)
     public TriageVerdict triage(String rawText) {
         String normalized = TextNormalizer.normalize(rawText == null ? "" : rawText);
 
@@ -65,6 +75,7 @@ public class TriageService {
             var verdict = judge.classify(normalized);
             sample.stop(meters.timer("agentic.triage.latency", "outcome", "ok"));
             count(verdict, "model");
+            score(verdict);
             return verdict;
         } catch (RuntimeException e) {
             sample.stop(meters.timer("agentic.triage.latency", "outcome", "error"));
@@ -77,6 +88,32 @@ public class TriageService {
             return TriageVerdict.deterministic(TriageVerdict.Decision.IN_SCOPE,
                     TriageVerdict.Intent.UNKNOWN, MessageLanguage.detect(normalized));
         }
+    }
+
+    /**
+     * The judge's own opinion, written where a human annotation and an offline evaluator
+     * write theirs.
+     *
+     * <p>A score rather than a span attribute because Langfuse aggregates scores across
+     * traces and does not aggregate arbitrary attributes: "the average confidence this
+     * week" and "every turn the judge was under 0.7 sure about" are one query each on a
+     * score and no query at all on an attribute. Putting the judge's verdict in the same
+     * column its later corrections land in is the point.
+     *
+     * <p>Only on the model path. The pre-filter answers without asking the judge, and a
+     * confidence recorded there would be a number attributed to a component that never
+     * ran.
+     */
+    private void score(TriageVerdict verdict) {
+        // The single-argument overload attaches to the CURRENT observation, which inside
+        // this method is the triage one. Resolving it here instead would re-implement
+        // ScoreWriter.record(Score) and give this class an AgentTracer it has no other use
+        // for.
+        scores.record(Score.numeric("triage_confidence", verdict.confidence())
+                .withComment(verdict.intent().name()));
+        // Categorical, so it groups rather than averages. Averaging IN_SCOPE and
+        // OUT_OF_SCOPE would produce a number with no meaning at all.
+        scores.record(Score.categorical("triage_decision", verdict.decision().name()));
     }
 
     /**

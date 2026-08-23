@@ -40,6 +40,8 @@ Every script carries a `WHAT / WHY / WHEN / HOW` header comment; read it before 
 |---|---|
 | [`check-tool-catalogue.py`](scripts/check-tool-catalogue.py) | after adding or renaming a tool, or editing `agentic.tools.apis` — pairs Java catalogue keys with configured endpoints both ways, and gates https |
 | [`check-skill-docs.py`](scripts/check-skill-docs.py) | after adding, renaming or removing a skill, or editing the tables in `docs/06-skills.md` — asserts set equality between `.claude/skills/` and the chapter, both ways |
+| [`check-observability-stack.sh`](scripts/check-observability-stack.sh) | after editing anything under `observability/` or bumping an image tag — pushes a real trace through the collector and reads the derived metric names back |
+| [`check-langfuse-ingestion.sh`](scripts/check-langfuse-ingestion.sh) | after changing anything under `observability/trace/` or upgrading Langfuse — pushes a real trace and real scores into a running instance and reads both back |
 
 **Standing rule — export repeatable procedures.** Whenever you hit a multi-step procedure that is
 deterministic and likely to recur (release, registry verification, a gating/render check, an
@@ -101,6 +103,12 @@ When something fails repeatedly, when User has to re-explain, or when a workarou
 - Per-piece critics cannot see docs the code falsified; run a cross-piece sweep.
 - Hand-off to a user-invoked skill must say "ask the user to run it".
 - Recursive splitters pack the next heading on; run one before printing a chunk.
+- Micronaut empty default is `${VAR:}`; `${VAR:``}` yields the literal two backticks.
+- "Unresolved compilation problem" at runtime = stale IDE classes; `./mvnw clean`.
+- Langfuse self-host: ClickHouse tag must match upstream's; 25.3 fails migration 39.
+- Langfuse v4 events_only has no `GET /traces/{id}`; read the observations instead.
+- `/api/public/v2/observations` needs `fields=`, else payload fields read back null.
+- Docker Desktop credsStore can break in WSL; anonymous pull works with `{}` config.
 
 
 

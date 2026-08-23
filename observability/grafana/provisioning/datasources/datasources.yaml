@@ -1,0 +1,58 @@
+# Grafana data sources, provisioned at startup so this stack has no manual setup step.
+apiVersion: 1
+
+# Removes provisioned data sources when they disappear from this file.
+prune: true
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    uid: prometheus
+    access: proxy
+    orgId: 1
+    url: http://prometheus:9090
+    basicAuth: false
+    isDefault: false
+    version: 1
+    editable: false
+    jsonData:
+      httpMethod: POST
+      timeInterval: 15s
+      prometheusType: Prometheus
+      # An exemplar on a span-metrics histogram becomes a click-through to the trace that
+      # produced the slow bucket. This is the last of the three links in that chain; the
+      # other two are exemplars.enabled in the collector's span_metrics connector and
+      # --enable-feature=exemplar-storage on Prometheus.
+      exemplarTraceIdDestinations:
+        - name: trace_id
+          datasourceUid: tempo
+
+  - name: Tempo
+    type: tempo
+    uid: tempo
+    access: proxy
+    orgId: 1
+    url: http://tempo:3200
+    basicAuth: false
+    isDefault: true
+    version: 1
+    editable: false
+    jsonData:
+      httpMethod: GET
+      nodeGraph:
+        enabled: true
+      search:
+        hide: false
+      streamingEnabled:
+        search: true
+        metrics: true
+      tracesToMetrics:
+        datasourceUid: prometheus
+        spanStartTimeShift: '-2m'
+        spanEndTimeShift: '2m'
+        # service_name, not service. Tempo's own metrics_generator emits `service`; the
+        # collector's prometheus exporter emits `service_name`, and this stack's metrics
+        # come from the collector.
+        tags:
+          - key: 'service.name'
+            value: 'service_name'

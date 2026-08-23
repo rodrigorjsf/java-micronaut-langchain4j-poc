@@ -1,0 +1,39 @@
+# Prometheus scrapes the collector, not the application.
+#
+# The application's own Micrometer metrics are on /prometheus and are a different, older
+# story — the per-role token and cost counters described in docs/04-operations.md. The
+# span metrics here are DERIVED from spans by the collector, so latency and error rate
+# come from the same data as the traces and cannot disagree with them.
+
+global:
+  scrape_interval:     15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # The span_metrics connector's output, via the collector's prometheus exporter.
+  - job_name: 'otel-collector-spanmetrics'
+    static_configs:
+      - targets: ['otel-collector:8889']
+
+  # The collector's OWN telemetry — a different port and a different metric set. Watch
+  # otelcol_exporter_send_failed_spans here: it is where a broken Langfuse or Tempo leg
+  # becomes visible instead of silent.
+  - job_name: 'otel-collector-internal'
+    static_configs:
+      - targets: ['otel-collector:8888']
+
+  - job_name: 'tempo'
+    static_configs:
+      - targets: ['tempo:3200']
+
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # The application's Micrometer registry, when it is reachable from this network.
+  # Fails silently when the app is not running, which is the normal state for someone
+  # who only started the observability profile.
+  - job_name: 'agentic-app'
+    metrics_path: /prometheus
+    static_configs:
+      - targets: ['app:8080']

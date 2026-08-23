@@ -1,0 +1,15 @@
+apiVersion: 1
+
+providers:
+  - name: 'agentic'
+    orgId: 1
+    folder: 'Agentic chat'
+    type: file
+    disableDeletion: false
+    # The dashboard is a file in this repository, so editing it in the UI and having the
+    # change survive a restart is not the intent; editing the JSON is.
+    allowUiUpdates: false
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

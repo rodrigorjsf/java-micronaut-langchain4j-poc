@@ -2,6 +2,10 @@ package io.github.rodrigorjsf.agenticchat.rag;
 
 import dev.langchain4j.rag.content.retriever.ContentRetriever;
 import dev.langchain4j.rag.content.retriever.EmbeddingStoreContentRetriever;
+import io.github.rodrigorjsf.agenticchat.observability.trace.AgentTracer;
+import io.github.rodrigorjsf.agenticchat.observability.trace.LangfuseEmbeddingStoreListener;
+import io.github.rodrigorjsf.agenticchat.observability.trace.LangfuseRetrieverListener;
+import io.github.rodrigorjsf.agenticchat.observability.trace.ObservationContentPolicy;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Value;
 import jakarta.inject.Singleton;
@@ -26,18 +30,34 @@ import jakarta.inject.Singleton;
 @Factory
 public class KnowledgeRetrieverFactory {
 
+    static final String RETRIEVER_NAME = "assistant-knowledge";
+
+    /**
+     * Two listeners rather than one, and they are not redundant. The retriever observation
+     * covers query in, segments and their scores out — which is the pair a threshold
+     * argument is settled with. The store observation sits inside it and covers the vector
+     * search alone, so the ~14 ms of embedding the query is separable from the search it
+     * pays for.
+     *
+     * <p>{@code addListener} returns a decorator in both cases: the wrapped instance is the
+     * one that has to be used, not the one it was called on.
+     */
     @Singleton
     ContentRetriever knowledgeRetriever(
             KnowledgeBase knowledge,
+            AgentTracer tracer,
+            ObservationContentPolicy content,
             @Value("${agentic.rag.max-results:3}") int maxResults,
             @Value("${agentic.rag.min-score:0.6}") double minScore) {
 
         return EmbeddingStoreContentRetriever.builder()
-                .displayName("assistant-knowledge")
-                .embeddingStore(knowledge.store())
+                .displayName(RETRIEVER_NAME)
+                .embeddingStore(knowledge.store()
+                        .addListener(new LangfuseEmbeddingStoreListener(tracer)))
                 .embeddingModel(knowledge.embeddingModel())
                 .maxResults(maxResults)
                 .minScore(minScore)
-                .build();
+                .build()
+                .addListener(new LangfuseRetrieverListener(RETRIEVER_NAME, tracer, content));
     }
 }
