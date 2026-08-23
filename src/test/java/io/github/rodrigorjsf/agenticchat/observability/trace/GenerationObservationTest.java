@@ -74,9 +74,11 @@ class GenerationObservationTest {
         // token, cache reads included; Langfuse's buckets are mutually exclusive and split
         // the same tokens across input and input_cached_tokens. Both are written from the
         // one TokenUsageDetails, so they cannot disagree.
-        var usage = new TokenUsageDetails(new java.util.LinkedHashMap<String, Long>(Map.of(
+        // Map.of directly: TokenUsageDetails' compact constructor does Map.copyOf, so the
+        // insertion order a LinkedHashMap would carry is discarded on the way in.
+        var usage = new TokenUsageDetails(Map.of(
                 "input", 100L, "input_cached_tokens", 900L,
-                "output", 50L, "output_reasoning_tokens", 200L)));
+                "output", 50L, "output_reasoning_tokens", 200L));
         try (var generation = tracer.start("agent", ObservationType.GENERATION)) {
             generation.usage(usage);
         }
