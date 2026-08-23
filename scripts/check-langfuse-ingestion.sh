@@ -626,6 +626,19 @@ else
   fail "the two usage families no longer resolve the way GenAiAttributes documents: '$REASONING'"
 fi
 
+# Precedence is not the same claim as discarding, and the difference is what a reader
+# deciding where to put an attribute actually needs. The OTel pair ARRIVES: it is filed in
+# the unmapped catch-all as metadata["attributes.gen_ai.usage.*"], where nothing aggregates
+# it and every chart ignores it. Asserted rather than assumed, because a version that began
+# MAPPING that family would be a behaviour change this project has to know about — the same
+# reason the experiment attributes are asserted as observed.
+GEN_AI_INPUT=$(jq -r '.data[] | select(.name=="agent") | .metadata["attributes.gen_ai.usage.input_tokens"] // empty' <<<"$SHAPE_OBS" 2>/dev/null | head -1)
+if [[ "$GEN_AI_INPUT" == "3164" ]]; then
+  ok "gen_ai.usage.* arrives and is filed unmapped, under metadata.attributes"
+else
+  fail "gen_ai.usage.input_tokens read back as '$GEN_AI_INPUT', expected 3164 in the catch-all"
+fi
+
 REFUSED_OBS=""
 for _ in $(seq 1 20); do
   REFUSED_OBS=$(curl -sS -H "Authorization: $AUTH" \

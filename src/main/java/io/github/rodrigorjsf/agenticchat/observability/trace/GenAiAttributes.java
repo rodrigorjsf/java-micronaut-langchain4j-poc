@@ -20,6 +20,17 @@ import io.opentelemetry.api.common.AttributeKey;
  * The {@code langfuse.*} namespace takes precedence, which is the same rule that governs
  * every other attribute here.
  *
+ * <p><b>Precedence is not the same thing as discarding, and the difference decides where an
+ * attribute belongs.</b> The OpenTelemetry pair ARRIVES at Langfuse — measured, it is filed
+ * in the unmapped catch-all as {@code metadata["attributes.gen_ai.usage.input_tokens"]},
+ * where nothing aggregates it and no chart reads it. So there are three consumers of these
+ * two keys and each uses them differently: <b>Langfuse</b> keeps them as inert metadata and
+ * charts the {@code langfuse.*} buckets; <b>Tempo</b> keeps them as ordinary span attributes
+ * a TraceQL query can filter on, because the collector strips only
+ * {@code gen_ai.(prompt|completion)}; and <b>Langfuse 3.80.0</b> reads them as the ONLY
+ * source of usage it understands. Stripping them from the Langfuse leg would buy two fewer
+ * metadata keys and cost the third consumer everything.
+ *
  * <p>So they are set, and the reason to set them is not symmetry. Langfuse 3.80.0 ignores
  * {@code langfuse.observation.usage_details} entirely and reads usage ONLY from this
  * family: without these two keys every token count and every cost on that version reads

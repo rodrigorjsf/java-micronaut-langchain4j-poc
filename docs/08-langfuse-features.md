@@ -1398,6 +1398,22 @@ the Langfuse buckets intact, byte for byte the same as one carrying only
 `langfuse.observation.usage_details`. The `langfuse.*` namespace takes precedence, as it
 does for every other attribute.
 
+**Precedence is not discarding**, and the difference is what decides where an attribute
+belongs. The OpenTelemetry pair arrives — read back off 4.16.0 **[verified]**, it sits in the
+unmapped catch-all as `metadata["attributes.gen_ai.usage.input_tokens"]`, where nothing
+aggregates it and no chart reads it. Three consumers, three uses of the same two keys:
+
+| Reader | What it does with `gen_ai.usage.*` |
+|---|---|
+| Langfuse 4.16.0 | keeps them as inert metadata; charts the `langfuse.*` buckets |
+| Tempo | keeps them as ordinary span attributes a TraceQL query can filter on — the collector strips only `gen_ai.(prompt\|completion)` |
+| Langfuse 3.80.0 | reads them as the **only** source of usage it understands |
+
+Stripping them from the Langfuse leg would buy two fewer metadata keys and cost the third
+reader everything. `scripts/check-langfuse-ingestion.sh` asserts both halves — that the
+buckets win, and that the OTel pair arrives unmapped — so a version that started mapping
+that family fails the check instead of silently changing what every generation reports.
+
 The two conventions **fold differently**, and that is the whole care this needs.
 `gen_ai.usage.input_tokens` is every prompt token, cache reads included; Langfuse's `input`
 bucket excludes them. Both are written from one `TokenUsageDetails`, which is the only
