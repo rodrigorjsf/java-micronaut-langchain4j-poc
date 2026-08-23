@@ -119,9 +119,23 @@ public class OtelAgentTracer implements AgentTracer {
 
         @Override
         public Observation usage(TokenUsageDetails usage) {
-            return usage == null || usage.isEmpty()
-                    ? this
-                    : write(LangfuseAttributes.USAGE_DETAILS.getKey(), json.write(usage.buckets()));
+            if (usage == null || usage.isEmpty()) {
+                // No point rather than a zero: a provider that did not report usage is
+                // making a different claim from one that used no tokens.
+                return this;
+            }
+            write(LangfuseAttributes.USAGE_DETAILS.getKey(), json.write(usage.buckets()));
+            // The same numbers in the OpenTelemetry vocabulary, folded ITS way — see
+            // GenAiAttributes for why both are set and why they cannot disagree.
+            long promptTokens = usage.promptTokens();
+            long completionTokens = usage.completionTokens();
+            if (promptTokens > 0) {
+                span.setAttribute(GenAiAttributes.USAGE_INPUT_TOKENS, promptTokens);
+            }
+            if (completionTokens > 0) {
+                span.setAttribute(GenAiAttributes.USAGE_OUTPUT_TOKENS, completionTokens);
+            }
+            return this;
         }
 
         @Override
