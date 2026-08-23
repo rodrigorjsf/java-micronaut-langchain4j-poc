@@ -125,6 +125,8 @@ When something fails repeatedly, when User has to re-explain, or when a workarou
 - Langfuse 3.80.0 knows only SPAN/GENERATION/EVENT; every richer type stores as SPAN.
 - Langfuse 3.80.0 reads usage from `gen_ai.usage.*` only, never `usage_details`.
 - Langfuse OTLP/JSON on 3.80.0 re-hexes the traceId string; protobuf is unaffected.
+- Micronaut Serde cannot serialize `ChatMessage`; use LangChain4j's `ChatMessageSerializer`.
+- Langfuse v3 scores name their target in `subject.kind`, not an `observationId` field.
 
 
 
