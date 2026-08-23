@@ -35,11 +35,13 @@ public class TokenCostListener implements ChatModelListener {
     private final String role;
     private final MeterRegistry meters;
     private final CostCalculator costs;
+    private final GenAiMetrics genAi;
 
-    public TokenCostListener(String role, MeterRegistry meters, CostCalculator costs) {
+    public TokenCostListener(String role, MeterRegistry meters, CostCalculator costs, GenAiMetrics genAi) {
         this.role = role;
         this.meters = meters;
         this.costs = costs;
+        this.genAi = genAi;
     }
 
     @Override
@@ -65,6 +67,8 @@ public class TokenCostListener implements ChatModelListener {
                 "role", role,
                 "model", requestModel,
                 "exception", context.error().getClass().getSimpleName()).increment();
+        genAi.recordFailure(providerOf(context.modelProvider()), requestModel,
+                context.error(), elapsed(context.attributes()));
     }
 
     private void record(ChatModelResponseContext context) {
@@ -108,12 +112,27 @@ public class TokenCostListener implements ChatModelListener {
             meters.timer("agentic.llm.latency", "role", role, "model", model).record(elapsed);
         }
 
+        // The SAME details object, in the portable vocabulary. See GenAiMetrics for why a
+        // second pipeline over one computation is not a second opinion.
+        genAi.recordCall(providerOf(context.modelProvider()),
+                modelNameOf(context.chatRequest() == null ? null : context.chatRequest().modelName()),
+                model, details, elapsed);
+
         LOG.debug("LLM call role={} model={} tokens={} usd={}",
                 role, model, details.buckets(), cost.toPlainString());
     }
 
     private static String modelNameOf(String modelName) {
         return modelName == null || modelName.isBlank() ? "unknown" : modelName;
+    }
+
+    /**
+     * The provider spelt as the generation span spells it, so a metric and a span about the
+     * same call can be correlated. See {@link GenAiMetrics} for why the registry value is
+     * deliberately not used.
+     */
+    private static String providerOf(dev.langchain4j.model.ModelProvider provider) {
+        return provider == null ? "unknown" : provider.name().toLowerCase(java.util.Locale.ROOT);
     }
 
     private static java.time.Duration elapsed(java.util.Map<Object, Object> attributes) {

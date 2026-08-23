@@ -5,6 +5,7 @@ import dev.langchain4j.model.chat.listener.ChatModelListener;
 import io.github.rodrigorjsf.agenticchat.llm.ChatModelRegistry;
 import io.github.rodrigorjsf.agenticchat.llm.config.ProviderCredentials;
 import io.github.rodrigorjsf.agenticchat.observability.CostCalculator;
+import io.github.rodrigorjsf.agenticchat.observability.GenAiMetrics;
 import io.github.rodrigorjsf.agenticchat.observability.TokenCostListener;
 import io.github.rodrigorjsf.agenticchat.observability.trace.AgentTracer;
 import io.github.rodrigorjsf.agenticchat.observability.trace.LangfuseChatModelListener;
@@ -54,16 +55,19 @@ public class StubChatModelRegistry extends ChatModelRegistry {
     private final CostCalculator costs;
     private final AgentTracer tracer;
     private final ObservationContentPolicy content;
+    private final GenAiMetrics genAiMetrics;
 
     public StubChatModelRegistry(MeterRegistry meters,
                                  CostCalculator costs,
                                  AgentTracer tracer,
-                                 ObservationContentPolicy content) {
-        super(List.of(), STUB_CREDENTIALS, List.of(), meters, costs, tracer, content);
+                                 ObservationContentPolicy content,
+                                 GenAiMetrics genAiMetrics) {
+        super(List.of(), STUB_CREDENTIALS, List.of(), meters, costs, tracer, content, genAiMetrics);
         this.meters = meters;
         this.costs = costs;
         this.tracer = tracer;
         this.content = content;
+        this.genAiMetrics = genAiMetrics;
     }
 
     public ScriptedChatModel model(String role) {
@@ -73,7 +77,7 @@ public class StubChatModelRegistry extends ChatModelRegistry {
 
     private List<ChatModelListener> listenersFor(String role) {
         return List.of(
-                new TokenCostListener(role, meters, costs),
+                new TokenCostListener(role, meters, costs, genAiMetrics),
                 new LangfuseChatModelListener(role, tracer, costs, content));
     }
 
