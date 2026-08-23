@@ -232,6 +232,49 @@ model thought.** OpenAI has the opposite convention — `completion_tokens` alre
 its reasoning tokens — so one is added and the other subtracted, and getting that backwards
 is invisible in both directions.
 
+**And the sentence above was still false when it was written — measured 2026-08-23.**
+`CostCalculator` was indeed the single source of prices, but through two overloads.
+`costOf(model, TokenUsageDetails)` prices the reasoning bucket; `costOf(model, input,
+output, cached)` takes raw counts and has no notion of one, and `TokenCostListener` — the
+Micrometer half — called the second. On a Gemini response with 880 thought tokens the span
+carried `5.32e-4` and the counter carried `1.8e-4`:
+
+```
+GenAiMetricsTest.theTwoCostsAgree  (before the fix)
+expected: 5.32E-4
+ but was: 1.8E-4
+```
+
+The counter reported **34% of the real cost**, on every turn of the `agent` role, while this
+ADR and chapter 7 both promised the two could not disagree. The fix is structural rather
+than arithmetical: `TokenCostListener` now builds `TokenUsageDetails` once and every emitter
+reads that one object. The test asserts equality against `costOf(model, details)` rather
+than a literal, so the two cannot be separated again by a price change.
+
+Two things fell out of it. The Micrometer buckets became **mutually exclusive** —
+`kind="input"` is the fresh input and no longer includes the cached reads — which is what
+the dashboard's cache-hit panel had assumed all along (`kind=~"input|cached_input"` is only
+a total if the two are disjoint), so that panel had been understating every rate it drew.
+And a bucket `kind="output_reasoning"` now exists, which makes the effect of
+`thinking-level` measurable rather than merely payable.
+
+### OpenTelemetry GenAI metrics ARE emitted — reversing this ADR's first position
+
+The original decision recorded here was that `otel.metrics.exporter` stays `none` because a
+second metrics pipeline could only be a way for two numbers to disagree.
+
+The reasoning was right about the risk and wrong about the remedy, and the finding above is
+why: the disagreement it feared was already present *inside the single pipeline it trusted*.
+Separateness was never what protected the numbers — a shared computation is. With
+`TokenCostListener` reducing to one `TokenUsageDetails` and every emitter reading it,
+`GenAiMetrics` is not a second opinion, it is the same number in the vocabulary every other
+GenAI tool speaks: `gen_ai.client.token.usage` and `gen_ai.client.operation.duration`, with
+the explicit bucket boundaries the convention specifies.
+
+It stays off unless there is a collector to send it to. `otel.metrics.exporter` follows
+`agentic.observability.otlp.endpoint`, because a `MeterProvider` dials on an interval rather
+than once and the default build is required to need no network.
+
 ## Consequences
 
 **Nothing is exported by default.** With no endpoint configured the injected `Tracer` is

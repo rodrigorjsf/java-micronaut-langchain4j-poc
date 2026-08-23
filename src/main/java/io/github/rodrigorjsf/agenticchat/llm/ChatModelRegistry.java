@@ -10,6 +10,7 @@ import io.github.rodrigorjsf.agenticchat.llm.config.ModelRoleProperties;
 import io.github.rodrigorjsf.agenticchat.llm.config.ModelRoleValidator;
 import io.github.rodrigorjsf.agenticchat.llm.config.ProviderCredentials;
 import io.github.rodrigorjsf.agenticchat.observability.CostCalculator;
+import io.github.rodrigorjsf.agenticchat.observability.GenAiMetrics;
 import io.github.rodrigorjsf.agenticchat.observability.TokenCostListener;
 import io.github.rodrigorjsf.agenticchat.observability.trace.AgentTracer;
 import io.github.rodrigorjsf.agenticchat.observability.trace.LangfuseChatModelListener;
@@ -66,7 +67,8 @@ public class ChatModelRegistry {
                              MeterRegistry meters,
                              CostCalculator costs,
                              AgentTracer tracer,
-                             ObservationContentPolicy content) {
+                             ObservationContentPolicy content,
+                             GenAiMetrics genAiMetrics) {
         this.configByRole = roles.stream()
                 .collect(Collectors.toUnmodifiableMap(ModelRoleProperties::name, Function.identity()));
 
@@ -74,7 +76,7 @@ public class ChatModelRegistry {
         for (ModelRoleProperties role : roles) {
             ModelRoleValidator.validate(role);
             var perRole = new ArrayList<>(listeners);
-            perRole.add(new TokenCostListener(role.name(), meters, costs));
+            perRole.add(new TokenCostListener(role.name(), meters, costs, genAiMetrics));
             // Per role for the same reason the cost listener is: the observation is named
             // for the role, so the judge's generations and the agent's are separable in a
             // trace without anyone having to recognise a model id.

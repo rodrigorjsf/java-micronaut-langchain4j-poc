@@ -42,6 +42,23 @@ public class TurnAttributesSpanProcessor implements SpanProcessor {
             turn.metadata().forEach((key, value) ->
                     set(span, LangfuseAttributes.traceMetadata(key).getKey(), value));
         });
+
+        // The experiment level rides the same mechanism for the same reason: Langfuse v4
+        // queries observations, so an experiment id on the item root alone leaves every
+        // child of it unattributable — and the run then looks like one observation per
+        // row rather than a truncated one.
+        ExperimentContext.from(parentContext).ifPresent(experiment -> {
+            set(span, LangfuseAttributes.EXPERIMENT_ID.getKey(), experiment.id());
+            set(span, LangfuseAttributes.EXPERIMENT_NAME.getKey(), experiment.name());
+            set(span, LangfuseAttributes.EXPERIMENT_DATASET_ID.getKey(), experiment.datasetId());
+            set(span, LangfuseAttributes.EXPERIMENT_DESCRIPTION.getKey(), experiment.description());
+            set(span, LangfuseAttributes.EXPERIMENT_ITEM_ID.getKey(), experiment.itemId());
+            set(span, LangfuseAttributes.EXPERIMENT_ITEM_VERSION.getKey(), experiment.itemVersion());
+            set(span, LangfuseAttributes.EXPERIMENT_ITEM_ROOT_OBSERVATION_ID.getKey(),
+                    experiment.rootObservationId());
+            experiment.metadata().forEach((key, value) ->
+                    set(span, LangfuseAttributes.experimentMetadata(key).getKey(), value));
+        });
     }
 
     @Override

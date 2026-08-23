@@ -58,9 +58,13 @@ context points back at it — a pointer costs ~15 tokens, a second copy would co
 ~3000 and then be replayed out of memory for the rest of the conversation.
 
 **The measurement not made.** `TokenCostListener` reads Gemini's
-`cachedContentTokenCount()` and exports `agentic.llm.tokens{kind="cached_input"}`,
-so the accounting path exists — but nobody has yet observed that counter go above
-zero for a prompt of this shape. The prefix is *positioned* to be cached; the hit
+`cachedContentTokenCount()` — through `TokenUsageDetails`, which is also what the
+generation span carries — and exports `agentic.llm.tokens{kind="cached_input"}`,
+so the accounting path exists. Its denominator was wrong until the buckets were
+made mutually exclusive: `kind="input"` used to include the cached reads, so the
+dashboard's `cached_input / (input + cached_input)` counted every hit twice on the
+bottom and drew a rate roughly half the truth. Nobody has yet observed that counter
+go above zero for a prompt of this shape. The prefix is *positioned* to be cached; the hit
 rate is unmeasured, and by the rule two sections above it may not be claimed until
 a live turn is read.
 

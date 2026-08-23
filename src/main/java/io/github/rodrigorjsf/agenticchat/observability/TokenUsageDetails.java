@@ -89,6 +89,27 @@ public record TokenUsageDetails(Map<String, Long> buckets) {
     }
 
     /**
+     * Every input token, cached or not.
+     *
+     * <p>The OpenTelemetry GenAI conventions close {@code gen_ai.token.type} at
+     * {@code input} and {@code output}, and Langfuse's buckets are four and mutually
+     * exclusive — so somewhere the four have to fold into two. Here, beside the buckets,
+     * rather than in the emitter: a fold computed by whoever is reporting is a fold each
+     * reporter can get differently, and the whole point of this type is that everything
+     * reading it reads one number.
+     */
+    public long promptTokens() {
+        return inputTokens() + cachedInputTokens();
+    }
+
+    /**
+     * Every output token, reasoning or not. Both are billed at the output rate.
+     */
+    public long completionTokens() {
+        return outputTokens() + reasoningOutputTokens();
+    }
+
+    /**
      * Provider-specific because the base {@link TokenUsage} has no notion of a cache
      * hit. Reflection-free: both subclasses are on the compile classpath already.
      */

@@ -80,6 +80,21 @@ public interface Observation extends AutoCloseable {
     Observation genAiResponse(String responseModel, String finishReason);
 
     /**
+     * Declares this observation the root of one experiment item, and records what the row
+     * expected.
+     *
+     * <p>{@code langfuse.experiment.item.root_observation_id} is derived from this
+     * observation's own span id rather than accepted as an argument: it names a span that
+     * does not exist until it has been started, so no caller can pass it correctly and a
+     * caller that passes something else produces an item whose root points at another
+     * trace, silently.
+     *
+     * <p>{@code expectedOutput} is written as JSON, like every other payload, and a null
+     * one writes nothing — a row with no expected answer is a legitimate row.
+     */
+    Observation experimentItem(String itemId, Object expectedOutput);
+
+    /**
      * Declares this observation the head of its trace.
      *
      * <p>Only the turn does this. Langfuse reads two different attributes for it depending

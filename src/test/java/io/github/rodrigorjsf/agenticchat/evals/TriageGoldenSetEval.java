@@ -2,6 +2,11 @@ package io.github.rodrigorjsf.agenticchat.evals;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.rodrigorjsf.agenticchat.observability.trace.AgentTracer;
+import io.github.rodrigorjsf.agenticchat.observability.trace.ExperimentAttributes;
+import io.github.rodrigorjsf.agenticchat.observability.trace.ExperimentRun;
+import io.github.rodrigorjsf.agenticchat.observability.trace.ObservationContentPolicy;
+import io.github.rodrigorjsf.agenticchat.observability.trace.ScoreWriter;
 import io.github.rodrigorjsf.agenticchat.triage.TriageService;
 import io.github.rodrigorjsf.agenticchat.triage.TriageVerdict;
 import io.micronaut.context.ApplicationContext;
@@ -61,11 +66,36 @@ class TriageGoldenSetEval {
 
     private ApplicationContext ctx;
     private TriageService triage;
+    private ExperimentRun run;
 
     @BeforeAll
     void setUp() {
-        ctx = ApplicationContext.run();
+        // The property goes in the run map rather than in a @Property annotation: this
+        // class boots its context by hand, and @Property only reaches a @MicronautTest.
+        //
+        // A separate Langfuse environment because the rows are a golden set, not traffic.
+        // Left on "default" they would move the production dashboards and fire the alert
+        // rules that watch them, once per release, from a suite nobody was looking at.
+        ctx = ApplicationContext.run(Map.of("agentic.observability.environment", "experiment"));
         triage = ctx.getBean(TriageService.class);
+        run = ExperimentRun.start(
+                ctx.getBean(AgentTracer.class),
+                ctx.getBean(ScoreWriter.class),
+                // The same data-protection switch every other span writer obeys. A golden
+                // set assembled from production traffic makes an item's input and output a
+                // user's message and a model's reply, and this run has no more licence to
+                // export them than the turn that produced them did.
+                ctx.getBean(ObservationContentPolicy.class),
+                ExperimentAttributes.builder()
+                        // Stable, and deliberately not unique per run: a golden set exists
+                        // to be re-run, and two runs Langfuse cannot group are two numbers
+                        // nobody can compare.
+                        .id("triage-golden-set")
+                        .name("triage golden set")
+                        .datasetId("evals/triage-golden.json")
+                        .description("routing accuracy and the false-refusal rate, against "
+                                + "a live model")
+                        .build());
     }
 
     @AfterAll
@@ -106,16 +136,21 @@ class TriageGoldenSetEval {
         var intentConfusion = new LinkedHashMap<String, Integer>();
 
         for (Case testCase : cases) {
+            boolean expectedInScope = "IN_SCOPE".equals(testCase.expected());
             TriageVerdict verdict;
             try {
-                verdict = triage.triage(testCase.text());
+                // One item per row. ExperimentRun marks the item failed and rethrows, so a
+                // rate-limited row is still SKIPPED here — scoring a quota error as a
+                // classification error would make every number below meaningless.
+                verdict = run.item(testCase.id(), testCase.text(), testCase.expected(),
+                        () -> triage.triage(testCase.text()),
+                        graded -> graded.inScope() == expectedInScope);
             } catch (RuntimeException e) {
                 skipped.add(testCase.id());
                 continue;
             }
             ran++;
 
-            boolean expectedInScope = "IN_SCOPE".equals(testCase.expected());
             if (expectedInScope) {
                 shouldPass++;
             }

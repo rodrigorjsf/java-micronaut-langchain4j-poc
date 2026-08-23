@@ -46,9 +46,22 @@ public class TracingDefaults {
             // produce an exporter Langfuse would refuse.
             properties.put("otel.exporter.otlp.protocol", "http/protobuf");
         }
-        // Metrics and logs are Micrometer's and Logback's jobs in this application. Leaving the
-        // OpenTelemetry defaults in place would add two more exporters dialling localhost.
-        properties.put("otel.metrics.exporter", "none");
+        // Metrics follow the collector, and ONLY the collector.
+        //
+        // OpenTelemetry's own default here is `otlp`, and unlike the trace exporter a
+        // MeterProvider dials on an INTERVAL rather than once — so the default would have
+        // every `./mvnw test` run open a connection to localhost:4318 and keep retrying
+        // it. The default build is required to need no network, which is why this is
+        // conditional rather than simply enabled.
+        //
+        // With a collector configured there is somewhere to send them: the collector's
+        // metrics pipeline already has an otlp receiver beside the span_metrics connector,
+        // so gen_ai.client.token.usage and gen_ai.client.operation.duration reach
+        // Prometheus with no further configuration. They go to the COLLECTOR and not to
+        // Langfuse, which ingests OTLP traces only — and this endpoint is the collector's.
+        properties.put("otel.metrics.exporter", collectorConfigured ? "otlp" : "none");
+        // Logs stay Logback's job either way. Correlating them with traces is a small
+        // change that has not been made; see chapter 7.
         properties.put("otel.logs.exporter", "none");
 
         // Sampling is a trace-level decision taken at the root, which is what Langfuse needs:

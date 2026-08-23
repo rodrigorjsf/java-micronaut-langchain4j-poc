@@ -74,4 +74,30 @@ class TracingDefaultsTest {
                     .containsEntry("otel.propagators", "tracecontext");
         }
     }
+
+    @Test
+    @DisplayName("the metrics exporter follows the collector, and is off without one")
+    void metricsFollowTheCollector() {
+        // OpenTelemetry's own default for otel.metrics.exporter is `otlp`, and a
+        // MeterProvider with a periodic reader dials on an INTERVAL rather than once —
+        // so leaving the default in place would have every `./mvnw test` run open a
+        // connection to localhost:4318 and keep retrying it. The default build is
+        // required to need no network.
+        assertThat(new TracingDefaults("", 1.0).properties())
+                .containsEntry("otel.metrics.exporter", "none");
+
+        // With a collector there IS somewhere to send them, and the GenAI client metrics
+        // (gen_ai.client.token.usage, gen_ai.client.operation.duration) are the portable
+        // half of this application's accounting. The collector's metrics pipeline already
+        // has an otlp receiver, so nothing else has to change for them to reach Prometheus.
+        assertThat(new TracingDefaults("http://otel-collector:4318", 1.0).properties())
+                .containsEntry("otel.metrics.exporter", "otlp");
+    }
+
+    @Test
+    @DisplayName("logs stay off even with a collector: Logback owns them here")
+    void logsStayOff() {
+        assertThat(new TracingDefaults("http://otel-collector:4318", 1.0).properties())
+                .containsEntry("otel.logs.exporter", "none");
+    }
 }

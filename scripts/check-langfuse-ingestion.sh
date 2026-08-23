@@ -242,6 +242,132 @@ if [[ "$NUMERIC" == "0.93" ]]; then ok "numeric score reads back as 0.93"; else 
 if [[ "$CATEGORICAL" == "IN_SCOPE" ]]; then ok "categorical score reads back as IN_SCOPE"; else fail "categorical reads back as '$CATEGORICAL'"; fi
 if [[ "$SUBJECT" == "observation" ]]; then ok "the score is attached to the OBSERVATION, not the trace"; else fail "score subject is '$SUBJECT'"; fi
 
+echo "==> corrections  (the exact body Score.correction(text) produces)"
+# name and dataType are FIXED by the feature, not chosen by the caller. A correction filed
+# under any other name is an ordinary score that never reaches the diff view, and nothing
+# anywhere reports that — which is why this is checked against a live server rather than
+# trusted from the documentation.
+CORRECTION_BODY=$(cat <<JSON
+{"traceId":"${TRACE_ID}","observationId":"${ROOT_SPAN}","name":"output",
+ "value":"Isso esta dentro do escopo.","dataType":"CORRECTION","environment":"default"}
+JSON
+)
+CORRECTION_STATUS=$(curl -sS -o /dev/null -w '%{http_code}' -X POST "$HOST/api/public/scores" \
+  -H 'Content-Type: application/json' -H "Authorization: $AUTH" -d "$CORRECTION_BODY")
+if [[ "$CORRECTION_STATUS" =~ ^2 ]]; then ok "correction accepted ($CORRECTION_STATUS)"; else fail "correction answered $CORRECTION_STATUS"; fi
+
+CORRECTIONS=""
+for _ in $(seq 1 20); do
+  # `fields=subject,details` is not optional: without it the projection is lean and `value`
+  # reads back null, which is indistinguishable from a write that never landed.
+  CORRECTIONS=$(curl -sS -H "Authorization: $AUTH" \
+    "$HOST/api/public/v3/scores?traceId=${TRACE_ID}&dataType=CORRECTION&fields=subject,details" 2>/dev/null)
+  if [[ $(jq -r '.data | length' <<<"$CORRECTIONS" 2>/dev/null || echo 0) -ge 1 ]]; then break; fi
+  sleep 3
+done
+CORR_NAME=$(jq -r '.data[0].name // empty' <<<"$CORRECTIONS" 2>/dev/null)
+CORR_VALUE=$(jq -r '.data[0].value // empty' <<<"$CORRECTIONS" 2>/dev/null)
+CORR_SUBJECT=$(jq -r '.data[0].subject.kind // empty' <<<"$CORRECTIONS" 2>/dev/null)
+CORR_TARGET=$(jq -r '.data[0].subject.id // empty' <<<"$CORRECTIONS" 2>/dev/null)
+if [[ "$CORR_NAME" == "output" ]]; then ok "the correction is named 'output'"; else fail "correction name is '$CORR_NAME'"; fi
+if [[ "$CORR_VALUE" == "Isso esta dentro do escopo." ]]; then ok "the corrected output survived the round trip"; else fail "correction value is '$CORR_VALUE'"; fi
+if [[ "$CORR_SUBJECT" == "observation" && "$CORR_TARGET" == "$ROOT_SPAN" ]]; then
+  ok "the correction is attached to the ROOT observation"
+else
+  fail "correction subject is '$CORR_SUBJECT' on '$CORR_TARGET', expected observation $ROOT_SPAN"
+fi
+
+echo "==> experiments  (langfuse.experiment.* and an EVALUATOR-typed child)"
+EXP_TRACE=$(head -c16 /dev/urandom | od -An -tx1 | tr -d ' \n')
+EXP_ROOT=$(head -c8 /dev/urandom | od -An -tx1 | tr -d ' \n')
+EXP_CHILD=$(head -c8 /dev/urandom | od -An -tx1 | tr -d ' \n')
+EXP_FILE="$(mktemp)"
+trap 'rm -f "$PAYLOAD_FILE" "$EXP_FILE"' EXIT
+EXP_TRACE="$EXP_TRACE" EXP_ROOT="$EXP_ROOT" EXP_CHILD="$EXP_CHILD" NOW="$NOW" END="$END" \
+python3 - "$EXP_FILE" <<'PYEXP'
+import json, os, sys
+
+def attr(key, value, kind="stringValue"):
+    return {"key": key, "value": {kind: value}}
+
+trace, root, child = os.environ["EXP_TRACE"], os.environ["EXP_ROOT"], os.environ["EXP_CHILD"]
+now, end = os.environ["NOW"], os.environ["END"]
+
+# Every langfuse.experiment.* key belongs on EVERY span of the item trace: Langfuse v4
+# queries observations, not traces, so an experiment id on the root alone leaves the
+# children unattributable. TurnAttributesSpanProcessor is what does this in the application.
+experiment = [
+    attr("langfuse.experiment.id", "exp-check"),
+    attr("langfuse.experiment.name", "triage-golden-set"),
+    attr("langfuse.experiment.dataset.id", "ds-triage"),
+    attr("langfuse.experiment.item.id", "item-3"),
+    attr("langfuse.experiment.item.root_observation_id", root),
+    attr("langfuse.environment", "experiment"),
+]
+spans = [
+    {"traceId": trace, "spanId": root, "name": "experiment-item", "kind": 1,
+     "startTimeUnixNano": now, "endTimeUnixNano": end,
+     "attributes": experiment + [
+         attr("langfuse.observation.type", "agent"),
+         attr("langfuse.internal.as_root", "true"),
+         attr("langfuse.internal.is_app_root", True, "boolValue"),
+         attr("langfuse.trace.name", "experiment-item"),
+         attr("langfuse.observation.input", '"bom dia"'),
+         attr("langfuse.observation.output", '"OUT_OF_SCOPE"'),
+         attr("langfuse.experiment.item.expected_output", '"IN_SCOPE"'),
+     ]},
+    {"traceId": trace, "spanId": child, "parentSpanId": root, "name": "grade", "kind": 1,
+     "startTimeUnixNano": now, "endTimeUnixNano": end,
+     "attributes": experiment + [attr("langfuse.observation.type", "evaluator")]},
+]
+open(sys.argv[1], "w").write(json.dumps(
+    {"resourceSpans": [{"resource": {"attributes": [attr("service.name", "agenticchat")]},
+                        "scopeSpans": [{"scope": {"name": "check-langfuse-ingestion"},
+                                        "spans": spans}]}]}))
+PYEXP
+
+EXP_STATUS=$(curl -sS -o /dev/null -w '%{http_code}' -X POST "$HOST/api/public/otel/v1/traces" \
+  -H 'Content-Type: application/json' -H "Authorization: $AUTH" \
+  -H 'x-langfuse-ingestion-version: 4' --data-binary @"$EXP_FILE")
+if [[ "$EXP_STATUS" =~ ^2 ]]; then ok "experiment trace accepted ($EXP_STATUS)"; else fail "experiment trace answered $EXP_STATUS"; fi
+
+EXP_OBS=""
+for _ in $(seq 1 40); do
+  EXP_OBS=$(curl -sS -H "Authorization: $AUTH" \
+    "$HOST/api/public/v2/observations?traceId=${EXP_TRACE}&fields=core,basic,io,metadata" 2>/dev/null)
+  if [[ $(jq -r '.data | length' <<<"$EXP_OBS" 2>/dev/null || echo 0) -ge 2 ]]; then break; fi
+  sleep 3
+done
+
+EVALUATOR_TYPE=$(jq -r --arg id "$EXP_CHILD" '.data[] | select(.id==$id) | .type' <<<"$EXP_OBS" 2>/dev/null)
+if [[ "$EVALUATOR_TYPE" == "EVALUATOR" ]]; then
+  ok "the grading child is typed EVALUATOR (lower-case 'evaluator' on the wire)"
+else
+  fail "the grading child is typed '$EVALUATOR_TYPE', expected EVALUATOR"
+fi
+
+EXP_ENVIRONMENT=$(jq -r --arg id "$EXP_ROOT" '.data[] | select(.id==$id) | .environment' <<<"$EXP_OBS" 2>/dev/null)
+if [[ "$EXP_ENVIRONMENT" == "experiment" ]]; then
+  ok "langfuse.environment separates the run from production traffic"
+else
+  fail "environment is '$EXP_ENVIRONMENT', expected experiment"
+fi
+
+# WHAT THIS ASSERTS, AND WHY IT IS PHRASED AS IT IS. On self-hosted 4.16.0 the
+# langfuse.experiment.* family is NOT mapped to first-class experiment fields: every value
+# arrives and every one lands in the unmapped catch-all as
+# metadata["attributes.langfuse.experiment.*"], the way Langfuse files any attribute it does
+# not recognise. The trace is intact and the data is queryable; what does not happen is the
+# experiments view assembling it. The check asserts what this deployment actually does, so
+# the day a version DOES map them this line fails and someone re-reads the mapping instead
+# of finding out years later.
+EXP_ID_ARRIVED=$(jq -r --arg id "$EXP_ROOT" '.data[] | select(.id==$id) | .metadata["attributes.langfuse.experiment.id"] // empty' <<<"$EXP_OBS" 2>/dev/null)
+if [[ "$EXP_ID_ARRIVED" == "exp-check" ]]; then
+  ok "experiment attributes arrive (unmapped, under metadata.attributes — see docs/07)"
+else
+  fail "langfuse.experiment.id did not arrive at all: '$EXP_ID_ARRIVED'"
+fi
+
 echo
 if [[ $FAILURES -eq 0 ]]; then
   echo "langfuse ingestion: OK"
