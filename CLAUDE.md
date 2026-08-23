@@ -45,6 +45,7 @@ Every script carries a `WHAT / WHY / WHEN / HOW` header comment; read it before 
 | [`check-alert-rule-claims.sh`](scripts/check-alert-rule-claims.sh) | after editing `observability/grafana/provisioning/alerting/alert-rules.yaml` — asserts the one claim a YAML linter cannot check, and reproduces it with a `promtool` unit test on the real PromQL engine |
 | [`check-app-tracing-e2e.sh`](scripts/check-app-tracing-e2e.sh) | after changing `compose.yaml`, the collector config, `TracingDefaults` or any seam — runs the REAL app in Docker, sends SIX REAL turns, and reads them back out of Tempo and Prometheus |
 | [`check-langfuse-3x-compat.sh`](scripts/check-langfuse-3x-compat.sh) | after changing anything under `observability/trace/`, and before editing the compatibility table in `docs/08-langfuse-features.md` — measures what Langfuse 3.80.0 does with every integration built against 4.16.0, and reports a difference as a GAP rather than a failure |
+| [`capture-langfuse-app-census.sh`](scripts/capture-langfuse-app-census.sh) | before editing a census, a payload figure or the reference trace in `docs/07`/`docs/08` — sends the six real scenarios through the running app and prints the observation census, the payload share and the trace tree, so those `[verified]` numbers are reproducible rather than hand-captured |
 
 **Standing rule — export repeatable procedures.** Whenever you hit a multi-step procedure that is
 deterministic and likely to recur (release, registry verification, a gating/render check, an
