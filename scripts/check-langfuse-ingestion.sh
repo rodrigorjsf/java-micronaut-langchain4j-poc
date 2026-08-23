@@ -501,6 +501,16 @@ spans = [
             {"input": 0.000535, "output": 0.000609, "total": 0.001144})),
         attr("gen_ai.operation.name", "chat"),
         attr("gen_ai.request.model", "gemini-3.1-flash-lite"),
+        # BOTH usage families on ONE generation, on purpose. The application writes both
+        # (see GenAiAttributes), and it does so on the strength of a measurement: Langfuse
+        # gives its own namespace precedence, so the exclusive buckets survive rather than
+        # being overwritten by the OpenTelemetry family's coarser fold. That measurement is
+        # asserted below rather than trusted, because the whole reason the two are sent
+        # together is that they DO NOT double-count — and a version that started
+        # preferring gen_ai.usage.* would silently drop the cached and reasoning buckets
+        # from every generation this application exports.
+        attr("gen_ai.usage.input_tokens", 3164, "intValue"),
+        attr("gen_ai.usage.output_tokens", 406, "intValue"),
     ]),
 
     # EVENT — a point in time with no duration of its own. Compaction is one.
@@ -604,6 +614,16 @@ if [[ "$REASONING" == *"output_reasoning_tokens"* ]]; then
   ok "the reasoning bucket is its own key, not folded into output"
 else
   fail "agent usageDetails came back as '$REASONING'"
+fi
+
+# The precedence, pinned. That generation carried gen_ai.usage.input_tokens=3164 beside
+# langfuse.observation.usage_details' exclusive {input 2140, input_cached_tokens 1024}.
+# If the coarse number is what reads back, langfuse.* has stopped winning and every
+# generation this application exports has lost its cache and reasoning split.
+if [[ "$REASONING" == *"1024"* && "$REASONING" != *"3164"* ]]; then
+  ok "langfuse.observation.usage_details takes precedence over gen_ai.usage.* on the same span"
+else
+  fail "the two usage families no longer resolve the way GenAiAttributes documents: '$REASONING'"
 fi
 
 REFUSED_OBS=""
