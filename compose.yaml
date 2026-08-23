@@ -53,6 +53,40 @@ services:
       AWS_SECRET_ACCESS_KEY: test
       VALKEY_HOST: floci
       VALKEY_PORT: "6379"
+
+      # ---- Observability ----------------------------------------------------
+      # Both stacks live in the same compose project (`name: agentic-chat`), so
+      # these service names resolve whenever the matching profile is up:
+      #
+      #   docker compose -f compose.yaml -f compose.observability.yaml --profile grafana up
+      #
+      # Defaulted ON rather than off, deliberately. The two failure modes are not
+      # symmetric: an exporter with no collector logs a retry, which is loud and
+      # visible, while an application that exports NOWHERE looks completely healthy
+      # and is exactly the gap this line closes — before it, `docker compose up`
+      # produced an app with a full tracing stack wired to nothing at all.
+      #
+      # Opt out with AGENTIC_OBSERVABILITY_OTLP_ENDPOINT= (empty) in .env.
+      AGENTIC_OBSERVABILITY_OTLP_ENDPOINT: ${AGENTIC_OBSERVABILITY_OTLP_ENDPOINT-http://otel-collector:4318}
+      AGENTIC_ENVIRONMENT: ${AGENTIC_ENVIRONMENT-docker}
+      # Langfuse is the OTHER profile and is reached directly, not through the
+      # collector — and it is defaulted ON for the SAME reason the collector is. Leaving
+      # these blank while defaulting the collector endpoint would be the exact asymmetry
+      # the paragraph above argues against: someone starts the langfuse profile, sees a
+      # healthy application and an empty Langfuse, and has nothing to read.
+      #
+      # The keys are safe as defaults because compose.observability.yaml initialises the
+      # Langfuse project HEADLESSLY with these very values (LANGFUSE_INIT_PROJECT_*), so
+      # they are not a secret — they are the fixed local-development pair, and the whole
+      # point of pinning them was that the application could be configured before the
+      # first boot rather than after clicking through a signup.
+      #
+      # With the langfuse profile DOWN this costs one refused connection per batch, logged
+      # by the exporter. That is louder than the alternative and quieter than a wrong
+      # answer. Opt out with AGENTIC_OBSERVABILITY_LANGFUSE_HOST= (empty) in .env.
+      AGENTIC_OBSERVABILITY_LANGFUSE_HOST: ${AGENTIC_OBSERVABILITY_LANGFUSE_HOST-http://langfuse-web:3000}
+      AGENTIC_OBSERVABILITY_LANGFUSE_PUBLIC_KEY: ${AGENTIC_OBSERVABILITY_LANGFUSE_PUBLIC_KEY-${LANGFUSE_PUBLIC_KEY-pk-lf-0000000000000000000000000000000000}}
+      AGENTIC_OBSERVABILITY_LANGFUSE_SECRET_KEY: ${AGENTIC_OBSERVABILITY_LANGFUSE_SECRET_KEY-${LANGFUSE_SECRET_KEY-sk-lf-0000000000000000000000000000000000}}
     ports:
       - "8080:8080"
     # 7 GB total on this machine; leave room for floci, its Valkey child and dockerd.
