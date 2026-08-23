@@ -156,6 +156,14 @@ real: `agent`, `chain`, `span`, `generation`, `tool`, `guardrail`, `embedding`, 
 enum with no producer at all, which is a different thing from a type this application has no
 use for.
 
+**Nine of them, on a request path.** That sentence is about the repository and it has been
+read as being about production traffic. `evaluator`'s only producer is `ExperimentRun`,
+whose only callers are under `src/test` and run under `-Pevals`; no served turn reaches it.
+Measured: six real turns against a self-hosted 4.16.0 produced 100 observations spanning
+nine types and no `EVALUATOR` row. Copy this design and never run an eval, and your traces
+hold nine — which is enough for everything the agent graph needs, because it needs one.
+[Chapter 8](08-langfuse-features.md) has the census.
+
 **Why two of them are `event` and not `span`.** An event is a decision taken at an instant,
 not work with a duration. N guardrail observations in a turn say a guardrail ran N times;
 none of them says the second run exists *because* the first asked for it, and the causal link

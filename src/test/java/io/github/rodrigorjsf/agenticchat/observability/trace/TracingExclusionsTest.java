@@ -97,7 +97,12 @@ class TracingExclusionsTest {
     @Test
     @DisplayName("nothing a user actually calls is excluded by accident")
     void realRoutesAreStillTraced() {
+        // The one real sibling route this application serves today. It keeps its server
+        // span: it is ordinary traffic and it has no turn observation to be the root of.
         assertThat(excluded.test("/api/chat/capabilities")).isFalse();
+        // Not a route that exists — the assertion is about the PATTERN. `/api/chat` is a
+        // full match, so it must not swallow a sub-path that someone adds under the
+        // controller later and reasonably expects to see traced.
         assertThat(excluded.test("/api/chat/history")).isFalse();
     }
 }
