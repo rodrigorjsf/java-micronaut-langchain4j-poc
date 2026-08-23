@@ -33,6 +33,15 @@ The version this chapter describes is **Langfuse 4.16.0**, self-hosted. The last
 measures the same integrations against **3.80.0**, because that question was asked and the
 answer is not in either version's documentation.
 
+**How claims here are labelled**, following the convention chapter 7 uses. **[verified]**
+means it was run on this machine against a real instance and the output was captured —
+every such claim traces to one of `scripts/check-langfuse-ingestion.sh`,
+`scripts/check-langfuse-3x-compat.sh`, `scripts/check-app-tracing-e2e.sh` or a test in
+`src/test`. `[sourced]` means it is quoted from Langfuse's own documentation, with the URL
+and the date it was read. `[sourced — unverified]` means the documentation says it and this
+project has not checked. Anything unlabelled is a design argument about this repository's
+own code, which the code itself settles.
+
 ---
 ## The wire
 
@@ -122,8 +131,9 @@ auth, the type mapping, usage and cost, scores and corrections.
 That the *application's own encoding* reaches Langfuse: neither of the above. The harness
 posts with `Content-Type: application/json` — it exercises OTLP/JSON, which is not the
 encoding the application uses. What proves the protobuf leg is a real run of the real
-application against a real Langfuse. Six turns produced 100 stored observations with every
-declared type mapped; the census is in the session's `app-on-4.16.0.txt`.
+application against a real Langfuse **[verified]**. Six turns produced 100 stored
+observations with every declared type mapped; the census is in the session's
+`app-on-4.16.0.txt`.
 
 ### One egress each: direct to Langfuse, not through the collector
 
@@ -324,7 +334,7 @@ time from `AGENTIC_RELEASE`. The shipped default is the empty string, and the sp
 skips null and blank values, so an unset release writes no attribute rather than an empty
 one.
 
-**A measured trap, and the one place `DeploymentIdentity` had to change.** Of the 37
+**A measured trap [verified], and the one place `DeploymentIdentity` had to change.** Of the 37
 observations the containerised application had ever exported to a real Langfuse, every one
 carried `version` as `"0.1}"` — with a stray closing brace. The cause was a *nested*
 placeholder default,
@@ -440,7 +450,7 @@ trace view.
 
 The other three are excluded because **a server span with no parent is a trace.** A liveness
 probe polled every few seconds does not sit beside the real traffic; it becomes the traffic.
-Measured on this project's own instance: of the **37** observations the containerised
+Measured on this project's own instance **[verified]**: of the **37** observations the containerised
 application had ever exported to Langfuse, **all 37 were `GET /health`**, and none was a
 conversation.
 
@@ -448,7 +458,7 @@ conversation.
 called by this application's `LangfuseScoreWriter` over an instrumented Micronaut HTTP
 client — and the exclusion list feeds the **client** filter as well as the server one.
 Without the entry, every `POST /api/public/scores` becomes a root span, becomes a trace, and
-is exported to Langfuse: telemetry about telemetry, filed beside the conversations. Measured
+is exported to Langfuse: telemetry about telemetry, filed beside the conversations. Measured **[verified]**
 on a six-turn run against a real instance: **10 traces named `POST`**, each one a score
 write, none of them work the application did. This project serves nothing under
 `/api/public`, so the pattern is safe to write broadly.
@@ -478,7 +488,7 @@ this application's own YAML — and asserts it in both directions: `/health`,
 `/api/chat/history` are not. The `/health/liveness` assertion is what encodes the full-match
 trap: it fails the moment someone shortens the pattern to `/health`.
 
-The end-to-end evidence is the census. After the exclusion list grew from one entry to four,
+The end-to-end evidence is the census **[verified]**. After the exclusion list grew from one entry to four,
 a six-turn run of the real application produced 100 observations across 20 distinct observation names,
 and **no `POST` and no `GET /health` among them** — the census is in the session's
 `app-on-4.16.0.txt`.
@@ -528,6 +538,7 @@ own type or gets the default.
 
 The ten names and their glosses are quoted from
 `https://langfuse.com/docs/observability/features/observation-types`, read 2026-08-23.
+`[sourced]`
 
 | Wire value | `ObservationType` | What Langfuse says it is | Where this application produces it | On a request path? |
 |---|---|---|---|---|
@@ -546,7 +557,7 @@ The ten names and their glosses are quoted from
 measurement is what says so.** `ExperimentRun` lives in `src/main`, but its only callers are
 `InjectionEval`, `TriageGoldenSetEval` and `ExperimentRunTest`, all under `src/test`, and all
 of them run under `-Pevals` rather than in a served turn. A six-turn run of the real
-application produced 100 observations spanning nine types and **no `EVALUATOR` row at all**
+application produced 100 observations spanning nine types and **no `EVALUATOR` row at all** **[verified]**
 (`app-on-4.16.0.txt`). The same is true of the `agent`-typed `experiment-item` root that
 `ExperimentRun.item` opens: it exists, and no user request reaches it.
 
@@ -714,7 +725,7 @@ a counter, drawing loops as cycles; expanded gives every individual call its own
 unrolls loops into a DAG.
 
 **What the wire needs.** Nothing that is not already in the table above. Quoting
-`https://langfuse.com/docs/observability/features/agent-graphs`, read 2026-08-23, on the two
+`https://langfuse.com/docs/observability/features/agent-graphs`, read 2026-08-23 `[sourced]`, on the two
 ways a graph appears for a trace:
 
 > 1. **Inferred from observations.** Have an observation with any observation type except
@@ -745,7 +756,7 @@ codebase that is `ChatTurnService.handle` and `LangfuseAiServiceListener` for `a
 `guardrail` and the two `@Observed` chains, and a turn is legible without opening a single
 span.
 
-**What it looks like on real traffic.** This is one trace exported by the real application to
+**What it looks like on real traffic [verified].** This is one trace exported by the real application to
 a self-hosted Langfuse 4.16.0, read back through the observations API and printed as a tree —
 `reference-trace-4.16.0.txt`, copied verbatim:
 
@@ -887,7 +898,7 @@ instead of a scroll.
 | `langfuse.observation.level` | one of `DEBUG`, `DEFAULT`, `WARNING`, `ERROR` |
 | `langfuse.observation.status_message` | free text, the context for the level |
 
-Quoting `https://langfuse.com/docs/observability/features/log-levels`, read 2026-08-23:
+Quoting `https://langfuse.com/docs/observability/features/log-levels`, read 2026-08-23 `[sourced]`:
 "You can differentiate the importance of observations with the `level` attribute to control
 the verbosity of your traces and highlight errors and warnings. Available `levels`: `DEBUG`,
 `DEFAULT`, `WARNING`, `ERROR`. In addition to the level, you can also include a
@@ -987,7 +998,7 @@ division of labour with the surrounding `chain`: `compactIfNeeded` is `@Observed
 `memory-compaction` chain and runs on **every** turn; the event fires only on the turns that
 actually crossed `agentic.agent.compaction-trigger-tokens`.
 
-That distinction is visible in the census, and it is the reason not to read the type counts as
+That distinction is visible in the census **[verified]**, and it is the reason not to read the type counts as
 "one of each". Across six real turns the application produced three `memory-compaction` chains
 and **zero** `memory-compacted` events — no conversation reached the trigger. The only `EVENT`
 rows in `app-on-4.16.0.txt` are two `guardrail-reprompt`s. The reference trace above shows
@@ -1308,7 +1319,7 @@ javadoc records the reversal, and so does [chapter 7](07-observability.md).
 
 The original reasoning was that Langfuse normalises the `gen_ai.usage.*` family by
 subtracting cache reads from input, so sending both would count a cache hit twice. Pushed at
-a real 4.16.0, that is not what happens: a generation carrying both families reads back with
+a real 4.16.0 **[verified]**, that is not what happens: a generation carrying both families reads back with
 the Langfuse buckets intact, byte for byte the same as one carrying only
 `langfuse.observation.usage_details`. The `langfuse.*` namespace takes precedence, as it
 does for every other attribute.
@@ -1815,6 +1826,12 @@ failure, meaning this script or that server is broken, moves its exit code.
 Every line of the recorded run appears below, grouped the way the script's own output is
 grouped: 38 results, of which 22 matched 4.16.0 and 16 are differences. Values are copied
 from the run, not restated.
+
+**Every row below is [verified].** The whole table is the read-back of one run of
+`scripts/check-langfuse-3x-compat.sh` against a real Langfuse 3.80.0 on this machine; the
+4.16.0 column is the read-back of `scripts/check-langfuse-ingestion.sh` against a real
+4.16.0. Nothing in it is inferred from either version's documentation, which is the reason
+the script exists.
 
 **API surface — what a v4-shaped client would call**
 

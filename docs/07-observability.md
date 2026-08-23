@@ -159,8 +159,8 @@ use for.
 **Nine of them, on a request path.** That sentence is about the repository and it has been
 read as being about production traffic. `evaluator`'s only producer is `ExperimentRun`,
 whose only callers are under `src/test` and run under `-Pevals`; no served turn reaches it.
-Measured: six real turns against a self-hosted 4.16.0 produced 100 observations spanning
-nine types and no `EVALUATOR` row. Copy this design and never run an eval, and your traces
+Measured **[verified]**: six real turns against a self-hosted 4.16.0 produced 100
+observations spanning nine types and no `EVALUATOR` row. Copy this design and never run an eval, and your traces
 hold nine — which is enough for everything the agent graph needs, because it needs one.
 [Chapter 8](08-langfuse-features.md) has the census.
 
@@ -637,6 +637,7 @@ capture off still has to be able to argue about its own retrieval threshold.
 `micronaut-tracing` ships a Logback appender installer — and it has not been made.
 
 **`gen_ai.usage.*` — this paragraph used to say the opposite, and measurement is why.**
+**[verified]**
 The usage family was left unset on the reasoning that Langfuse normalises it by subtracting
 cache reads from input, so sending both would count a cache hit twice. Pushed at a real
 4.16.0, that is not what happens: a generation carrying both families reads back with the
