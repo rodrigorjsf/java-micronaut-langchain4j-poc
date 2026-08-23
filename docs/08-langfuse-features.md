@@ -808,6 +808,21 @@ an unparseable fragment behind. The lever is
 `agentic.observability.capture-content: false`, which removes it along with every other
 payload.
 
+**Nothing truncates them, and that was checked rather than assumed [verified].** A 25 KB
+attribute has three chances to be cut — the OpenTelemetry SDK's span limits, the exporter,
+and Langfuse's own ingestion — and a cut would land mid-object and leave a fragment no
+reader can parse. All **40** memory payloads of the six-turn run were re-read through
+`/api/public/v2/observations` and parsed as JSON; none was truncated. The largest is the
+24.8 KB quoted above.
+
+**How to know it worked.** `MemoryObservationTest` boots the real annotated bean through the
+container — the only way its AOP advice runs at all, since the default test profile selects
+the `in-memory` backend — and asserts the read's type, the write's type, and that both
+payloads parse. `ObservationJsonTest` pins the encoding, including the nested-argument shape.
+`scripts/check-app-tracing-e2e.sh` closes the loop on a real run: *"every memory-read is
+typed 'retriever'"* and *"a memory write is typed 'span' — it changes state, so it is not a
+retriever"*.
+
 #### `AgentTracer` and `Observation` — an SPI, for code you do not own
 
 Every LangChain4j seam is a callback. There is no method of this application's to annotate,
