@@ -72,12 +72,16 @@ public class ObservationJson {
     }
 
     /**
-     * Replaces every {@link ChatMessage} in the value with the JSON tree LangChain4j
-     * writes for it, at whatever depth it sits, and leaves everything else alone.
+     * Replaces a {@link ChatMessage} with the JSON tree LangChain4j writes for it, and
+     * recurses through {@code List}s so a conversation nested inside an argument list is
+     * reached too. {@code List} is the only container walked, because it is the only one
+     * a seam here produces: {@code ObservedInterceptor} builds a positional argument list
+     * and the memory store returns a list of messages. A message inside a {@code Map}
+     * would fall through to the {@code toString} fallback.
      */
     private Object serializable(Object value) {
         if (value instanceof ChatMessage message) {
-            return tree(ChatMessageSerializer.messageToJson(message), message);
+            return reparsed(ChatMessageSerializer.messageToJson(message), message);
         }
         if (value instanceof List<?> list) {
             return list.stream().map(this::serializable).toList();
@@ -85,7 +89,7 @@ public class ObservationJson {
         return value;
     }
 
-    private Object tree(String json, Object original) {
+    private Object reparsed(String json, Object original) {
         try {
             return mapper.readValue(json, JsonNode.class);
         } catch (IOException | RuntimeException e) {

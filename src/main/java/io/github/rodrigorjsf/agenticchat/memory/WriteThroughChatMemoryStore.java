@@ -43,10 +43,15 @@ import java.util.List;
  * turn's arguments are the user's message; here the arguments and the result ARE the
  * conversation, and an observation of the memory layer that omits it records that a
  * lookup happened while withholding the one fact a reader opened the trace for — what
- * history the model was given. {@code ObservationContentPolicy} still governs it, so
- * {@code agentic.observability.capture-content: false} turns all of it off in one
- * place, and {@code ObservationJson} writes the messages through LangChain4j's own
- * serializer rather than as a Java {@code toString}.
+ * history the model was given. {@code agentic.observability.capture-content: false}
+ * turns all of it off in one place, and {@code ObservationJson} writes the messages
+ * through LangChain4j's own serializer rather than as a Java {@code toString}.
+ *
+ * <p>What a {@code ContentRedactor} sees here is a {@code List<ChatMessage>} and not
+ * text, because the encoding to JSON happens after the policy has run. A redactor
+ * written against {@code String} therefore passes the whole conversation through
+ * untouched while appearing to be installed — the failure mode its own contract warns
+ * about, on the payload that is now the largest in the trace.
  */
 @Singleton
 @Primary
