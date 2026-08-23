@@ -215,11 +215,24 @@ else
     fi
   done
 
-  # MEMORY, by name and not by type. `memory-read` and `memory-write` are typed `span`,
-  # which is also what the judge observation and the framework's client spans are typed —
-  # so "the trace contains a span" proves nothing about the memory layer. The write-through
-  # store is the seam a follower is most likely to forget to observe, and a turn that never
-  # touched conversation memory is a turn whose next question starts from nothing.
+  # RAG, by NAME, and this pair is load-bearing for the loop above rather than extra.
+  # `retriever` used to be produced by exactly two things — the content retriever and the
+  # vector search — so "the trace contains a retriever" was a statement about RAG. The
+  # conversation-memory read is now a retriever too, and it fires on every turn, so the
+  # type assertion alone would stay green with RAG switched off entirely. Naming both is
+  # what keeps that assertion discriminating.
+  for want in assistant-knowledge embedding-store-search; do
+    if echo "$TRACE" | jq -e --arg n "$want" '[.. | objects | select(.name? == $n)] | length > 0' >/dev/null 2>&1; then
+      ok "the turn produced a '$want' observation"
+    else
+      fail "no '$want' observation — RAG retrieval did not fire, and 'retriever' above no longer proves it did"
+    fi
+  done
+
+  # MEMORY, by name, because the name is the only thing that separates these from the RAG
+  # retrievers above and from every other span in the trace. The write-through store is the
+  # seam a follower is most likely to forget to observe, and a turn that never touched
+  # conversation memory is a turn whose next question starts from nothing.
   for want in memory-read memory-write; do
     if echo "$TRACE" | jq -e --arg n "$want" '[.. | objects | select(.name? == $n)] | length > 0' >/dev/null 2>&1; then
       ok "the turn produced a '$want' observation"
@@ -227,6 +240,30 @@ else
       fail "no '$want' observation — the conversation memory seam did not fire"
     fi
   done
+
+  # And the memory read's TYPE, asserted on the observation that carries it rather than on
+  # the trace's type set. Langfuse reserves `retriever` for a step that looks something up
+  # without changing state, which is what a read is and is not what the two writes are —
+  # so a change that types them all alike has to fail here.
+  READ_TYPES=$(echo "$TRACE" | jq -r '
+    [ .. | objects | select(.name? == "memory-read")
+      | .attributes[]? | select(.key == "langfuse.observation.type") | .value.stringValue ]
+    | unique | join(",")' 2>/dev/null || echo '')
+  if [[ "$READ_TYPES" == "retriever" ]]; then
+    ok "every memory-read is typed 'retriever'"
+  else
+    fail "memory-read is typed '${READ_TYPES:-none}', not 'retriever'"
+  fi
+
+  WRITE_TYPES=$(echo "$TRACE" | jq -r '
+    [ .. | objects | select(.name? == "memory-write" or .name? == "memory-delete")
+      | .attributes[]? | select(.key == "langfuse.observation.type") | .value.stringValue ]
+    | unique | join(",")' 2>/dev/null || echo '')
+  if [[ "$WRITE_TYPES" == "span" ]]; then
+    ok "a memory write is typed 'span' — it changes state, so it is not a retriever"
+  else
+    fail "a memory write is typed '${WRITE_TYPES:-none}', not 'span'"
+  fi
 
   # The compaction CHAIN runs on every turn; the `memory-compacted` EVENT fires only on the
   # turns that actually crossed the token trigger, which a short run need not reach. Asserting
