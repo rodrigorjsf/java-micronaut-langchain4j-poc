@@ -40,8 +40,10 @@ Every script carries a `WHAT / WHY / WHEN / HOW` header comment; read it before 
 |---|---|
 | [`check-tool-catalogue.py`](scripts/check-tool-catalogue.py) | after adding or renaming a tool, or editing `agentic.tools.apis` — pairs Java catalogue keys with configured endpoints both ways, and gates https |
 | [`check-skill-docs.py`](scripts/check-skill-docs.py) | after adding, renaming or removing a skill, or editing the tables in `docs/06-skills.md` — asserts set equality between `.claude/skills/` and the chapter, both ways |
-| [`check-observability-stack.sh`](scripts/check-observability-stack.sh) | after editing anything under `observability/` or bumping an image tag — pushes a real trace through the collector and reads the derived metric names back |
-| [`check-langfuse-ingestion.sh`](scripts/check-langfuse-ingestion.sh) | after changing anything under `observability/trace/` or upgrading Langfuse — pushes a real trace and real scores into a running instance and reads both back |
+| [`check-observability-stack.sh`](scripts/check-observability-stack.sh) | after editing anything under `observability/` or bumping an image tag — pushes a real trace through the collector, reads the derived metric names back, and reads the provisioned alert rules, contact point and notification policy back out of Grafana |
+| [`check-langfuse-ingestion.sh`](scripts/check-langfuse-ingestion.sh) | after changing anything under `observability/trace/` or upgrading Langfuse — pushes a real trace, real scores, a CORRECTION and an experiment-shaped trace into a running instance and reads every one back |
+| [`check-alert-rule-claims.sh`](scripts/check-alert-rule-claims.sh) | after editing `observability/grafana/provisioning/alerting/alert-rules.yaml` — asserts the one claim a YAML linter cannot check, and reproduces it with a `promtool` unit test on the real PromQL engine |
+| [`check-app-tracing-e2e.sh`](scripts/check-app-tracing-e2e.sh) | after changing `compose.yaml`, the collector config, `TracingDefaults` or any seam — runs the REAL app in Docker, sends one REAL turn, and reads it back out of Tempo and Prometheus |
 
 **Standing rule — export repeatable procedures.** Whenever you hit a multi-step procedure that is
 deterministic and likely to recur (release, registry verification, a gating/render check, an
@@ -109,6 +111,11 @@ When something fails repeatedly, when User has to re-explain, or when a workarou
 - Langfuse v4 events_only has no `GET /traces/{id}`; read the observations instead.
 - `/api/public/v2/observations` needs `fields=`, else payload fields read back null.
 - Docker Desktop credsStore can break in WSL; anonymous pull works with `{}` config.
+- `check-langfuse-ingestion.sh` needs Langfuse already up; it starts nothing.
+- Workflow concurrency caps at CPUs-2; on 4 CPUs only 2 agents run.
+- Background command piped to `tail -N` shows nothing until it exits.
+- Deleting floci's Valkey child by hand desyncs its state; wipe `floci-data`.
+- `docker compose down` then `up` on one profile can orphan the network; prune it.
 
 
 
