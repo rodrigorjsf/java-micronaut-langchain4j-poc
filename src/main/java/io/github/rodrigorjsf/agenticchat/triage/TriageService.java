@@ -126,6 +126,15 @@ public class TriageService {
      */
     private TriageVerdict judged(String normalized) {
         try (var observation = tracer.start("triage-judge", ObservationType.SPAN)) {
+            // The judge takes TWO arguments and this records one of them, deliberately.
+            // TriageJudge.classify(text, skills) is also handed the skills index, which is
+            // fixed for the lifetime of the process — it is what makes the rendered system
+            // prompt byte-identical on every request, which is what a provider's prompt
+            // cache keys on. Writing it here would put the same constant on every judge
+            // span in every trace and tell a reader nothing they could not read once. What
+            // varies per turn, and what the verdict is an opinion about, is this text. The
+            // full prompt is on the GENERATION underneath on a cache miss; on a cache hit
+            // no prompt was rendered at all, because no model was asked.
             observation.input(content.capture(normalized));
             try {
                 var verdict = judge.classify(normalized);

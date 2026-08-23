@@ -32,8 +32,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  * happens and no {@code GENERATION} observation is produced — while
  * {@link io.github.rodrigorjsf.agenticchat.triage.TriageService} still records the scores.
  * A trace of a cached turn therefore showed a judge's opinion with no judge anywhere in
- * it. The observation asserted here is what makes the cached path visible, and its
- * {@code cached} metadata is what tells the two apart.
+ * it. The observation asserted here is what makes the cached path visible, and what tells
+ * the two apart is the ABSENCE of a generation under it — asserted below rather than a
+ * flag, because a flag would be a second thing that can disagree with the tree.
  */
 class TriageObservationTest {
 

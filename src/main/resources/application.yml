@@ -69,6 +69,13 @@ micronaut:
 # traffic, and neither has a turn to be the root of.
 # ---------------------------------------------------------------------------
 #
+# /api/public/.* is matched on the PATH and is blind to the host, which is a real limitation
+# and not an oversight: Micronaut's exclusion predicate is given the request path and nothing
+# else. It is safe here because this project serves nothing under /api/public and no tool in
+# the catalogue has a path beginning that way — checked, not assumed. A tool whose upstream
+# did would silently lose its client span, so the day one is added, narrow this to the two
+# endpoints the score writer and the exporter actually call.
+#
 # /api/public/.* is LANGFUSE's own API, called by this application's score writer over an
 # instrumented Micronaut HTTP client. Without it every POST /api/public/scores becomes a
 # root span, which becomes a trace, which is exported to Langfuse — telemetry about
