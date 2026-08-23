@@ -146,7 +146,15 @@ services:
 
   langfuse-clickhouse:
     profiles: ["langfuse"]
-    image: clickhouse/clickhouse-server:25.3
+    # 25.12, and NOT a version of this project's choosing. Langfuse's ClickHouse
+    # migration 39 creates a skip index whose argument is not a literal, which 25.3
+    # rejects outright:
+    #   Code: 80. DB::Exception: Only literals can be skip index arguments. (INCORRECT_QUERY)
+    # The migration then leaves schema_migrations at version 39 with dirty=1, and every
+    # subsequent boot of langfuse-web exits 1 with "Dirty database version 39. Fix and
+    # force version." — a restart loop that names the database and not the cause.
+    # Track the tag in langfuse/langfuse's own docker-compose.yml.
+    image: clickhouse/clickhouse-server:25.12
     container_name: agentic-langfuse-clickhouse
     restart: always
     user: "101:101"

@@ -247,16 +247,18 @@ With none of them set, nothing is exported and no connection is opened — which
 The Langfuse profile initialises **headlessly**, so those two keys exist before anyone opens
 the UI rather than being copied out of it afterwards.
 
-### The check
+### The checks
 
 ```bash
-./scripts/check-observability-stack.sh --down
+./scripts/check-observability-stack.sh --down    # the Grafana leg
+./scripts/check-langfuse-ingestion.sh            # the Langfuse leg, against a running instance
 ```
 
-It pushes a real trace through the real OTLP door and reads back what the collector
-produced, rather than asserting what it should be — because the Prometheus metric name is
-composed by three separate pieces of code and a dashboard query can be wrong while every
-container is healthy. Measured on this machine:
+Both push real data through the real doors and read back what arrived, rather than asserting
+what should have. On the Grafana side the Prometheus metric name is composed by three
+separate pieces of code, so a dashboard query can be wrong while every container is healthy.
+On the Langfuse side every part of the contract fails silently — an upper-case observation
+type is filed as a `SPAN` with no error at all. Measured on this machine:
 
 ```
   ok    no deprecated component types in the collector config
@@ -265,6 +267,16 @@ container is healthy. Measured on this machine:
   ok    label langfuse_observation_type
   ok    tempo returned the probe trace by id
   ok    dashboard agentic-llm provisioned
+```
+
+```
+  ok    root observation typed AGENT (not SPAN)
+  ok    usage_details parsed, exclusive buckets kept: {"input":86,"input_cached_tokens":17817,…}
+  ok    cost_details ingested rather than inferred: {"input":0.0000215,"output":0.000282,…}
+  ok    totalCost is the ingested number, not an inferred one
+  ok    the session id is on every observation
+  ok    prefixed metadata is a top-level, filterable key
+  ok    the score is attached to the OBSERVATION, not the trace
 ```
 
 ---
@@ -319,6 +331,9 @@ capture off still has to be able to argue about its own retrieval threshold.
 | a dashboard panel is empty while everything is healthy | the metric name | the unit and the `_total` suffix are appended by the exporter, not the connector. `check-observability-stack.sh` |
 | an unset variable takes out unrelated beans at startup | `${VAR:``}` | that resolves to the two-character string `` , not to empty. Write `${VAR:}` |
 | a test fails with `Unresolved compilation problem` | stale IDE-compiled classes in `target/` | `./mvnw clean` |
+| `langfuse-web` restart-loops on `Dirty database version 39` | ClickHouse older than 25.12 | migration 39 creates a skip index with a non-literal argument; 25.3 answers `Code: 80 … Only literals can be skip index arguments` and leaves the migration dirty. The message names the database, not the version |
+| `GET /api/public/traces/{id}` answers 404 | a v4 deployment in events_only mode | there is no trace entity — read the trace's name and session off its observations |
+| an observation reads back with `input`, `model` and `usageDetails` all `null` | the read, not the write | `/api/public/v2/observations` returns `core,basic` unless `fields=` asks for more; `traceName` needs the `trace_context` group |
 
 ---
 

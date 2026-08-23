@@ -120,6 +120,85 @@ It reads them back because that metric name is composed by three separate pieces
 the connector's namespace, the exporter's unit suffix, the exporter's `_total` for a
 monotonic sum — so a dashboard query can be wrong while every container is healthy.
 
+### The Langfuse leg, exercised against a running instance **[measured]**
+
+`./scripts/check-langfuse-ingestion.sh` against self-hosted Langfuse `4.16.0`, 2026-08-23.
+It pushes an OTLP trace and two scores through the real endpoints and reads both back:
+
+```
+  ok    OTLP accepted (200)
+  ok    both observations ingested (2)
+  ok    root observation typed AGENT (not SPAN)
+  ok    child observation typed GENERATION
+  ok    root input survived the round trip
+  ok    root output survived the round trip
+  ok    usage_details parsed, exclusive buckets kept: {"input":86,"input_cached_tokens":17817,"output":188,"total":18091}
+  ok    cost_details ingested rather than inferred: {"input":0.0000215,"output":0.000282,"total":0.0003035}
+  ok    model name mapped
+  ok    the root observation is recognised as the root
+  ok    trace is named 'chat-turn'
+  ok    the session id is on every observation
+  ok    prefixed metadata is a top-level, filterable key
+  ok    totalCost is the ingested number, not an inferred one
+  ok    score created (200, id 06c1e398-da7f-4b52-8e55-c2eab147c8b8)
+  ok    categorical score accepted (200)
+  ok    numeric score reads back as 0.93
+  ok    categorical score reads back as IN_SCOPE
+  ok    the score is attached to the OBSERVATION, not the trace
+```
+
+The observation as Langfuse stored it, read back verbatim:
+
+```
+=== chat-turn AGENT
+    input = "qual o cep da avenida paulista?"
+    output = "O CEP e 01310-100."
+    metadata = {'outcome': 'ANSWERED', 'scope.name': 'check-langfuse-ingestion', …}
+    traceName = chat-turn
+    sessionId = check-e399a323
+    isRootObservation = True
+=== agent GENERATION
+    model = gemini-3.1-flash-lite
+    usageDetails = {'input': 86, 'input_cached_tokens': 17817, 'output': 188, 'total': 18091}
+    costDetails = {'input': 2.15e-05, 'output': 0.000282, 'total': 0.0003035}
+    totalCost = 0.0003035
+```
+
+So the two silent failures below are now confirmed rather than inferred: the lower-case
+`agent` produced `type = AGENT` (an upper-case one would have produced `SPAN`), and the
+explicit root markers produced `isRootObservation = True`. `totalCost` equals the number
+this application sent, so nothing was re-priced. The `langfuse.observation.metadata.`
+prefix put `outcome` at the top level where a filter can reach it, while the unprefixed
+OpenTelemetry attributes went to the `attributes.*` catch-all exactly as documented.
+
+**Three things this cost, all of which look like something else.**
+
+**ClickHouse must be 25.12.** Pinning 25.3 — a version this project chose without checking
+the one upstream pins — fails Langfuse's migration 39, which creates a skip index whose
+argument is not a literal:
+
+```
+Code: 80. DB::Exception: Only literals can be skip index arguments. (INCORRECT_QUERY)
+```
+
+The migration then leaves `schema_migrations` at version 39 with `dirty = 1`, and every
+subsequent boot of `langfuse-web` exits 1 with `Dirty database version 39. Fix and force
+version.` — a restart loop whose message names the database and not the cause. The first
+diagnosis was wrong for an instructive reason: the table also held version 38 twice, once
+dirty and once clean, which looks exactly like two services racing on the migration. It was
+one service failing, restarting, and trying again.
+
+**Two read endpoints do not exist on a v4 deployment.** `GET /api/public/traces/{traceId}`
+and `GET /api/public/observations/{id}` both answer 404 with *"This endpoint is not
+available on deployments running in Langfuse v4 events_only mode"*. There is no trace
+entity to read — a trace is a query over observations — so the trace's name and session are
+read off the observations themselves.
+
+**`/api/public/v2/observations` returns a lean projection unless asked otherwise.** Without
+`fields=`, `input`, `output`, `model`, `usageDetails` and `costDetails` all come back
+`null`, which is indistinguishable from an ingestion that dropped them; `traceName` needs
+the `trace_context` group specifically. Both of those cost a round of false diagnosis here.
+
 ### Two silent failures found by reading the Langfuse source
 
 `[sourced]` `packages/shared/src/server/otel/ObservationTypeMapper.ts` at v4.16.0.
