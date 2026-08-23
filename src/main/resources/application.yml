@@ -52,12 +52,27 @@ micronaut:
 # neither the user's message nor the reply, one level above the only observation that
 # has them.
 #
-# The exclusion is for this route only. /api/chat/capabilities, /health and /prometheus
-# keep their server spans; they have no turn to be the root of.
+# The health probe and the metrics scrape are excluded for a DIFFERENT reason, and it is
+# not tidiness. A server span with no parent is a trace, so a liveness probe polled every
+# few seconds does not sit beside the real traffic — it becomes the traffic. Measured on
+# this project's own Langfuse instance: of the 37 observations the containerised
+# application had ever exported, all 37 were `GET /health` and none was a conversation.
+#
+# Excluded HERE and not in the collector: the application exports to Langfuse directly, so
+# a probe span dropped by a collector processor still arrives at Langfuse. This is the only
+# place that covers both readers.
+#
+# These are regexes matched with Matcher.matches() — a FULL match — so `/health` alone
+# would not exclude `/health/liveness`, which is the path a Kubernetes probe actually calls.
+#
+# /api/chat/capabilities and /api/chat/history keep their server spans: they are real
+# traffic, and neither has a turn to be the root of.
 # ---------------------------------------------------------------------------
 otel:
   exclusions:
     - /api/chat
+    - /health.*
+    - /prometheus
 
 endpoints:
   health:
