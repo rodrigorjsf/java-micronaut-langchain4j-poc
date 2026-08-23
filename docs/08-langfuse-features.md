@@ -36,8 +36,9 @@ answer is not in either version's documentation.
 **How claims here are labelled**, following the convention chapter 7 uses. **[verified]**
 means it was run on this machine against a real instance and the output was captured —
 every such claim traces to one of `scripts/check-langfuse-ingestion.sh`,
-`scripts/check-langfuse-3x-compat.sh`, `scripts/check-app-tracing-e2e.sh` or a test in
-`src/test`. `[sourced]` means it is quoted from Langfuse's own documentation, with the URL
+`scripts/check-langfuse-3x-compat.sh`, `scripts/check-app-tracing-e2e.sh`,
+`scripts/capture-langfuse-app-census.sh` — the one that measures rather than asserts, and the
+source of every census, payload figure and trace tree below — or a test in `src/test`. `[sourced]` means it is quoted from Langfuse's own documentation, with the URL
 and the date it was read. `[sourced — unverified]` means the documentation says it and this
 project has not checked. Anything unlabelled is a design argument about this repository's
 own code, which the code itself settles.
@@ -632,7 +633,7 @@ measurement is what says so.** `ExperimentRun` lives in `src/main`, but its only
 `InjectionEval`, `TriageGoldenSetEval` and `ExperimentRunTest`, all under `src/test`, and all
 of them run under `-Pevals` rather than in a served turn. A six-turn run of the real
 application produced 122 observations spanning nine types and **no `EVALUATOR` row at all** **[verified]**
-(`app-on-4.16.0.txt`). The same is true of the `agent`-typed `experiment-item` root that
+(reproduce with `./scripts/capture-langfuse-app-census.sh`). The same is true of the `agent`-typed `experiment-item` root that
 `ExperimentRun.item` opens: it exists, and no user request reaches it.
 
 [Chapter 7](07-observability.md) draws the same distinction beside its seam table — that
@@ -676,7 +677,7 @@ them back through `/api/public/v2/observations`, asserting the stored `type` per
 observation. It is worth being precise about what that proves: the trace is a synthetic
 probe assembled inside the script, so a green run says *Langfuse accepts and stores these ten
 types*, not *this application emits ten types*. The measured claim about the application is
-the census in `app-on-4.16.0.txt`.
+the census `./scripts/capture-langfuse-app-census.sh` prints.
 
 **Against an older Langfuse, which is where the silence gets expensive.**
 `scripts/check-langfuse-3x-compat.sh` pushes the same ten-type trace at a real Langfuse
@@ -732,9 +733,12 @@ conceptually belongs — would compile, would work on the miss path, and would p
 inner one never runs. The cached path is the common one and the whole reason that method
 exists, so the annotation would go missing on exactly the calls it was added for.
 `TriageService.judged` therefore opens `triage-judge` at the call site instead, which is
-order-independent. The real run confirms both halves: five `triage-judge` spans and eight
-`judge`/`judge-fallback` generations across six turns — the cached turn still visible, still
-carrying its verdict.
+order-independent. The real run confirms both halves, though the arithmetic needs one extra
+fact to read: five `triage-judge` spans and eight `judge`/`judge-fallback` generations across
+six turns. Eight is not more judges than spans — the primary judge was rate-limited on this
+run and `FailoverTriageJudge` retried each call on the secondary provider, so four judged
+calls produced four `judge` and four `judge-fallback` generations. The fifth span is the
+cached turn: no generation under it at all, still visible, still carrying its verdict.
 
 The general rule a follower should take from this: an annotation is the right mechanism only
 where no other `@Around` advice sits in an earlier phase. Where one does, or where there is
@@ -799,10 +803,12 @@ interceptor hands a multi-argument method its arguments as a positional list, so
 second element rather than the value. `ObservationJsonTest` parses every payload it asserts on,
 for exactly that reason.
 
-**What it costs [verified].** Over the six-turn run in the census above, the memory layer was
-699,999 bytes of the run's 958,842 bytes of observation payload — **73%** — with a largest
-single payload of 24.8 KB. Most of it is the system prompt, which lives in the conversation as
-its first message and is therefore re-sent on every read and every write — so the 73% is a
+**What it costs [verified].** Over the six-turn run in the census above — reproduce it with
+`./scripts/capture-langfuse-app-census.sh`, which prints every number in this paragraph — the
+memory layer was
+701,940 bytes of the run's 965,562 bytes of observation payload — **72%** — with a largest
+single payload of 24,814 bytes. Most of it is the system prompt, which lives in the conversation as
+its first message and is therefore re-sent on every read and every write — so the 72% is a
 fact about this application's prompt, not a constant of the design. Halve the prompt and the
 share falls with it; hold a longer conversation and it climbs. There is no separate
 size cap and that is deliberate: a byte ceiling would cut a conversation mid-object and leave
@@ -815,7 +821,7 @@ attribute has three chances to be cut — the OpenTelemetry SDK's span limits, t
 and Langfuse's own ingestion — and a cut would land mid-object and leave a fragment no
 reader can parse. All **40** memory payloads of the six-turn run were re-read through
 `/api/public/v2/observations` and parsed as JSON; none was truncated. The largest is the
-24.8 KB quoted above.
+24,814 bytes quoted above.
 
 **How to know it worked.** `MemoryObservationTest` boots the real annotated bean through the
 container — the only way its AOP advice runs at all, since the default test profile selects
@@ -906,52 +912,59 @@ codebase that is `ChatTurnService.handle` and `LangfuseAiServiceListener` for `a
 span.
 
 **What it looks like on real traffic [verified].** This is one trace exported by the real application to
-a self-hosted Langfuse 4.16.0, read back through the observations API and printed as a tree —
-`reference-trace-4.16.0.txt`, copied verbatim:
+a self-hosted Langfuse 4.16.0, read back through the observations API and printed as a tree by
+`./scripts/capture-langfuse-app-census.sh`, copied verbatim from its output:
 
 ```
-TRACE f17b7b0ae8ac4eefb2574812ba8add5a - 28 observations
+TRACE de48ade3c1f9bde3d1782b904b6a75fc - 33 observations
 [AGENT] chat-turn in="quem e voce e o que voce sabe fazer?" out="Sou um assistente de serviços de dados públicos brasil
   [CHAIN] triage out="TriageVerdict[decision=IN_SCOPE, confidence=0.98, inte
     [SPAN] triage-judge in="quem e voce e o que voce sabe fazer?" out="TriageVerdict[decision=IN_SCOPE, confidence=0.98, inte
+      [AGENT] TriageJudge.classify in="<message>quem e voce e o que voce sabe fazer?</message
+        [GENERATION] judge in=[{"role":"system","content":"You are the triage classif
+      [AGENT] TriageJudge.classify in="<message>quem e voce e o que voce sabe fazer?</message out="TriageVerdict[decision=IN_SCOPE, confidence=0.98, inte
+        [GENERATION] judge-fallback in=[{"role":"system","content":"You are the triage classif out="{\n  \"decision\": \"IN_SCOPE\",\n  \"confidence\": 0.
   [AGENT] ChatAssistant.chat in="<turn_context>\nreply_language: pt-BR\nsuggested_skill out="Sou um assistente de serviços de dados públicos brasil
-    [RETRIEVER] memory-read in="census-1787524822" out=[{"text":"# Role\n\nYou are the assistant of a Brazilia
+    [RETRIEVER] memory-read in="census-1787526169" out=[]
     [RETRIEVER] assistant-knowledge in="<turn_context>\nreply_language: pt-BR\nsuggested_skill out={"segments":0,"results":[]}
       [EMBEDDING] all-minilm-l6-v2-q in="<turn_context>\nreply_language: pt-BR\nsuggested_skill out={"embeddings":1,"dimension":384}
       [RETRIEVER] embedding-store-search in={"min_score":0.72,"max_results":3,"dimensions":384} out={"matches":0}
     [GUARDRAIL] NormalizingInputGuardrail in="<turn_context>\nreply_language: pt-BR\nsuggested_skill out={"result":"SUCCESS"}
+    [RETRIEVER] memory-read in="census-1787526169" out=[]
     [GUARDRAIL] InjectionTriageGuardrail in="<turn_context>\nreply_language: pt-BR\nsuggested_skill out={"result":"SUCCESS"}
-    [RETRIEVER] memory-read in="census-1787524822" out=[{"text":"# Role\n\nYou are the assistant of a Brazilia
-    [RETRIEVER] memory-read in="census-1787524822" out=[{"text":"# Role\n\nYou are the assistant of a Brazilia
-    [RETRIEVER] memory-read in="census-1787524822" out=[{"text":"# Role\n\nYou are the assistant of a Brazilia
-    [SPAN] memory-write in=["census-1787524822",[{"text":"# Role\n\nYou are the as
+    [SPAN] memory-write in=["census-1787526169",[{"text":"# Role\n\nYou are the as
+    [RETRIEVER] memory-read in="census-1787526169" out=[{"text":"# Role\n\nYou are the assistant of a Brazilia
+    [RETRIEVER] memory-read in="census-1787526169" out=[{"text":"# Role\n\nYou are the assistant of a Brazilia
+    [SPAN] memory-write in=["census-1787526169",[{"text":"# Role\n\nYou are the as
     [GENERATION] agent in=[{"role":"system","content":"# Role\n\nYou are the assi out="Sou um assistente de serviços de dados públicos brasil
-    [RETRIEVER] memory-read in="census-1787524822" out=[{"text":"# Role\n\nYou are the assistant of a Brazilia
-    [SPAN] memory-write in=["census-1787524822",[{"text":"# Role\n\nYou are the as
+    [RETRIEVER] memory-read in="census-1787526169" out=[{"text":"# Role\n\nYou are the assistant of a Brazilia
+    [SPAN] memory-write in=["census-1787526169",[{"text":"# Role\n\nYou are the as
     [GUARDRAIL] SystemPromptLeakageGuardrail in="Sou um assistente de serviços de dados públicos brasil out={"result":"SUCCESS"}
     [GUARDRAIL] ExfiltrationGuardrail in="Sou um assistente de serviços de dados públicos brasil out={"result":"SUCCESS"}
     [GUARDRAIL] VoiceComplianceGuardrail in="Sou um assistente de serviços de dados públicos brasil out={"result":"FATAL","failures":["Voice profile violated: 
       [EVENT] guardrail-reprompt
-    [RETRIEVER] memory-read in="census-1787524822" out=[{"text":"# Role\n\nYou are the assistant of a Brazilia
+    [RETRIEVER] memory-read in="census-1787526169" out=[{"text":"# Role\n\nYou are the assistant of a Brazilia
     [GENERATION] agent in=[{"role":"system","content":"# Role\n\nYou are the assi out="Sou um assistente de serviços de dados públicos brasil
-    [GUARDRAIL] SystemPromptLeakageGuardrail in="Sou um assistente de serviços de dados públicos brasil out={"result":"SUCCESS"}
     [GUARDRAIL] ExfiltrationGuardrail in="Sou um assistente de serviços de dados públicos brasil out={"result":"SUCCESS"}
+    [GUARDRAIL] SystemPromptLeakageGuardrail in="Sou um assistente de serviços de dados públicos brasil out={"result":"SUCCESS"}
     [GUARDRAIL] VoiceComplianceGuardrail in="Sou um assistente de serviços de dados públicos brasil out={"result":"SUCCESS"}
   [CHAIN] memory-compaction
-    [RETRIEVER] memory-read in="census-1787524822" out=[{"text":"# Role\n\nYou are the assistant of a Brazilia
+    [RETRIEVER] memory-read in="census-1787526169" out=[{"text":"# Role\n\nYou are the assistant of a Brazilia
 
 scores: [('triage_decision', 'IN_SCOPE', 'CATEGORICAL', 'observation'), ('triage_confidence', 0.98, 'NUMERIC', 'observation')]
 ```
 
-Twenty-eight observations, eight types: two `agent`, two `chain`, three `span`, two
-`generation`, eight `guardrail`, nine `retriever`, one `embedding`, one `event`. Twenty-two of
-the twenty-eight are outside `span`/`event`/`generation`, so the precondition is met
-twenty-two times over, and one would have done.
+Thirty-three observations, eight types: four `agent`, two `chain`, four `span`, four
+`generation`, eight `guardrail`, nine `retriever`, one `embedding`, one `event`. Twenty-four
+of the thirty-three are outside `span`/`event`/`generation`, so the precondition is met
+twenty-four times over, and one would have done.
 
 Nine `retriever`s in one turn is not a busy RAG pipeline. Two of them are the RAG pair —
 `assistant-knowledge` and the `embedding-store-search` under it — and the other seven are
-`memory-read`, which LangChain4j calls once per message it adds to the window. Reading the
-type alone will mislead you here; read the name beside it.
+`memory-read`, which LangChain4j calls once per message it adds to the window. Across the
+run **[verified]** the turns that reach the assistant take six to eight reads and two to four
+writes; the turns the input guardrails refuse take none. Reading the type alone will mislead
+you here; read the name beside it.
 
 Two absences in that trace are worth naming, because a reader comparing it against the
 ten-type table will notice them and should not conclude anything is broken. There is **no
@@ -960,10 +973,14 @@ tool. `TOOL activate_skill` appears once in the six-turn census, from a differen
 there is **no `evaluator`**, for the structural reason above — no request path produces one.
 
 The shape the graph draws from this is the argument for typing in the first place. `chat-turn`
-branches into `triage` and `ChatAssistant.chat`; triage's judge span holds no generation, so
-this turn's verdict was **cached**; the retriever fans out into the query's embedding and the
-store search, and both report zero — a retrieval that ran and found nothing, which is a
-different fact from a retrieval that did not run. The three output guardrails run, the voice
+branches into `triage` and `ChatAssistant.chat`. Under the judge span sit **two**
+`TriageJudge.classify` agents rather than one, and only the second carries an output: the
+primary judge was rate-limited and `FailoverTriageJudge` retried on the secondary provider, so
+`judge` produced no verdict and `judge-fallback` did. Nothing in a log line says that as
+quickly as two sibling nodes with one output between them. The RAG retriever fans out into the
+query's embedding and the store search, and both report zero — a retrieval that ran and found
+nothing, which is a different fact from a retrieval that did not run. Between them sit seven
+`memory-read`s, the first of which returns `[]` because this conversation is new. The three output guardrails run, the voice
 guardrail returns `FATAL`, a `guardrail-reprompt` event fires under it, a second `agent`
 generation follows, and the three guardrails run again and pass. That last sequence is the
 whole value of the picture: the second model call is not a mystery, it has a cause, and the
@@ -1155,7 +1172,7 @@ actually crossed `agentic.agent.compaction-trigger-tokens`.
 That distinction is visible in the census **[verified]**, and it is the reason not to read the type counts as
 "one of each". Across six real turns the application produced three `memory-compaction` chains
 and **zero** `memory-compacted` events — no conversation reached the trigger. The only `EVENT`
-rows in `app-on-4.16.0.txt` are two `guardrail-reprompt`s. The reference trace above shows
+rows the capture script reports are two `guardrail-reprompt`s. The reference trace above shows
 exactly that shape: a `[CHAIN] memory-compaction` with a single `[RETRIEVER] memory-read`
 child and no event under it. That child is worth a second look for a different reason: it
 carries the conversation as it stood when compaction considered it, so a compacted turn now
@@ -1248,9 +1265,12 @@ works:
 
 **The parameter is `Object`, not `String`.** A redactor receives whatever the seam handed
 the policy. `TriageService` hands it a `String`; `LangfuseChatModelListener` hands it the
-`List<Map<String, Object>>` that `messagesOf` built. A redactor written to accept a
-`String` and pass anything else through silently does nothing to a generation's input —
-which is the largest payload in the trace and the one carrying the system prompt.
+`List<Map<String, Object>>` that `messagesOf` built; the memory layer hands it a
+**`List<ChatMessage>`** — LangChain4j's own message objects, not text, because the encoding
+to JSON happens after the policy has run. A redactor written to accept a `String` and pass
+anything else through silently does nothing to any of the three, and between them they are
+most of the payload in a trace: the generation's input carries the system prompt, and the
+memory layer carries the whole conversation several times a turn.
 
 **The chain composes, and nothing here fixes its order.** The policy loops
 `redacted = redactor.redact(redacted)`, so each bean sees the previous bean's output — but

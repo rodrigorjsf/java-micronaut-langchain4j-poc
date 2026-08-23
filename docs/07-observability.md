@@ -115,10 +115,13 @@ flowchart TB
     class MEMW span
 ```
 
-`memory-read` and `memory-write` are drawn once each and fire several times per turn —
-**28 reads and 12 writes across six turns** on the run measured below **[verified]**.
-LangChain4j's `MessageWindowChatMemory` reads the history on every message it adds, so a
-turn touches the store four or five times rather than once.
+`memory-read` and `memory-write` are drawn once each and fire several times per turn.
+Measured **[verified]** on the six-turn run in [chapter 8](08-langfuse-features.md): **28
+reads and 12 writes**, and the distribution matters more than the totals. The four turns
+that reach the assistant take **six to eight** reads and **two to four** writes each —
+LangChain4j's `MessageWindowChatMemory` reads the history on every message it adds, and a
+reprompted turn adds more. The two turns the input guardrails refuse touch the store **not
+at all**, which is why dividing 28 by six gives a number no turn actually had.
 
 Two things about this shape are load-bearing.
 
@@ -147,7 +150,8 @@ by virtue of the OpenTelemetry context alone, with no plumbing.
 |---|---|---|---|
 | the turn | opened by hand — the only one | `agent` | `ChatTurnService` |
 | triage | `@Observed` | `chain` | `TriageService` |
-| memory read / write / delete | `@Observed` | `span` | `WriteThroughChatMemoryStore` |
+| memory read | `@Observed` on `getMessages` | `retriever` | `WriteThroughChatMemoryStore` |
+| memory write / delete | `@Observed` on `updateMessages` / `deleteMessages` | `span` | `WriteThroughChatMemoryStore` |
 | compaction | `@Observed` | `chain` | `ConversationCompactor` |
 | model call | `ChatModelListener` | `generation` | `LangfuseChatModelListener` |
 | AI-service invocation | `AiServiceStarted/Completed/Error` | `agent` | `LangfuseAiServiceListener` |
@@ -156,8 +160,6 @@ by virtue of the OpenTelemetry context alone, with no plumbing.
 | embeddings | `EmbeddingModelListener` | `embedding` | `LangfuseEmbeddingModelListener` |
 | RAG retrieval | `ContentRetrieverListener` | `retriever` | `LangfuseRetrieverListener` |
 | vector search | `EmbeddingStoreListener` | `retriever` | `LangfuseEmbeddingStoreListener` |
-| a conversation-memory read | `@Observed` on `WriteThroughChatMemoryStore.getMessages` | `retriever` | the AOP interceptor |
-| a conversation-memory write | `@Observed` on `updateMessages` / `deleteMessages` | `span` | the AOP interceptor |
 | outbound HTTP | Micronaut OTel client filter | `span` | — |
 | a guardrail reprompt | `OutputGuardrailExecuted`, when the result is a reprompt | `event` | `LangfuseGuardrailListener` |
 | a compaction firing | inside the compactor, at the moment it decides | `event` | `ConversationCompactor` |
@@ -627,11 +629,13 @@ capture off still has to be able to argue about its own retrieval threshold.
 **The conversation is the biggest thing this switch governs, and it is worth knowing by how
 much.** `memory-read` writes the history it returned and `memory-write` writes the history
 it persisted, so a turn puts the whole conversation into the trace once per store call —
-four or five times. Measured over the six-turn run whose census is in
-[chapter 8](08-langfuse-features.md) **[verified]**: 700 KB of that run's
-959 KB of observation payload was the memory layer, **73%**, with a largest single payload
-of 24.8 KB. Most of that is the system prompt, which lives in the conversation as its first
-message and is therefore re-sent on every read and every write. Read the 73% as a fact about
+six to eight times on a turn that reaches the assistant. Measured over the six-turn run whose
+census is in [chapter 8](08-langfuse-features.md) **[verified]**: 701,940 of that run's
+965,562 bytes of observation payload was the memory layer, **72%**, with a largest single
+payload of 24,814 bytes. Both numbers come out of
+`./scripts/capture-langfuse-app-census.sh`, which prints them. Most of it is the system
+prompt, which lives in the conversation as its first message and is therefore re-sent on
+every read and every write. Read the 72% as a fact about
 *this* application rather than about the memory layer: the ratio is the prompt size times the
 store calls per turn, so a shorter prompt or a longer conversation moves it.
 
