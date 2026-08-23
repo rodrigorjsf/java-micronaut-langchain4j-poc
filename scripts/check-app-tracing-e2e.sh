@@ -284,12 +284,30 @@ echo "==> prometheus: the OpenTelemetry GenAI client metrics (the OTLP metrics p
 # `gen_ai_client_operation_duration_seconds_count` — while `{token}` is an annotation rather
 # than a unit and adds nothing, leaving `gen_ai_client_token_usage_count`. Guessing them
 # symmetrically gets exactly one of the two wrong, and reports FAIL on a working pipeline.
+# POLLED, for the same reason Tempo's search is. This pipeline has THREE delays in series
+# and none of them is the 25 s slept above: the OpenTelemetry Java MeterProvider exports on
+# a 60 s interval, the collector's prometheus exporter republishes on its own schedule, and
+# Prometheus then has to scrape it. Measured on this stack: a run that queried once after
+# the sleep reported all three of these absent, and the identical query a minute later
+# returned 119 series. A fixed sleep here turns an export interval into "the OTLP metrics
+# path is not working", which is the same false conclusion the Tempo search block exists to
+# avoid.
+metrics_deadline=$((SECONDS + 180))
+while :; do
+  MISSING=""
+  for metric in gen_ai_client_token_usage_count gen_ai_client_operation_duration_seconds_count; do
+    [[ "$(promq "$metric" | jq -r '.data.result | length')" -gt 0 ]] || MISSING="$MISSING $metric"
+  done
+  [[ -z "$MISSING" ]] && break
+  (( SECONDS > metrics_deadline )) && break
+  sleep 15
+done
 for metric in gen_ai_client_token_usage_count gen_ai_client_operation_duration_seconds_count; do
   COUNT=$(promq "$metric" | jq -r '.data.result | length')
   if [[ "${COUNT:-0}" -gt 0 ]]; then
     ok "$metric is being scraped"
   else
-    fail "$metric is absent — the OTLP metrics path is not working"
+    fail "$metric is absent after 180s — the OTLP metrics path is not working"
   fi
 done
 
