@@ -6,7 +6,10 @@ import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.data.message.UserMessage;
+import io.github.rodrigorjsf.agenticchat.observability.trace.ObservationJson;
+import io.github.rodrigorjsf.agenticchat.observability.trace.OtelAgentTracer;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.opentelemetry.api.trace.TracerProvider;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -22,8 +25,15 @@ class ConversationCompactorTest {
 
     private final InMemoryFakeStore store = new InMemoryFakeStore();
     private final RecordingSummarizer summarizer = new RecordingSummarizer();
-    private final ConversationCompactor compactor =
-            new ConversationCompactor(store, summarizer, new SimpleMeterRegistry(), TRIGGER);
+    /**
+     * OpenTelemetry's own no-op tracer, which is what {@code OtelAgentTracer} runs on
+     * when no SDK is configured — the compaction rules below are about which messages
+     * survive, and none of them is about the span that says so. The event itself is
+     * asserted through an exporter in {@code CompactionEventTest}.
+     */
+    private final ConversationCompactor compactor = new ConversationCompactor(
+            store, summarizer, new SimpleMeterRegistry(), TRIGGER,
+            new OtelAgentTracer(TracerProvider.noop().get("test"), ObservationJson.compact()));
 
     private static final class RecordingSummarizer implements ConversationSummarizer {
         List<ChatMessage> lastInput;

@@ -7,6 +7,7 @@ import dev.langchain4j.guardrail.InputGuardrailRequest;
 import dev.langchain4j.guardrail.InputGuardrailResult;
 import dev.langchain4j.guardrail.OutputGuardrail;
 import dev.langchain4j.guardrail.OutputGuardrailResult;
+import dev.langchain4j.guardrail.config.OutputGuardrailsConfig;
 import dev.langchain4j.service.AiServices;
 import dev.langchain4j.service.V;
 import io.github.rodrigorjsf.agenticchat.testsupport.ScriptedChatModel;
@@ -68,6 +69,23 @@ class LangfuseGuardrailListenerTest {
             return executions.getAndIncrement() == 0
                     ? reprompt("the answer used an emoji outside the allow-list",
                             "Rewrite it without the emoji.")
+                    : success();
+        }
+    }
+
+    /**
+     * Fails twice before passing, so the reprompt ordinal is a number this test can
+     * disagree with. A guardrail that reprompts once proves nothing about a counter:
+     * a hardcoded 1 passes it.
+     */
+    static class StubbornGuardrail implements OutputGuardrail {
+
+        private final AtomicInteger executions = new AtomicInteger();
+
+        @Override
+        public OutputGuardrailResult validate(AiMessage responseFromLLM) {
+            return executions.getAndIncrement() < 2
+                    ? reprompt("emoji: outside the allow-list", "Rewrite it without the emoji.")
                     : success();
         }
     }
@@ -221,6 +239,101 @@ class LangfuseGuardrailListenerTest {
         // filters on — it is written whichever way the switch is set.
         assertThat(guardrail.getAttributes().asMap())
                 .containsEntry(LangfuseAttributes.observationMetadata("guardrail_result"), "SUCCESS_WITH_RESULT");
+    }
+
+    @Test
+    @DisplayName("a reprompt is an event naming the rule it broke and the attempt it is")
+    void aRepromptIsItsOwnEvent() {
+        var agentListener = new LangfuseAiServiceListener(tracer, content, 8);
+        var guardrailListener = new LangfuseGuardrailListener(tracer, content);
+
+        var assistant = AiServices.builder(Assistant.class)
+                .chatModel(new ScriptedChatModel()
+                        .replyWith("resposta com \uD83C\uDF89", "ainda com \uD83C\uDF89", "resposta limpa"))
+                .outputGuardrails(List.of(new StubbornGuardrail()))
+                // MAX_RETRIES_DEFAULT is 2 and its budget counts the first attempt, so two
+                // reprompts need a raised ceiling — otherwise the executor throws and the
+                // second event this test is about never happens.
+                .outputGuardrailsConfig(OutputGuardrailsConfig.builder().maxRetries(3).build())
+                .registerListeners(agentListener.listeners())
+                .registerListeners(guardrailListener.listeners())
+                .build();
+
+        assertThat(assistant.chat("bom dia")).isEqualTo("resposta limpa");
+
+        var events = named("guardrail-reprompt");
+        assertThat(events).hasSize(2);
+        assertThat(events).allSatisfy(event -> assertThat(event.getAttributes().asMap())
+                // Lower case on the wire. An upper-case value does not error — Langfuse
+                // silently files it as a plain span, and the event stops being an event.
+                .containsEntry(LangfuseAttributes.OBSERVATION_TYPE, "event")
+                .containsEntry(LangfuseAttributes.observationMetadata("guardrail"), "StubbornGuardrail")
+                .containsEntry(LangfuseAttributes.observationMetadata("violated_rules"),
+                        "emoji: outside the allow-list"));
+
+        // The ordinal, and the reason the guardrail fails twice: a counter that reset per
+        // execution would read 1 twice and nothing would be red.
+        assertThat(events).extracting(span ->
+                        span.getAttributes().get(LangfuseAttributes.observationMetadata("attempt")))
+                .containsExactly("1", "2");
+    }
+
+    @Test
+    @DisplayName("a reprompt event sits under the guardrail that asked for it and has no duration")
+    void aRepromptEventIsAChildAndNotADuration() {
+        var agentListener = new LangfuseAiServiceListener(tracer, content, 8);
+        var guardrailListener = new LangfuseGuardrailListener(tracer, content);
+
+        var assistant = AiServices.builder(Assistant.class)
+                .chatModel(new ScriptedChatModel().replyWith("resposta com \uD83C\uDF89", "resposta limpa"))
+                .outputGuardrails(List.of(new EmojiGuardrail()))
+                .registerListeners(agentListener.listeners())
+                .registerListeners(guardrailListener.listeners())
+                .build();
+
+        assistant.chat("bom dia");
+
+        var event = named("guardrail-reprompt").getFirst();
+        var guardrail = named("EmojiGuardrail").getFirst();
+        var invocation = named("Assistant.chat").getFirst();
+
+        // An event that opened its own root trace would still export, still carry the
+        // right type and still read correctly in isolation — and would be invisible from
+        // the turn it belongs to, which is the only place anyone would look for it.
+        assertThat(event.getParentSpanId()).isEqualTo(guardrail.getSpanId());
+        assertThat(event.getTraceId()).isEqualTo(invocation.getTraceId());
+
+        // A point in time, not an interval. Not asserted equal to zero: SimpleSpanProcessor
+        // timestamps a real start and a real end, so the honest claim is a bound.
+        assertThat(event.getEndEpochNanos() - event.getStartEpochNanos())
+                .isLessThan(java.time.Duration.ofMillis(50).toNanos());
+    }
+
+    @Test
+    @DisplayName("a reprompt event carries the rule and the count, never the answer or the retry text")
+    void aRepromptEventCarriesNoContent() {
+        var guardrailListener = new LangfuseGuardrailListener(tracer, content);
+
+        var assistant = AiServices.builder(Assistant.class)
+                .chatModel(new ScriptedChatModel().replyWith("meu CPF e 000.000.000-00 \uD83C\uDF89", "resposta limpa"))
+                .outputGuardrails(List.of(new EmojiGuardrail()))
+                .registerListeners(guardrailListener.listeners())
+                .build();
+
+        assistant.chat("bom dia");
+
+        // The reprompt instruction is the one field here that quotes the answer back —
+        // VoiceComplianceGuardrail builds it by embedding the repaired text — so it is the
+        // one field the event must not carry, whichever way the content switch is set.
+        // The assertion is on VALUES, not on attribute names, for the reason
+        // TurnTraceShapeTest states: a new key added later is covered by it for free.
+        var values = named("guardrail-reprompt").getFirst().getAttributes().asMap().values().stream()
+                .map(String::valueOf)
+                .toList();
+
+        assertThat(values).isNotEmpty();
+        assertThat(values).noneMatch(value -> value.contains("000.000.000-00"));
+        assertThat(values).noneMatch(value -> value.contains("Rewrite it without the emoji."));
     }
 
     private List<SpanData> named(String name) {

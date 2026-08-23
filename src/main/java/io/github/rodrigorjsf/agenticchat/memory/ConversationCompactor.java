@@ -8,6 +8,8 @@ import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.store.memory.chat.ChatMemoryStore;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.annotation.Value;
+import io.github.rodrigorjsf.agenticchat.observability.trace.AgentTracer;
+import io.github.rodrigorjsf.agenticchat.observability.trace.Observation;
 import io.github.rodrigorjsf.agenticchat.observability.trace.Observed;
 import io.github.rodrigorjsf.agenticchat.observability.trace.ObservationType;
 import jakarta.inject.Singleton;
@@ -84,14 +86,23 @@ public class ConversationCompactor {
     private final MeterRegistry meters;
     private final io.micrometer.core.instrument.DistributionSummary conversationTokens;
     private final int triggerTokens;
+    private final AgentTracer tracer;
 
+    /**
+     * The tracer is a required dependency, not an optional one. A nullable-conjunction
+     * constructor was removed from this project once already: it compiled, every test
+     * passed, and observation was silently off wherever the second constructor was the
+     * one that got called.
+     */
     public ConversationCompactor(ChatMemoryStore store,
                                  ConversationSummarizer summarizer,
                                  MeterRegistry meters,
-                                 @Value("${agentic.agent.compaction-trigger-tokens:14400}") int triggerTokens) {
+                                 @Value("${agentic.agent.compaction-trigger-tokens:14400}") int triggerTokens,
+                                 AgentTracer tracer) {
         this.store = store;
         this.summarizer = summarizer;
         this.meters = meters;
+        this.tracer = tracer;
         this.conversationTokens = io.micrometer.core.instrument.DistributionSummary
                 .builder("agentic.memory.tokens")
                 .description("Estimated tokens in a conversation when compaction was considered")
@@ -122,12 +133,42 @@ public class ConversationCompactor {
             store.updateMessages(conversationId.value(), compacted);
 
             meters.counter("agentic.memory.compactions").increment();
+            recordCompacted(messages.size(), compacted.size(), before, after);
             LOG.info("Compacted conversation {}: {} -> {} messages, ~{} -> ~{} tokens",
                     conversationId, messages.size(), compacted.size(), before, after);
         } catch (RuntimeException e) {
             meters.counter("agentic.memory.compaction_failures").increment();
             LOG.warn("Compaction failed for conversation {}; the conversation is unchanged",
                     conversationId, e);
+        }
+    }
+
+    /**
+     * The compaction, as a Langfuse {@code event}.
+     *
+     * <p>An event rather than a span because compaction has no duration anyone waits
+     * for — it runs after the turn is delivered — and because the fact it records is
+     * consumed in a <em>later</em> turn: the answer that lost context did not lose it
+     * in its own trace. Whoever is reading that later trace needs a filterable marker
+     * saying the history was cut, and by how much.
+     *
+     * <p>Counts only, and deliberately: what was summarised away is the conversation,
+     * and content in this application travels through {@code ObservationContentPolicy}
+     * rather than riding along on a measurement. Four numbers, all top-level metadata
+     * keys, because Langfuse filters those and nothing else.
+     */
+    private void recordCompacted(int messagesBefore, int messagesAfter, int tokensBefore, int tokensAfter) {
+        // Caught here rather than left to the caller's handler. That one increments
+        // agentic.memory.compaction_failures and logs "the conversation is unchanged",
+        // and by this point the store has already been updated — a tracing fault would
+        // file a false report about the compaction itself.
+        try (Observation event = tracer.start("memory-compacted", ObservationType.EVENT)) {
+            event.metadata("messages_before", messagesBefore);
+            event.metadata("messages_after", messagesAfter);
+            event.metadata("tokens_before", tokensBefore);
+            event.metadata("tokens_after", tokensAfter);
+        } catch (RuntimeException e) {
+            LOG.warn("Could not observe the compaction of a conversation", e);
         }
     }
 

@@ -6,6 +6,8 @@ import dev.langchain4j.data.message.TextContent;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.guardrail.GuardrailResult;
 import dev.langchain4j.guardrail.OutputGuardrailResult;
+import dev.langchain4j.invocation.InvocationContext;
+import dev.langchain4j.invocation.InvocationParameters;
 import dev.langchain4j.observability.api.event.GuardrailExecutedEvent;
 import dev.langchain4j.observability.api.event.InputGuardrailExecutedEvent;
 import dev.langchain4j.observability.api.event.OutputGuardrailExecutedEvent;
@@ -51,11 +53,29 @@ import java.util.Objects;
  * is written as metadata. An LLM-backed guardrail — this application has one — is
  * seconds; a regular-expression one is microseconds, which is why the unit is
  * milliseconds with a fraction rather than a truncated integer.
+ *
+ * <h2>The reprompt is an event, and the retry it caused is not</h2>
+ * <p>N guardrail observations per turn say a guardrail ran N times. None of them says
+ * the second run exists <em>because</em> the first one asked for it — the causal link
+ * between a refusal and the extra model call it bought is the expensive fact, and it
+ * was invisible. {@link ObservationType#EVENT} is the right shape for it: a reprompt is
+ * a decision taken at an instant, not work with a duration, and the duration that
+ * followed is the generation's own.
  */
 @Singleton
 public class LangfuseGuardrailListener {
 
     private static final Logger LOG = LoggerFactory.getLogger(LangfuseGuardrailListener.class);
+
+    /**
+     * Where the reprompt ordinal is kept. {@link InvocationParameters} is created once
+     * per invocation and the guardrail executor hands the SAME instance to every retry
+     * attempt, so a counter in it is scoped to one turn and discarded with it — unlike a
+     * map on this singleton, which would need eviction and would be shared by every
+     * concurrent conversation. {@code VoiceComplianceGuardrail} bounds its own reprompt
+     * budget the same way; the key is namespaced so the two counters cannot collide.
+     */
+    private static final String ATTEMPTS_KEY = "langfuse.reprompt.attempts";
 
     private final AgentTracer tracer;
     private final ObservationContentPolicy content;
@@ -122,6 +142,13 @@ public class LangfuseGuardrailListener {
             observation.input(content.capture(checked));
             observation.output(content.capture(verdictOf(result)));
 
+            // Inside the guardrail's own observation, so the event is its child. Opened
+            // after it and closed before it, which is what makes the nesting come out of
+            // the OpenTelemetry context rather than out of anything passed by hand.
+            if (result instanceof OutputGuardrailResult output && output.isReprompt()) {
+                recordReprompt(event, result);
+            }
+
             if (!result.isSuccess()) {
                 // WARNING and not ERROR, including for FATAL. A guardrail that blocks is
                 // the guardrail working; ERROR in Langfuse means something went wrong, and
@@ -131,6 +158,51 @@ public class LangfuseGuardrailListener {
                 observation.level(ObservationLevel.WARNING, summaryOf(result));
             }
         }
+    }
+
+    /**
+     * The moment a guardrail sent the answer back to the model.
+     *
+     * <p>Three keys, all of them things a human filters on: which guardrail, which rules
+     * it objected to, and how many reprompts this turn has now cost. All are top-level
+     * metadata, which is the only part of an observation Langfuse indexes for filtering.
+     *
+     * <p>What is deliberately absent is the reprompt text. It is the one field here that
+     * quotes the answer back — {@code VoiceComplianceGuardrail} builds its instruction by
+     * embedding the repaired response — so an event carrying it would put model output on
+     * a measurement, past the switch that decides whether content leaves the process. It
+     * is already on the guardrail observation's output, where {@link ObservationContentPolicy}
+     * governs it.
+     */
+    private void recordReprompt(GuardrailExecutedEvent<?, ?, ?> event, GuardrailResult<?> result) {
+        try (Observation reprompt = tracer.start("guardrail-reprompt", ObservationType.EVENT)) {
+            reprompt.metadata("guardrail", event.guardrailName());
+            reprompt.metadata("violated_rules", summaryOf(result));
+            reprompt.metadata("attempt", countThisReprompt(event));
+        }
+    }
+
+    /**
+     * Counts this reprompt and returns which one of the invocation it is, from 1.
+     *
+     * <p>Named for the write, not for the read. It looked like a query called
+     * {@code attemptNumber} and it is not one — it increments the counter it returns, in a
+     * parameter map shared with the guardrail. A caller that read it twice out of curiosity
+     * would report the third reprompt as the fourth, and nothing would say so.
+     *
+     * <p>Null when the invocation carries no parameter map, and the metadata key is then
+     * simply absent: an ordinal that silently restarted at 1 on every attempt would be a
+     * number nobody could tell from a real one.
+     */
+    private static Integer countThisReprompt(GuardrailExecutedEvent<?, ?, ?> event) {
+        InvocationContext invocation = event.invocationContext();
+        InvocationParameters parameters = invocation == null ? null : invocation.invocationParameters();
+        if (parameters == null) {
+            return null;
+        }
+        int attempt = parameters.<Integer>getOrDefault(ATTEMPTS_KEY, 0) + 1;
+        parameters.put(ATTEMPTS_KEY, attempt);
+        return attempt;
     }
 
     /**
