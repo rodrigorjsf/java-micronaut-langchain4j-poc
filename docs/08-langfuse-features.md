@@ -84,7 +84,8 @@ that reason.
 
 **Where this POC does it.** `LangfuseProperties` binds the three values under the prefix
 `agentic.observability.langfuse` — `host`, `public-key`, `secret-key` — and all three are
-absent by default, because configuring an exporter nobody asked for would have `./mvnw test`
+**blank** by default rather than absent — which is precisely why the guard in the next
+paragraph is a pattern and not a presence check — because configuring an exporter nobody asked for would have `./mvnw test`
 open a connection on every run.
 
 `LangfuseOtlpSettings` turns them into the wire form. It holds the path as the constant
@@ -107,11 +108,13 @@ synchronous export would put an HTTP round trip inside the request the user is w
 **`OtlpHttpSpanExporter` is protobuf, and that is not incidental.** The Langfuse leg does
 not get its encoding from a property — `TracingDefaults` sets
 `otel.exporter.otlp.protocol = http/protobuf` only inside the branch that configures a
-*collector*. The Langfuse leg is protobuf because of the exporter class this line picks. It
+*collector*. The Langfuse leg is protobuf because of the class
+`AgenticTracingCustomizer.configure` picks — `OtlpHttpSpanExporter.builder()`, which has no
+JSON mode. It
 matters because the two encodings are not equivalent on every Langfuse version: over
 OTLP/**JSON**, Langfuse 3.80.0 stores a trace under an id that is not the one that was sent.
 Over protobuf both versions store the id unchanged, so the application is unaffected — and it
-is unaffected because of the exporter class this line picks rather than by luck. The
+is unaffected because of that class rather than by luck. The
 mechanism, and why it bites a hand-written probe and nothing else, is in
 [the compatibility section](#langfuse-3800-what-still-works).
 
@@ -177,9 +180,17 @@ the reason it has no producer on a request path is in the types table above.
 **What you see.** In the collector's config, no Langfuse exporter — and in the Langfuse
 project, traces that keep arriving when the whole Grafana profile is down.
 
-**What the wire needs.** Nothing extra. This is a routing decision, and the cost of it is
-one additional egress from the application: the same spans are serialised twice, once to the
-collector and once to Langfuse.
+**What the wire needs.** Nothing extra, but two properties do different jobs and a reader
+replicating this will reach for the wrong one. `agentic.observability.otlp.endpoint` turns on
+the COLLECTOR leg, and it is the only thing that does: `TracingDefaults` sets
+`otel.traces.exporter` to `otlp` when it is present and to **`none`** when it is not. The
+LANGFUSE leg is not autoconfiguration at all — it is a `BatchSpanProcessor` the tracer-provider
+customizer adds when `LangfuseOtlpSettings` exists. Setting `otel.traces.exporter=otlp` by
+hand to "enable tracing" therefore does not enable the Langfuse leg; it adds a second,
+differently-configured exporter beside it.
+
+The cost of the routing is one additional egress from the application: the same spans are
+serialised twice, once to the collector and once to Langfuse.
 
 **Where this POC does it.** `compose.observability.yaml` ships the two halves as two
 independent profiles, `grafana` and `langfuse` (a third, `langfuse3`, exists only for the
@@ -301,8 +312,10 @@ than a stored flag, and there are two write paths with two different spellings:
 | `langfuse.internal.as_root` | **string** `"true"` | the dual/legacy write path, which compares `String(attribute) === "true"` |
 | `langfuse.trace.name` | string | what the trace is called once it has a head |
 
-Send the boolean where the string is expected, or the reverse, and the attribute is accepted
-and ignored. Which path runs is a property of the Langfuse deployment, not of the
+Send the boolean where the string is expected, or the reverse, and the path that wanted the
+other type does not read it. `[sourced — unverified]` — this project sets both rather than
+measuring which half a given deployment uses, so the failure mode is reasoned from the two
+predicates and not observed. Which path runs is a property of the Langfuse deployment, not of the
 application, so this project sets both.
 
 The first half of the predicate — `parent_span_id = ''` — is usually what makes this work:
@@ -354,7 +367,8 @@ comma-joined string in that key is accepted and does not become tags.
 
 Anything else worth filtering on has to carry the prefix `langfuse.trace.metadata.` —
 Langfuse filters on top-level metadata keys only, and an ordinary OpenTelemetry attribute
-lands under `metadata.attributes`, where it is queryable but not filterable.
+lands under `metadata.attributes`, where — in `LangfuseAttributes`' own words — it "cannot
+be filtered on at all".
 `LangfuseAttributes.traceMetadata(key)` builds those.
 
 **Where this POC does it.** `TurnAttributes` is the record; `ChatTurnService.handle` builds
