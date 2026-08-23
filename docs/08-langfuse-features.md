@@ -121,19 +121,53 @@ That the *settings* are right: `LangfuseOtlpSettingsTest` asserts the signal-spe
 the trailing-slash tolerance, the Basic header, the `x-langfuse-ingestion-version: 4` entry,
 and that with no credentials the bean does not exist at all.
 `LangfuseConfiguredContextTest.theSettingsBeanIsPresentAndCorrect` re-asserts the endpoint
-and the header from a fully booted context, which is the only place a real startup is
-exercised.
+and the header from a context booted WITH credentials and stub models — which is what makes
+it the one test that also proves a configured exporter opens no connection, and that
+`ScoreWriter` still resolves to exactly one bean. (Both tests boot a real Micronaut context;
+that part is not what distinguishes them.)
 
 That the *server* honours the contract: `scripts/check-langfuse-ingestion.sh` pushes a real
-trace at a running instance and reads it back, with 46 assertions covering the path, the
-auth, the type mapping, usage and cost, scores and corrections.
+trace at a running instance and reads it back — 47 assertions on the run recorded for this
+chapter, covering the path, the auth, the type mapping, usage and cost, scores and
+corrections. The number is not a property of the script: most of its assertions come out of
+a loop over the observation types, so it moves whenever a type is added.
 
 That the *application's own encoding* reaches Langfuse: neither of the above. The harness
 posts with `Content-Type: application/json` — it exercises OTLP/JSON, which is not the
 encoding the application uses. What proves the protobuf leg is a real run of the real
 application against a real Langfuse **[verified]**. Six turns produced 100 stored
-observations with every declared type mapped; the census is in the session's
-`app-on-4.16.0.txt`.
+observations, every type the chat path emits mapped correctly:
+
+```
+STORED       NAME                           N
+AGENT        chat-turn                       4      <- the turn, the trace root
+AGENT        ChatAssistant.chat              3
+AGENT        TriageJudge.classify            3
+CHAIN        triage                          4
+CHAIN        memory-compaction               3
+SPAN         triage-judge                    4
+SPAN         memory-read                    27
+SPAN         memory-write                   11
+GENERATION   agent                           7
+GENERATION   judge                           3
+GUARDRAIL    NormalizingInputGuardrail       3
+GUARDRAIL    InjectionTriageGuardrail        4
+GUARDRAIL    ExfiltrationGuardrail           5
+GUARDRAIL    SystemPromptLeakageGuardrail    5
+GUARDRAIL    VoiceComplianceGuardrail        5
+RETRIEVER    assistant-knowledge             2
+RETRIEVER    embedding-store-search          2
+EMBEDDING    all-minilm-l6-v2-q              2
+TOOL         activate_skill                  1
+EVENT        guardrail-reprompt              2
+                                          ---
+                                          100 observations, 9 of the 10 types
+```
+
+Nine, not ten: no chat turn emits an `EVALUATOR`. Its round trip is proved separately, by
+`scripts/check-langfuse-ingestion.sh` — *"ok type EVALUATOR survived the round trip"* — and
+the reason it has no producer on a request path is in the types table above.
+
 
 ### One egress each: direct to Langfuse, not through the collector
 
@@ -172,21 +206,29 @@ the demonstration that neither depends on the other.
 
 ### Sampling: the decision has to be taken at the root
 
-**What you see.** With the wrong sampler, an observation in Langfuse whose trace has no
-root — so no name, no session and no input/output at the top. Every child was ingested;
-nothing errored; the trace is headless.
+**What you see.** Nothing, when it is right. When a trace loses its root — which sampling
+is not the way to lose it, see below — Langfuse still shows every observation and still
+groups them, because `TurnAttributesSpanProcessor` puts the session, the trace name and the
+environment on all of them. What goes missing is narrower and is the same loss the root
+subsection above describes: the trace has no name of its own and no top-level input or
+output.
 
 **What the wire needs.** `otel.traces.sampler = parentbased_traceidratio`, with
-`otel.traces.sampler.arg` carrying the ratio. Parent-based is the operative half: a child
-span inherits its parent's sampling decision instead of taking its own, so the decision is
-made once, at the root, for the whole trace.
+`otel.traces.sampler.arg` carrying the ratio.
 
-A ratio sampler that is *not* parent-based re-rolls the dice per span. On a plain
-distributed-tracing backend that produces a partial trace, which is degraded but readable.
-On Langfuse it can produce something worse — Langfuse assembles a trace out of observations
-correlated by trace id and needs a root to give it a name, a session and a top-level
-input/output. Keep a child and drop its root and the result is orphan observations that
-aggregate into nothing.
+**And here is a mechanism this chapter used to claim and that does not exist**, kept because
+it is the kind of thing that reads as obvious and is wrong. The claim was that a bare
+`traceidratio` sampler "re-rolls the dice per span", so it could keep a child and drop its
+root. It cannot. `TraceIdRatioBasedSampler.shouldSample` is a pure function of the trace id
+and the ratio, and the SDK's own comment says the decision holds *"even for child spans
+(that may have had a different sampling samplingResult made)"*. Inside one process, every
+span of a trace already gets the same answer with no sampler doing anything to enforce it.
+
+What parent-based actually adds is the **remote** case: it honours an incoming W3C
+`sampled` flag instead of re-deciding with this service's own ratio. Two services at 0.5
+that each decide for themselves keep a quarter of their shared traces whole and cut three
+quarters somewhere in the middle. Nothing calls this application today, so it is insurance —
+correct insurance, for a reason the old sentence got wrong.
 
 **Where this POC does it.** `TracingDefaults.properties()` sets both keys **unconditionally**
 — outside the `collectorConfigured` branch — so a deployment that configures only Langfuse
@@ -489,9 +531,10 @@ this application's own YAML — and asserts it in both directions: `/health`,
 trap: it fails the moment someone shortens the pattern to `/health`.
 
 The end-to-end evidence is the census **[verified]**. After the exclusion list grew from one entry to four,
-a six-turn run of the real application produced 100 observations across 20 distinct observation names,
-and **no `POST` and no `GET /health` among them** — the census is in the session's
-`app-on-4.16.0.txt`.
+a six-turn run of the real application produced 100 observations across the 20 names in the
+census above, and **no `POST` and no `GET /health` among them**. Reproduce it with
+`./scripts/check-app-tracing-e2e.sh`, which asserts the second half of that directly:
+*"no GET /health trace reached Tempo"*.
 ## Observation types, and the agent graph
 
 Langfuse's timeline, its filters and its agent graph are all downstream of one span

@@ -225,9 +225,10 @@ agentic:
     # turning the whole thing off.
     capture-content: ${AGENTIC_CAPTURE_CONTENT:true}
 
-    # Head sampling, applied at the root and inherited by every child. Trace-level on
-    # purpose: Langfuse needs a root span to build a trace at all, so a sampler that
-    # could keep a child and drop its root would produce orphans.
+    # Head sampling. The ratio is a pure function of the trace id, so every span of one
+    # trace gets the same decision without anything having to enforce it — see the comment
+    # in TracingDefaults for why the sampler is parent-based anyway, and for the mechanism
+    # this comment used to claim and that does not exist.
     sample-rate: ${AGENTIC_TRACE_SAMPLE_RATE:1.0}
 
     # An empty default is written `${VAR:}`. The spelling `${VAR:``}` looks like the same
