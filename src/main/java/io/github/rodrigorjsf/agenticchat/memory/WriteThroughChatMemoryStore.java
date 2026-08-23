@@ -27,6 +27,26 @@ import java.util.List;
  * <p>Availability is asymmetric on purpose: Valkey being down degrades latency
  * only, while DynamoDB being down fails the request. Silently continuing without
  * the durable store would drop a user's conversation with no signal.
+ *
+ * <p><b>The read is a {@code retriever} and the two writes are not.</b> Langfuse
+ * reserves {@code retriever} for "a data-retrieval step that only looks something up
+ * rather than changing state, such as a call to a vector store, database, or other
+ * knowledge source" — which is {@link #getMessages} exactly, and is not
+ * {@link #updateMessages} or {@link #deleteMessages}, both of which write DynamoDB
+ * and then Valkey. Those stay {@code span}, whose meaning is "a unit of work with no
+ * more specific meaning": none of the other nine types describes a store write, and
+ * typing one {@code retriever} would draw a write into the agent graph wearing a
+ * read's label.
+ *
+ * <p>All three capture their content, and that is a deliberate exception to this
+ * application's default. {@code @Observed} captures nothing unless asked because a
+ * turn's arguments are the user's message; here the arguments and the result ARE the
+ * conversation, and an observation of the memory layer that omits it records that a
+ * lookup happened while withholding the one fact a reader opened the trace for — what
+ * history the model was given. {@code ObservationContentPolicy} still governs it, so
+ * {@code agentic.observability.capture-content: false} turns all of it off in one
+ * place, and {@code ObservationJson} writes the messages through LangChain4j's own
+ * serializer rather than as a Java {@code toString}.
  */
 @Singleton
 @Primary
@@ -45,7 +65,8 @@ public class WriteThroughChatMemoryStore implements ChatMemoryStore {
     }
 
     @Override
-    @Observed(value = "memory-read", type = ObservationType.SPAN)
+    @Observed(value = "memory-read", type = ObservationType.RETRIEVER,
+            captureArguments = true, captureResult = true)
     public List<ChatMessage> getMessages(Object memoryId) {
         try {
             var cached = cache.getMessages(memoryId);
@@ -64,7 +85,9 @@ public class WriteThroughChatMemoryStore implements ChatMemoryStore {
     }
 
     @Override
-    @Observed(value = "memory-write", type = ObservationType.SPAN)
+    // No captureResult: the method returns void, and an output attribute reading
+    // "null" is a worse answer than no attribute.
+    @Observed(value = "memory-write", type = ObservationType.SPAN, captureArguments = true)
     public void updateMessages(Object memoryId, List<ChatMessage> messages) {
         durable.updateMessages(memoryId, messages);
         try {
@@ -76,7 +99,7 @@ public class WriteThroughChatMemoryStore implements ChatMemoryStore {
     }
 
     @Override
-    @Observed(value = "memory-delete", type = ObservationType.SPAN)
+    @Observed(value = "memory-delete", type = ObservationType.SPAN, captureArguments = true)
     public void deleteMessages(Object memoryId) {
         durable.deleteMessages(memoryId);
         invalidate(memoryId);
