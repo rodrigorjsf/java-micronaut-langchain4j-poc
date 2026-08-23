@@ -178,7 +178,14 @@ services:
 
   langfuse-minio:
     profiles: ["langfuse"]
-    image: minio/minio:latest
+    # Pinned, for the reason the ClickHouse comment gives at length: a floating tag is how
+    # a self-hosted stack breaks on a morning nobody changed anything, and this file argues
+    # that in writing 190 lines up while `latest` sat here. This is not a guess at a good
+    # version — it is the version every measurement in docs/08-langfuse-features.md was
+    # taken against, read off the image that was actually running:
+    #   docker inspect minio/minio:latest --format '{{json .Config.Labels}}'
+    #     -> "release": "RELEASE.2025-09-07T16-13-09Z"
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
     container_name: agentic-langfuse-minio
     restart: always
     entrypoint: sh
@@ -368,7 +375,14 @@ services:
 
   langfuse3-minio:
     profiles: ["langfuse3"]
-    image: minio/minio:latest
+    # Pinned, for the reason the ClickHouse comment gives at length: a floating tag is how
+    # a self-hosted stack breaks on a morning nobody changed anything, and this file argues
+    # that in writing 190 lines up while `latest` sat here. This is not a guess at a good
+    # version — it is the version every measurement in docs/08-langfuse-features.md was
+    # taken against, read off the image that was actually running:
+    #   docker inspect minio/minio:latest --format '{{json .Config.Labels}}'
+    #     -> "release": "RELEASE.2025-09-07T16-13-09Z"
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
     container_name: agentic-langfuse3-minio
     restart: always
     entrypoint: sh
