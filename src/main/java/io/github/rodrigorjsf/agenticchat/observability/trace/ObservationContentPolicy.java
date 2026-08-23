@@ -2,6 +2,8 @@ package io.github.rodrigorjsf.agenticchat.observability.trace;
 
 import io.micronaut.context.annotation.Value;
 import jakarta.inject.Singleton;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
@@ -21,6 +23,8 @@ import java.util.List;
 @Singleton
 public class ObservationContentPolicy {
 
+    private static final Logger LOG = LoggerFactory.getLogger(ObservationContentPolicy.class);
+
     private final boolean captureContent;
     private final List<ContentRedactor> redactors;
 
@@ -32,8 +36,9 @@ public class ObservationContentPolicy {
     }
 
     /**
-     * @return the value to write, or {@code null} when content capture is off — the
-     * observation then writes no attribute rather than an empty one
+     * @return the value to write, or {@code null} when content capture is off, when a
+     * redactor dropped it, or when a redactor FAILED — the observation then writes no
+     * attribute rather than an empty one
      */
     public Object capture(Object value) {
         if (!captureContent || value == null) {
@@ -41,7 +46,18 @@ public class ObservationContentPolicy {
         }
         Object redacted = value;
         for (ContentRedactor redactor : redactors) {
-            redacted = redactor.redact(redacted);
+            try {
+                redacted = redactor.redact(redacted);
+            } catch (RuntimeException e) {
+                // A redactor is deployment-supplied code running inside a method it was
+                // only supposed to watch, and this is called from ChatTurnService AFTER the
+                // reply exists — an escaping exception would lose a computed answer to a
+                // failure in the layer observing it. Dropping the payload is the only safe
+                // direction: a redactor that threw did not establish that the value is safe.
+                LOG.warn("Redactor {} failed; dropping the payload rather than the call",
+                        redactor.getClass().getName(), e);
+                return null;
+            }
             if (redacted == null) {
                 return null;
             }

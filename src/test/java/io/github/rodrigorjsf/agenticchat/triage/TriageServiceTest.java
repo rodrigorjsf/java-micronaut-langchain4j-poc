@@ -46,12 +46,9 @@ class TriageServiceTest {
     private TriageService serviceWhoseJudge(java.util.function.Function<String, TriageVerdict> judge) {
         var cached = new CachedTriageJudge(
                 (text, skills) -> judge.apply(text), new SkillCatalog(List.of()), meters);
-        // A real tracer over a no-op OpenTelemetry and a no-op score writer: this test is
-        // about the triage decision, and the observability seams have their own.
+        // A no-op score writer: this test is about the triage decision, and the scores it
+        // emits have their own test in JudgeScoreTest.
         return new TriageService(cached, meters,
-                new io.github.rodrigorjsf.agenticchat.observability.trace.OtelAgentTracer(
-                        io.opentelemetry.api.OpenTelemetry.noop().getTracer("test"),
-                        io.github.rodrigorjsf.agenticchat.observability.trace.ObservationJson.compact()),
                 new io.github.rodrigorjsf.agenticchat.observability.trace.NoOpScoreWriter());
     }
 

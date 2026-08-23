@@ -59,7 +59,7 @@ public class StubChatModelRegistry extends ChatModelRegistry {
                                  CostCalculator costs,
                                  AgentTracer tracer,
                                  ObservationContentPolicy content) {
-        super(List.of(), STUB_CREDENTIALS, List.of());
+        super(List.of(), STUB_CREDENTIALS, List.of(), meters, costs, tracer, content);
         this.meters = meters;
         this.costs = costs;
         this.tracer = tracer;

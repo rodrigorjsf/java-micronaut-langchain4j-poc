@@ -9,6 +9,7 @@ import io.github.rodrigorjsf.agenticchat.memory.ConversationId;
 import io.github.rodrigorjsf.agenticchat.observability.trace.AgentTracer;
 import io.github.rodrigorjsf.agenticchat.observability.trace.Observation;
 import io.github.rodrigorjsf.agenticchat.observability.trace.ObservationContentPolicy;
+import io.github.rodrigorjsf.agenticchat.observability.trace.ObservationLevel;
 import io.github.rodrigorjsf.agenticchat.observability.trace.ObservationType;
 import io.github.rodrigorjsf.agenticchat.observability.trace.TurnAttributes;
 import io.github.rodrigorjsf.agenticchat.observability.trace.TurnContext;
@@ -88,6 +89,12 @@ public class ChatTurnService {
     public ChatTurn handle(ConversationId conversationId, String message) {
         // The conversation is the Langfuse session, which is how a multi-turn exchange
         // reads as one thing there rather than as N unrelated traces.
+        // No userId and no tags, and neither is an oversight. This application has no
+        // authentication, so there is no user to name; and a tag is only worth setting
+        // before the first span starts, which is before triage has produced the intent
+        // that would be worth tagging. Setting it later would put it on the second half of
+        // the turn and not the first, which is worse than not setting it: an aggregation
+        // over tags would then silently count some observations and not others.
         var turnAttributes = TurnAttributes.builder()
                 .traceName(TRACE_NAME)
                 .sessionId(conversationId.value())
@@ -147,8 +154,7 @@ public class ChatTurnService {
             meters.counter("agentic.turn.guardrail_blocks").increment();
             // WARNING rather than ERROR: a blocked turn is the defence working, and an
             // alert that fires on it would fire on every probe an attacker sends.
-            observation.level(io.github.rodrigorjsf.agenticchat.observability.trace.ObservationLevel.WARNING,
-                    "blocked by an output guardrail");
+            observation.level(ObservationLevel.WARNING, "blocked by an output guardrail");
             return ChatTurn.blocked(verdict, GUARDRAIL_REFUSAL);
         }
     }

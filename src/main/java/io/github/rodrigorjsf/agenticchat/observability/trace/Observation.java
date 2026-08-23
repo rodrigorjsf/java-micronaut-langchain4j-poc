@@ -69,6 +69,17 @@ public interface Observation extends AutoCloseable {
     Observation genAi(String system, String operationName, String requestModel);
 
     /**
+     * The response half of the GenAI conventions: what actually served the call, and why
+     * it stopped.
+     *
+     * <p>Written IN ADDITION to the same facts in observation metadata, and the duplication
+     * is the point rather than an oversight: Langfuse filters on metadata and does not
+     * index {@code gen_ai.*}, while a Tempo query and the span-metrics connector read
+     * {@code gen_ai.*} and have never heard of Langfuse's namespace.
+     */
+    Observation genAiResponse(String responseModel, String finishReason);
+
+    /**
      * Declares this observation the head of its trace.
      *
      * <p>Only the turn does this. Langfuse reads two different attributes for it depending

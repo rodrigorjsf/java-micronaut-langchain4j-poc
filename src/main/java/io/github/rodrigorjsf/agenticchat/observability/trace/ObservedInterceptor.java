@@ -44,7 +44,11 @@ public class ObservedInterceptor implements MethodInterceptor<Object, Object> {
                     observation.output(content.capture(result));
                 }
                 return result;
-            } catch (RuntimeException e) {
+            } catch (Throwable e) {
+                // Throwable, not RuntimeException. Catching only the latter ends the span
+                // UNMARKED on an Error: the observation is exported, looks successful, and
+                // the turn it belongs to failed. Rarer and worse is the wrong pair of
+                // properties for the case a layer misses. Rethrown untouched.
                 observation.failed(e);
                 throw e;
             }

@@ -1,7 +1,6 @@
 package io.github.rodrigorjsf.agenticchat.triage;
 
 import io.github.rodrigorjsf.agenticchat.guardrail.input.TextNormalizer;
-import io.github.rodrigorjsf.agenticchat.observability.trace.AgentTracer;
 import io.github.rodrigorjsf.agenticchat.observability.trace.ObservationType;
 import io.github.rodrigorjsf.agenticchat.observability.trace.Observed;
 import io.github.rodrigorjsf.agenticchat.observability.trace.Score;
@@ -51,14 +50,11 @@ public class TriageService {
     private final CachedTriageJudge judge;
     private final MeterRegistry meters;
 
-    private final AgentTracer tracer;
     private final ScoreWriter scores;
 
     public TriageService(CachedTriageJudge judge,
                          MeterRegistry meters,
-                         AgentTracer tracer,
                          ScoreWriter scores) {
-        this.tracer = tracer;
         this.scores = scores;
         this.judge = judge;
         this.meters = meters;
@@ -109,13 +105,15 @@ public class TriageService {
      * ran.
      */
     private void score(TriageVerdict verdict) {
-        tracer.current().ifPresent(observation -> {
-            scores.record(observation, Score.numeric("triage_confidence", verdict.confidence())
-                    .withComment(verdict.intent().name()));
-            // Categorical, so it groups rather than averages. Averaging IN_SCOPE and
-            // OUT_OF_SCOPE would produce a number with no meaning at all.
-            scores.record(observation, Score.categorical("triage_decision", verdict.decision().name()));
-        });
+        // The single-argument overload attaches to the CURRENT observation, which inside
+        // this method is the triage one. Resolving it here instead would re-implement
+        // ScoreWriter.record(Score) and give this class an AgentTracer it has no other use
+        // for.
+        scores.record(Score.numeric("triage_confidence", verdict.confidence())
+                .withComment(verdict.intent().name()));
+        // Categorical, so it groups rather than averages. Averaging IN_SCOPE and
+        // OUT_OF_SCOPE would produce a number with no meaning at all.
+        scores.record(Score.categorical("triage_decision", verdict.decision().name()));
     }
 
     /**

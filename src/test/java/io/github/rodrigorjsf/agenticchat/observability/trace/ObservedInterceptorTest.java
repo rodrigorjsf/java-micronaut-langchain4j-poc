@@ -35,6 +35,11 @@ class ObservedInterceptorTest {
             throw new IllegalStateException("upstream refused");
         }
 
+        @Observed("errors")
+        void errors() {
+            throw new StackOverflowError("simulated");
+        }
+
         @Observed(value = "outer", type = ObservationType.AGENT)
         String outer() {
             return classify("from inside");
@@ -119,6 +124,41 @@ class ObservedInterceptorTest {
         var inner = spans.getFirst();
         var outer = spans.getLast();
         assertThat(inner.getParentSpanId()).isEqualTo(outer.getSpanId());
+    }
+
+    @Test
+    @DisplayName("an Error also marks the observation before it propagates")
+    void anErrorIsRecordedToo() {
+        assertThatThrownBy(subject::errors).isInstanceOf(StackOverflowError.class);
+
+        // Catching only RuntimeException ends the span UNMARKED: the observation is
+        // exported, looks successful, and the turn it belongs to failed. An Error is rarer
+        // and worse, which is the wrong pair of properties for the one this layer misses.
+        assertThat(exported.getFinishedSpanItems()).singleElement().satisfies(span ->
+                assertThat(span.getAttributes().asMap())
+                        .containsEntry(LangfuseAttributes.OBSERVATION_LEVEL, "ERROR"));
+    }
+
+    @Test
+    @DisplayName("a redactor that throws loses the payload, never the call")
+    void aFailingRedactorCannotBreakTheMethodItObserves() {
+        try (var ctx = ApplicationContext.run(Map.of(
+                "agentic.test.record-spans", "true",
+                "agentic.test.broken-redactor", "true",
+                "agentic.llm.credentials.google-api-key", "fake",
+                "agentic.llm.credentials.openai-api-key", "fake"))) {
+
+            var recorder = ctx.getBean(InMemorySpanExporter.class);
+            recorder.reset();
+
+            // The call still returns. A ContentRedactor is deployment-supplied code running
+            // inside a method it was only supposed to watch.
+            assertThat(ctx.getBean(Subject.class).classify("bom dia")).isEqualTo("IN_SCOPE");
+
+            var keys = recorder.getFinishedSpanItems().getFirst().getAttributes().asMap()
+                    .keySet().stream().map(key -> key.getKey()).toList();
+            assertThat(keys).doesNotContain(LangfuseAttributes.OBSERVATION_INPUT.getKey());
+        }
     }
 
     @Test

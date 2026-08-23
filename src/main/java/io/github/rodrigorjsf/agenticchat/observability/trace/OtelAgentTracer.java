@@ -147,6 +147,12 @@ public class OtelAgentTracer implements AgentTracer {
         }
 
         @Override
+        public Observation genAiResponse(String responseModel, String finishReason) {
+            write(GenAiAttributes.RESPONSE_MODEL.getKey(), responseModel);
+            return write(GenAiAttributes.RESPONSE_FINISH_REASON.getKey(), finishReason);
+        }
+
+        @Override
         public Observation asTraceRoot() {
             span.setAttribute(LangfuseAttributes.INTERNAL_IS_APP_ROOT, true);
             span.setAttribute(LangfuseAttributes.INTERNAL_AS_ROOT, "true");

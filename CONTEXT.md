@@ -184,17 +184,21 @@ span, and the reason is that scores aggregate across traces where attributes do 
 | Package | Owns | May depend on |
 |---|---|---|
 | `api` | HTTP surface, DTOs, error shaping | `conversation`, `skills` |
-| `conversation` | the turn lifecycle | `triage`, `agent`, `skills`, `memory` |
-| `triage` | scope decisions | `llm`, `skills`, `guardrail.input` (normalizer only) |
-| `agent` | assistant assembly, the system prompt, sub-agent workflows | `llm`, `skills`, `memory`, `guardrail`, `rag`, `tools.*` |
-| `guardrail` | input and output checks | `llm` |
+| `conversation` | the turn lifecycle | `triage`, `agent`, `skills`, `memory`, `observability` |
+| `triage` | scope decisions | `llm`, `skills`, `guardrail.input` (normalizer only), `observability` |
+| `agent` | assistant assembly, the system prompt, sub-agent workflows | `llm`, `skills`, `memory`, `guardrail`, `rag`, `tools.*`, `observability` |
+| `guardrail` | input and output checks | `llm`, `observability` |
 | `skills` | catalogue, `SKILL.md` loading, tool binding | — |
 | `tools.*` | tool implementations over external data sources | `tools.http`, `skills` |
-| `rag` | corpus ingestion, retrieval, routing | `skills` |
-| `memory` | chat memory stores | `infra` |
+| `rag` | corpus ingestion, retrieval, routing | `skills`, `observability` |
+| `memory` | chat memory stores | `infra`, `observability` |
 | `llm` | model construction by role | `infra.config`, `observability` |
 | `observability` | token accounting, cost, tracing seams, scores | — |
 | `infra` | AWS and Valkey clients, configuration, clock | — |
+
+Almost everything depends on `observability`, and almost nothing should worry about it: what
+those packages import is `AgentTracer` and `@Observed`, both of which are one interface and
+one annotation. The edge is wide and thin on purpose.
 
 Two rules, enforced by ArchUnit rather than by convention:
 

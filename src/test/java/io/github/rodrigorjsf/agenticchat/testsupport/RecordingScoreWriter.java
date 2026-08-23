@@ -1,5 +1,6 @@
 package io.github.rodrigorjsf.agenticchat.testsupport;
 
+import io.github.rodrigorjsf.agenticchat.observability.trace.AgentTracer;
 import io.github.rodrigorjsf.agenticchat.observability.trace.ObservationRef;
 import io.github.rodrigorjsf.agenticchat.observability.trace.Score;
 import io.github.rodrigorjsf.agenticchat.observability.trace.ScoreWriter;
@@ -24,10 +25,21 @@ public class RecordingScoreWriter implements ScoreWriter {
     }
 
     private final List<Recorded> recorded = new CopyOnWriteArrayList<>();
+    private final AgentTracer tracer;
 
+    public RecordingScoreWriter(AgentTracer tracer) {
+        this.tracer = tracer;
+    }
+
+    /**
+     * Resolves the current observation exactly as {@code LangfuseScoreWriter} does. A
+     * double that skipped that step would record every score with no subject, and the
+     * assertion that a score is attached to an observation would pass against a writer that
+     * attached nothing.
+     */
     @Override
     public void record(Score score) {
-        recorded.add(new Recorded(null, score));
+        tracer.current().ifPresent(observation -> record(observation, score));
     }
 
     @Override

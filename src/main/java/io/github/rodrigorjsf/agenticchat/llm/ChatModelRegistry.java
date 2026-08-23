@@ -15,8 +15,6 @@ import io.github.rodrigorjsf.agenticchat.observability.trace.AgentTracer;
 import io.github.rodrigorjsf.agenticchat.observability.trace.LangfuseChatModelListener;
 import io.github.rodrigorjsf.agenticchat.observability.trace.ObservationContentPolicy;
 import io.micrometer.core.instrument.MeterRegistry;
-import io.micronaut.core.annotation.Nullable;
-import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,26 +46,27 @@ public class ChatModelRegistry {
     private final Map<String, ChatModel> modelsByRole;
     private final Map<String, ModelRoleProperties> configByRole;
 
-    public ChatModelRegistry(List<ModelRoleProperties> roles,
-                             ProviderCredentials credentials,
-                             List<ChatModelListener> listeners) {
-        this(roles, credentials, listeners, null, null, null, null);
-    }
-
     /**
-     * Each role gets its own {@link TokenCostListener}, which is what puts a
-     * {@code role} tag on every token and cost metric. Without that tag the LLM bill
-     * is one number and there is no way to see that the judge is most of the calls
+     * Each role gets its own {@link TokenCostListener} and its own
+     * {@link LangfuseChatModelListener}, which is what puts a {@code role} tag on every
+     * token and cost metric and a role name on every generation observation. Without it the
+     * LLM bill is one number and there is no way to see that the judge is most of the calls
      * and a small part of the cost — the fact the whole triage design rests on.
+     *
+     * <p>One constructor, and no nullable dependencies. The convenience overload that used
+     * to exist took four nulls, which made "tracing is on" a conjunction of three
+     * not-null checks: a deployment with a tracer and no {@code CostCalculator} would have
+     * silently produced no generation observation at all, for a reason nothing reported.
+     * Every one of these beans is unconditional, so the only caller that wanted the short
+     * form was a test double, and it can pass what it has.
      */
-    @Inject
     public ChatModelRegistry(List<ModelRoleProperties> roles,
                              ProviderCredentials credentials,
                              List<ChatModelListener> listeners,
-                             @Nullable MeterRegistry meters,
-                             @Nullable CostCalculator costs,
-                             @Nullable AgentTracer tracer,
-                             @Nullable ObservationContentPolicy content) {
+                             MeterRegistry meters,
+                             CostCalculator costs,
+                             AgentTracer tracer,
+                             ObservationContentPolicy content) {
         this.configByRole = roles.stream()
                 .collect(Collectors.toUnmodifiableMap(ModelRoleProperties::name, Function.identity()));
 
@@ -75,15 +74,11 @@ public class ChatModelRegistry {
         for (ModelRoleProperties role : roles) {
             ModelRoleValidator.validate(role);
             var perRole = new ArrayList<>(listeners);
-            if (meters != null && costs != null) {
-                perRole.add(new TokenCostListener(role.name(), meters, costs));
-            }
+            perRole.add(new TokenCostListener(role.name(), meters, costs));
             // Per role for the same reason the cost listener is: the observation is named
             // for the role, so the judge's generations and the agent's are separable in a
             // trace without anyone having to recognise a model id.
-            if (tracer != null && costs != null && content != null) {
-                perRole.add(new LangfuseChatModelListener(role.name(), tracer, costs, content));
-            }
+            perRole.add(new LangfuseChatModelListener(role.name(), tracer, costs, content));
             models.put(role.name(), build(role, credentials, perRole));
         }
         this.modelsByRole = Map.copyOf(models);

@@ -178,8 +178,13 @@ public class LangfuseChatModelListener implements ChatModelListener {
             return;
         }
         observation.output(content.capture(outputOf(response.aiMessage())));
-        observation.metadata(FINISH_REASON, response.finishReason() == null ? null : response.finishReason().name());
+        String finishReason = response.finishReason() == null ? null : response.finishReason().name();
+        observation.metadata(FINISH_REASON, finishReason);
         observation.metadata(RESPONSE_MODEL, response.modelName());
+        // The same two facts in the GenAI namespace. Langfuse filters on metadata and does
+        // not index gen_ai.*; Tempo and the span-metrics connector read gen_ai.* and know
+        // nothing of langfuse.*. Two readers, two namespaces, one pair of facts.
+        observation.genAiResponse(response.modelName(), finishReason);
 
         var usage = TokenUsageDetails.of(response.tokenUsage());
         observation.usage(usage);

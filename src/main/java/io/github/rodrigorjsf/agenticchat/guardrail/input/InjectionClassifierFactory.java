@@ -2,6 +2,7 @@ package io.github.rodrigorjsf.agenticchat.guardrail.input;
 
 import dev.langchain4j.service.AiServices;
 import io.github.rodrigorjsf.agenticchat.llm.ChatModelRegistry;
+import io.github.rodrigorjsf.agenticchat.observability.trace.LangfuseAiServiceListener;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Value;
 import jakarta.inject.Singleton;
@@ -24,6 +25,7 @@ public class InjectionClassifierFactory {
     @Singleton
     InjectionClassifier injectionClassifier(
             ChatModelRegistry models,
+            LangfuseAiServiceListener observability,
             @Value("${agentic.guardrails.input.llm-classifier-enabled:true}") boolean enabled) {
 
         if (!enabled) {
@@ -33,6 +35,12 @@ public class InjectionClassifierFactory {
 
         var judge = AiServices.builder(InjectionJudge.class)
                 .chatModel(models.forRole("judge"))
+                // This one is easy to forget because it is not assembled in
+                // AiServiceFactory with the others. Without it the gray-zone classifier's
+                // model call still appears — the per-role listener sees it — but with no
+                // invocation observation above it, so it hangs off the guardrail rather
+                // than off the judge that made it.
+                .registerListeners(observability.listeners())
                 .build();
 
         return text -> {
