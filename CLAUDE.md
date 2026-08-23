@@ -115,7 +115,7 @@ When something fails repeatedly, when User has to re-explain, or when a workarou
 - `check-langfuse-ingestion.sh` needs Langfuse already up; it starts nothing.
 - Workflow concurrency caps at CPUs-2; on 4 CPUs only 2 agents run.
 - Background command piped to `tail -N` shows nothing until it exits.
-- Deleting floci's Valkey child by hand desyncs its state; wipe `floci-data`.
+- Any floci teardown desyncs its Valkey child; wipe `floci-data` before `up`.
 - `docker compose down` then `up` on one profile can orphan the network; prune it.
 - Micronaut nested placeholder default `${a:${b:x}}` leaks the inner `}` into the value.
 - Micronaut `otel.exclusions` regexes are FULL matches; `/health` misses `/health/liveness`.
