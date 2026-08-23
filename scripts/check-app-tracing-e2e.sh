@@ -8,6 +8,12 @@
 #       the OpenTelemetry GenAI client metrics arrived over OTLP, the health probe did NOT
 #       become a trace, and the prompt was stripped before anything reached Tempo.
 #
+#       Two of the type assertions read the type off the OBSERVATION rather than off the
+#       trace's type set: every `memory-read` must be `retriever` and every memory write
+#       must be `span`. The trace-level check cannot make that distinction — it only says
+#       some observation somewhere had the type — and the two halves of the memory layer
+#       are the pair most likely to be typed alike by a change that means well.
+#
 #       Six turns and not one, because one question is not a test of a conversational
 #       agent. This script used to send a single weather question — which needs a data
 #       tool, and a data tool is what issue #18 breaks, so the one turn it sent was the one
