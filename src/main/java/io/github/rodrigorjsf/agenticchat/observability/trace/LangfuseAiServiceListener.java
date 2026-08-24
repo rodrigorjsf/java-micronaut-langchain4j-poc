@@ -201,33 +201,27 @@ public class LangfuseAiServiceListener {
     }
 
     private void onCompleted(AiServiceCompletedEvent event) {
-        Observation observation = claim(event.invocationContext().invocationId());
-        if (observation == null) {
-            return;
-        }
-        try {
+        try (Observation observation = claim(event.invocationContext().invocationId())) {
+            if (observation == null) {
+                return;
+            }
             observation.output(content.capture(resultOf(event)));
-        } finally {
-            // In a finally so that a serialisation failure still ends the span. An
-            // observation that is not closed is not exported at all.
-            observation.close();
         }
+        // In a finally so that a serialisation failure still ends the span. An
+        // observation that is not closed is not exported at all.
     }
 
     private void onError(AiServiceErrorEvent event) {
-        Observation observation = claim(event.invocationContext().invocationId());
-        if (observation == null) {
-            // DefaultAiServices fires the error event from the proxy's catch block, which
-            // wraps more than the block that fires the started event: a failure while
-            // validating the AI-service method's parameters arrives here with no
-            // observation to fail. There is nothing to close, and inventing a span for it
-            // would report a turn that never began.
-            return;
-        }
-        try {
+        try (Observation observation = claim(event.invocationContext().invocationId())) {
+            if (observation == null) {
+                // DefaultAiServices fires the error event from the proxy's catch block, which
+                // wraps more than the block that fires the started event: a failure while
+                // validating the AI-service method's parameters arrives here with no
+                // observation to fail. There is nothing to close, and inventing a span for it
+                // would report a turn that never began.
+                return;
+            }
             observation.failed(event.error());
-        } finally {
-            observation.close();
         }
     }
 

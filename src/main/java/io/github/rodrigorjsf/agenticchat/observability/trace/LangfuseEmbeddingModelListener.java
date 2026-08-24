@@ -125,34 +125,28 @@ public class LangfuseEmbeddingModelListener implements EmbeddingModelListener {
 
     @Override
     public void onResponse(EmbeddingModelResponseContext context) {
-        var observation = take(context.attributes());
-        if (observation == null) {
-            return;
-        }
-        try {
+        try (var observation = take(context.attributes())) {
+            if (observation == null) {
+                return;
+            }
             record(observation, context);
         } catch (RuntimeException e) {
             LOG.warn("Could not describe the embedding response for model {}", modelName, e);
-        } finally {
-            observation.close();
         }
     }
 
     @Override
     public void onError(EmbeddingModelErrorContext context) {
-        var observation = take(context.attributes());
-        if (observation == null) {
-            return;
-        }
-        try {
+        try (var observation = take(context.attributes())) {
+            if (observation == null) {
+                return;
+            }
             observation.failed(context.error());
         } catch (RuntimeException e) {
             LOG.warn("Could not record the embedding failure for model {}", modelName, e);
-        } finally {
-            // In the finally block and not after the try: the span has to end even when
-            // describing the failure is what failed, or the error is invisible twice.
-            observation.close();
         }
+        // In the finally block and not after the try: the span has to end even when
+        // describing the failure is what failed, or the error is invisible twice.
     }
 
     private void describe(Observation observation, EmbeddingModelRequestContext context) {
