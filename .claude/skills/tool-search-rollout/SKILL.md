@@ -165,7 +165,7 @@ filled from anything else is worse in the parent's hands than in the child's.
 | Column | What goes in it |
 |---|---|
 | `name` | the tool name exactly as the model sees it |
-| `reach` | `static`, `provider` (non-dynamic), or `dynamic` — decided by reading the provider, not by guessing from where the class lives. **Where the provider's answer is computed rather than constant, the cell carries the expression verbatim and the condition that makes it true**, because the same tool is then `provider` on one deployment and `dynamic` on another and every decision downstream has to hold for both |
+| `reach` | `static`, `provider` (non-dynamic), or `dynamic` — decided by reading the provider, not by guessing from where the class lives. A fourth value, `unknown`, is what a child writes for a provider it could not locate; it is a transient that Step 1 resolves, never a value Step 2 counts. **Where the provider's answer is computed rather than constant, the cell carries the expression verbatim and the condition that makes it true**, because the same tool is then `provider` on one deployment and `dynamic` on another and every decision downstream has to hold for both |
 | `purpose` | one line, in the form *when a turn needs this*, not *what it calls* |
 | `vocabulary` | the words a **user** would say for it — three to six literal phrasings, including the ones that do not contain the tool's own nouns |
 | `wording` | `ours`, `upstream`, or `unknown` — whether this repository can edit the name and description that ship to the model |
@@ -205,16 +205,27 @@ each**. Its `reach` is untouched by either gap, so a both-`unknown` row that is
 no query reaches it: unresolved is a question about the row, and never an
 exemption for it. `RESEARCH-BRIEFS.md`, *Reading the returns*, carries why.
 
-**Step 1 ends** when every registration route brief 1 listed has its tools in the
-census, every `principals` cell holds a quoted check or `unknown`, and every
-`unknown` in any cell appears in the *could not determine* list beside the
-artefact or the person who would fill it.
+**Step 1 ends** when all three returns are in hand, not when the census is.
+Brief 1: every registration route it listed has its tools in the census, every
+`principals` cell holds a quoted check or `unknown`, and every `unknown` in any
+cell appears in the *could not determine* list beside the artefact or the person
+who would fill it. Brief 2: a model named with its quoted evidence, or the three
+negatives written down as the finding — the survey is the input to Step 2's
+fourth decision and to every branch of `SCOPED-TOOLS.md`, so an open survey is an
+open step. Brief 3: the rows, the counts and the ZERO-phrasings list, or the
+recorded reason it was not run.
 
 ## Step 2 — Decide
 
-Four decisions, in this order, each with a sibling that carries it.
+Four decisions, in this order. The first is settled here; the other three each
+have a sibling that carries them, and the fourth exists only on the branch where
+brief 2 found a permission model — on the other branch the decision is the
+recorded negative, which is what gate item 9 asks for.
 
-**Is the rollout still viable?** Count the census rows by `reach`. If nothing is
+**Is the rollout still viable?** Count the census rows by `reach`. Resolve every
+`unknown` first: an unsurveyed provider counted as nothing is a layer that looks
+all-dynamic because nobody looked, and the stop below would then be a verdict the
+evidence has not earned. Once none are left, if nothing is
 `static` or `provider`, stop — see *When not to run this pass*. If some are, the
 rollout covers those and the dynamic ones stay permanently visible; say so
 explicitly in the plan rather than letting the reader assume search covers
@@ -305,8 +316,9 @@ that verdict can carry a suggested search query.
 classifier*, carries the seam and the two failure modes that go into the plan
 with it.
 
-**Step 2 ends** with four decisions recorded, each carrying the count or the
-observation that produced it — and, where the disclosure lifetime was defaulted
+**Step 2 ends** with all four decisions recorded, each carrying the count or the
+observation that produced it — the fourth as the recorded negative on the branch
+where brief 2 found no model — and, where the disclosure lifetime was defaulted
 rather than measured, the word *defaulted* beside its number.
 
 ## Step 3 — The approval gate
@@ -484,7 +496,9 @@ in step 4.
   every searchable row's reach path from the real provider graph rather than
   from the census or a test double;
 - every tool marked always-visible was checked against the `principals` column
-  and none of them is a tool the scope was meant to hide, and each marking is
+  and any tool the scope was meant to hide that must stay marked for
+  availability reasons is named here with the layer-3 row that speaks for it,
+  and each marking is
   recorded with the `reach` of the provider it sits behind rather than stripped
   because that provider is dynamic today;
 - every row whose `wording` is not `ours` carries a named move, or is recorded at
@@ -512,7 +526,9 @@ in step 4.
   reading of both to compare against;
 - a turn requiring two separate searches was driven end to end and completed,
   and the search tool's description says the tool may be called again;
-- the standing retrieval check runs in the build, partitioned by `reach`, and a
+- the standing retrieval check runs — the offline form gating the build, the
+  model-dependent form on a tag or a schedule and reporting rather than
+  blocking — partitioned by `reach`, and a
   searchable tool that no query reaches fails it — with no searchable tool left
   out of it for want of a query-set row;
 - the search record ships in the same change as the strategy, and its provenance

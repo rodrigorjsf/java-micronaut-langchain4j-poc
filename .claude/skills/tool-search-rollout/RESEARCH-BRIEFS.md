@@ -41,7 +41,8 @@ output the parent can see.
 Required. Its output is the artefact the whole pass is built on.
 
 ```
-You are surveying the tool layer of this repository for a documentation pass.
+You are surveying the tool layer of this repository for a rollout someone else
+will plan. Read only; change no files.
 Read only; change no files.
 
 Find every function, method or object that is published to an LLM as a tool.
@@ -152,7 +153,7 @@ Also return, separately:
   field, and what you would need in order to fill it.
 
 Return the census as a markdown table with the seven columns above, then the
-three lists, and stop there. Naming a tool, describing one, and judging the
+four lists below it, and stop there. Naming a tool, describing one, and judging the
 layer are the parent's work, made against output the parent can see.
 
 RETURN EXACTLY THIS SHAPE.
@@ -351,7 +352,7 @@ individual row: it names the capabilities no user has ever been recorded asking
 for, and every one of them is a tool the retrieval measurement cannot cover until
 somebody writes a phrasing by hand.
 
-Return the rows and the counts, and stop there.
+Return the rows, the counts and the ZERO-phrasings list, and stop there.
 
 RETURN EXACTLY THIS SHAPE.
 

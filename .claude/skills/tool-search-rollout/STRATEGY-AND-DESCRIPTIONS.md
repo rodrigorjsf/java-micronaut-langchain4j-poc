@@ -281,7 +281,7 @@ different terms, until the turn has what it needs. Raising `maxResults` is the
 expensive way to paper over a sentence you did not write, and it pays those
 tokens on every search forever.
 
-**Rename the search tool only with a reason.** `tool_search_tool` is graceless
+**Keep `tool_search_tool` unless a rename survives the gate.** `tool_search_tool` is graceless
 but stable across upgrades and matches every example a reader will find; a rename
 is a routing change like any other and goes to the gate as one.
 
