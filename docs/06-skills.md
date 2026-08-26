@@ -95,6 +95,7 @@ flowchart TB
         PD["progressive-tool-disclosure"]
         AS["authoring-agent-skills"]
         RV["reviewing-agent-tools-and-skills<br/><i>by name</i>"]
+        TSR["tool-search-rollout<br/><i>by name</i>"]
     end
 
     subgraph C3["Chain 3 · a runtime you did not write"]
@@ -124,6 +125,9 @@ flowchart TB
     BND -->|"rules spanning the set"| AS
     AS -->|"score before shipping"| RV
     RV -->|"single-item defect"| BND
+    PD -->|"search chosen over skills"| TSR
+    RV -->|"rewritten for retrieval"| TSR
+    TSR -->|"no phrasing separates two tools"| AT
 
     AU -->|"seam facts"| SC
     PI -->|"where it attaches"| SC
@@ -137,7 +141,7 @@ flowchart TB
 
     class AU,RT entry
     class PM,WK,CT corpus
-    class AT,BND,PD,AS,RV tools
+    class AT,BND,PD,AS,RV,TSR tools
     class SC,PI,CO,MEM,TG runtime
     class GL,SA,EV bar
 ```
@@ -286,14 +290,16 @@ when a similarity threshold is being tuned.
 
 ## Skills that are about building one
 
-Ordered the way the work runs: author, sweep what already ships, audit, move
-prompt text into a corpus and prove it lands, then assemble and drive the runtime.
+Ordered the way the work runs: author, sweep what already ships, roll a mechanism
+out over it, audit, move prompt text into a corpus and prove it lands, then
+assemble and drive the runtime.
 
 | Skill | What it is for | Fired by |
 |---|---|---|
 | [`authoring-agent-tools`](../.claude/skills/authoring-agent-tools/SKILL.md) | the interview before a tool exists — whether it should, and what its contract is | the model |
 | [`authoring-agent-skills`](../.claude/skills/authoring-agent-skills/SKILL.md) | writing the document a model reads when tools are grouped: the description routes, the body teaches | the model |
 | [`reviewing-agent-tools-and-skills`](../.claude/skills/reviewing-agent-tools-and-skills/SKILL.md) | sweeping a whole tool and skill layer for routing, contract and body defects | **by name** |
+| [`tool-search-rollout`](../.claude/skills/tool-search-rollout/SKILL.md) | putting a tool layer behind a search tool — census, strategy, description rewrites, per-caller scope, and the guardrail that makes the scope real | **by name** |
 | [`agentic-codebase-audit`](../.claude/skills/agentic-codebase-audit/SKILL.md) | inventorying a codebase's seams and producing a ranked, capped plan for what is *absent* | **by name** |
 | [`prompt-to-corpus-migration`](../.claude/skills/prompt-to-corpus-migration/SKILL.md) | finding standing prompt content that ships on every turn and planning its move out | **by name** |
 | [`writing-retrievable-knowledge`](../.claude/skills/writing-retrievable-knowledge/SKILL.md) | writing a document so that one retrieved chunk of it answers the user alone | the model |
@@ -365,6 +371,40 @@ description, a name, which items are exposed, or the order they appear in.
 | `progressive-tool-disclosure` | hands to | **which items are exposed versus what exposure costs.** The sweep decides the first; the economics and the failure mode are that page's |
 | `agentic-evals` | handed by | **whose set it is.** Evals owns row counts and thresholds in general; this particular turn set — its sourcing, its sizing, its scoring — is the sweep's |
 | `agentic-codebase-audit` | handed by | **an absent control versus a mis-routed one.** The audit hunts what was never written; a description that routes badly is written and wrong, which is this page's |
+
+### `tool-search-rollout`
+
+**Invoked by name.** Reach for it once `progressive-tool-disclosure` has settled
+that search — not skills, not a smaller layer — is the mechanism. It is the
+rollout, and it ends in an approval gate rather than in advice.
+
+- Fifty tool schemas ship in the standing prompt on every turn, and the model
+  picks worse than it did at twelve.
+- A permission model decides things at the HTTP edge and the tool layer knows
+  nothing about it, so every caller is offered every tool and the only thing
+  stopping the wrong one is that nobody has asked for it yet.
+- Tool search is already enabled and half the layer is still visible on every
+  turn — the half arriving through a provider the filter runs before.
+
+Two facts hold the whole pass up, and both are properties of the framework rather
+than opinions. Search recomputes the specifications **sent** to the model and
+leaves the executor map whole, so a tool name the model produces from an earlier
+turn, a hallucination or injected text still runs — search is discovery, never
+access control. And the filter runs *between* the statically registered tools and
+the dynamic providers, so a dynamic provider's tools are neither hideable nor
+findable through it. Everything the skill says about scope rests on the first;
+the census column recording how each tool reaches the model rests on the second.
+
+| Neighbour | Way | The discriminator |
+|---|---|---|
+| `progressive-tool-disclosure` | handed by | **whether versus how.** The token math, skills against search, and the roughly-fifteen threshold decide that this mechanism is the right one; this page assumes that decision was made and runs it. A reader who has not made it is sent back, and the first of the four exits here says so |
+| `agentic-tool-boundary` | both ways | **the description's second job.** House style, bounded results and a failure returned as a value are that page's and do not change. What changes is that a description must now be *retrieved* before it can *route* — a job the boundary never had to give it, and the reason a description can be flawless and still never reach the model |
+| `reviewing-agent-tools-and-skills` | both ways | **rewriting for retrieval versus sweeping for routing.** A rename moves traffic and is measured there; this pass rewrites names and descriptions so search can find them, and hands the routing question back. *Search returned it and the model chose another* is that page's finding, not this one's |
+| `authoring-agent-tools` | hands to | **a description that cannot be written.** When no phrasing separates two tools, the honest finding is one tool where the layer has two, and that is a request for the interview rather than a wording problem |
+| `agentic-evals` | handed by | **the set's size versus its shape.** How many rows a claim needs, where a threshold goes, and what a build may gate on rather than only report are that page's; the three classes this particular claim needs — the turn the tool should serve, the turn a neighbour should, and the turn nothing should — are this one's |
+| `subagent-context-isolation` | handed by | **the doctrine versus the three briefs.** Why a sub-agent earns its cost, what a brief carries and how a return is read live there; [`RESEARCH-BRIEFS.md`](../.claude/skills/tool-search-rollout/RESEARCH-BRIEFS.md) is the instance — a census, a permission survey and a vocabulary pass, each with a literal return template |
+| `prompt-injection-layers` | hands to | **who wins the attention.** Telling the model which tools this caller may use is a prompt, and a prompt competes with injected text for the same attention. That fight is that page's, and it is exactly why the prompt layer here is reinforcement and the execution guardrail is the control |
+| `llm-triage-gate`, `llm-cost-observability` | handed by | **the seam versus the field added to it.** Whether a cheap classifier should run in front at all, and the plumbing that makes a turn attributable, belong to those pages. A verdict that already routes carrying a *suggested search query*, and the one search-shaped record laid on top of the turn — query sent, tools returned, tool finally called — are this page's optional step and its standing signal |
 
 ### `agentic-codebase-audit`
 
@@ -647,6 +687,13 @@ says so in its own body.
 **Where it ends.** When every item in the layer leaves the sweep with a verdict:
 *body clean* or *body deferred*. A deferred body is not a failure, it is a finding
 handed back to step 4.
+
+**Step 3 has a second exit.** Past fifteen tools the answer is skills *or* search,
+and they do not compose — a dynamic tool provider, which is how a skill hands its
+tools over, is refreshed after the search filter has already run. When search wins,
+the chain does not continue here: `tool-search-rollout` is its own by-name pass,
+and a person types it. It re-enters this chain twice, at step 1 when no phrasing
+separates two tools, and at step 5 with the descriptions it rewrote.
 
 ### Chain 3 — a runtime you did not write
 
