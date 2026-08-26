@@ -48,8 +48,11 @@ Find every function, method or object that is published to an LLM as a tool.
 Look for: annotations that mark a method as a tool; explicit registration on an
 AI-service or agent builder; tool-provider classes; tool specifications built by
 hand; and any tools reaching the model over MCP or a similar external protocol.
-The list must be complete — a tool registered by one route you did not think to
-look for is the tool this whole pass will silently skip.
+The list must be complete, and the registration-route list below is how you show
+it: every distinct mechanism by which a tool reaches the model, with the number
+of tools arriving by each, so the route counts add up to the census's row count.
+A tool registered by one route you did not think to look for is the tool this
+whole pass will silently skip.
 
 For each tool, return these seven fields.
 
@@ -70,7 +73,7 @@ For each tool, return these seven fields.
               expression verbatim and the condition that makes it true — that
               condition is a finding on its own.
               If a tool reaches the model through a provider you cannot locate,
-              reach is `unknown`. Do not guess `static`.
+              reach is `unknown`.
 
   purpose     One line, in the form "when a turn needs this", not "what it
               calls". If the tool's own description already says this, quote it;
@@ -91,9 +94,9 @@ For each tool, return these seven fields.
                            where it comes from and name the artifact that would
                            have to change for its description to change.
                 unknown  — you could not establish it.
-              Do not default to `ours`. A plan written against an editable
-              string that turns out not to be editable fails at execution time,
-              after somebody approved it.
+              Establish which of the three it is. A plan written against an
+              editable string that turns out not to be editable fails at
+              execution time, after somebody approved it.
 
   effect      read | write. For a write, say whether it is reversible and by
               whom.
@@ -149,8 +152,8 @@ Also return, separately:
   field, and what you would need in order to fill it.
 
 Return the census as a markdown table with the seven columns above, then the
-three lists. No prose summary, no recommendations, no opinion on whether the tool layer
-is good. Do not propose changes to any name or description.
+three lists, and stop there. Naming a tool, describing one, and judging the
+layer are the parent's work, made against output the parent can see.
 
 RETURN EXACTLY THIS SHAPE.
 
@@ -263,8 +266,7 @@ Then answer these four directly.
   4. Does any tool take a user, account, tenant or org identifier as a PARAMETER?
      List them. That is identity being supplied by the model.
 
-  THE NEGATIVE CASE. If you find no model, do not report an impression. Report
-  three specific negatives:
+  THE NEGATIVE CASE. If you find no model, report three specific negatives:
     a. Can anything in this repository refuse an AUTHENTICATED caller? Give the
        patterns searched and the hit counts.
     b. Does any query filter by a caller attribute — an ownership join, a tenant
@@ -276,9 +278,9 @@ Then answer these four directly.
   customer shares the instance.
 
 Return: the five tiers with hit counts and quoted examples; the walk's two lists;
-the four numbered answers; and, if applicable, the three negatives. Do not
-recommend a permission model, do not propose one where none exists, and do not
-say whether what you found is adequate.
+the four numbered answers; and, if applicable, the three negatives — and stop
+there. Whether the model you found is adequate, and whether one should exist at
+all, are the parent's calls.
 
 RETURN EXACTLY THIS SHAPE.
 
@@ -329,11 +331,11 @@ fixtures; evaluation datasets; integration tests that send a user message;
 support tickets, issue titles and bug reports quoting a user; documentation that
 quotes a request; demo scripts and READMEs.
 
-Return every phrasing VERBATIM. Do not normalise, do not correct spelling, do not
-translate, do not merge near-duplicates, and do not summarise. Near-duplicates
-are the most valuable rows here: two users asking the same thing with different
-words is exactly the measurement this set exists to make. A summarised return
-destroys the entire value of this brief.
+Return every phrasing VERBATIM — the original characters, the original spelling,
+the original language, and one row per phrasing so that each near-duplicate
+survives as its own row. Near-duplicates are the most valuable rows here: two
+users asking the same thing with different words is exactly the measurement this
+set exists to make. A summarised return destroys the entire value of this brief.
 
 For each phrasing return:
   text      the exact words, in the original language
@@ -349,8 +351,7 @@ individual row: it names the capabilities no user has ever been recorded asking
 for, and every one of them is a tool the retrieval measurement cannot cover until
 somebody writes a phrasing by hand.
 
-Return the rows and the counts. No analysis, no grouping into themes, no
-recommendations.
+Return the rows and the counts, and stop there.
 
 RETURN EXACTLY THIS SHAPE.
 
@@ -432,15 +433,15 @@ Unresolved is a question about the row; it is never an exemption for it.
 
 **Contradictions between children are findings, not noise.** Two children
 disagreeing about whether a provider is dynamic means the answer is computed, and
-the condition is the thing you actually need. Resolve it yourself by reading the
-one method; do not send a third child to arbitrate.
+the condition is the thing you actually need. Resolve it yourself, by reading the
+one method.
 
 **Everything unresolved becomes a gate line.** The `could not determine` list and
 every `unknown` in `principals` go into the plan verbatim, as questions for named
 people. A pass that quietly drops them presents a complete-looking census whose
 gaps have been erased rather than answered.
 
-## What you may not delegate
+## What stays with you
 
 - Choosing the strategy. It depends on latency budgets, deployment cost and what
   the users are like — none of which is in the repository.

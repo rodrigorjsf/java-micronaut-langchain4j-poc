@@ -1,8 +1,9 @@
 # Scoping a tool layer to its caller
 
-Reference for [`tool-search-rollout`](SKILL.md), Step 2 and Step 4. How to find
-the permission model a project already has, scope discovery to it, and put
-enforcement where enforcement can actually sit.
+Reference for [`tool-search-rollout`](SKILL.md), Step 2 and Step 4, on the branch
+where brief 2 found a permission model — and on the branch where it found none,
+for what that run still ships. How to find the model a project already has, scope
+discovery to it, and put enforcement where enforcement can actually sit.
 
 `SKILL.md` states the fact this file implements: search filters what the model
 **sees**, never what it can **run**, and of the three layers only the execution
@@ -101,16 +102,13 @@ refuse an authenticated caller, no query filters by a caller attribute, and the
 deployment itself is the boundary. Then this pass ships the census, the strategy
 and the descriptions, and **stops**. It does not invent one.
 
-That branch has a real deliverable and it is not a shrug. Produce:
+Produce three things:
 
-- **The negative as evidence** — the patterns searched, the hit counts, the walk
-  from entry point to executing tool. *"Searched six patterns for a refusal an
-  authenticated caller could receive: 0 hits"* is a finding. *"There doesn't seem
-  to be any auth"* is an opinion and loses the argument with whoever wrote the
-  code.
+- **The negative as evidence** — the patterns searched, the hit counts, and the
+  walk from entry point to executing tool, in the evidence-not-conclusions shape
+  `RESEARCH-BRIEFS.md` sets for every return.
 - **A trigger** — the second tenant, the first tool that writes, the first
-  externally-facing caller. Without one, "we should think about permissions"
-  decays into "we forgot" inside two quarters.
+  externally-facing caller.
 - **One seam** — a single explicit boundary the tool layer calls before executing
   anything, whose implementation today permits everything and logs the call. One
   seam and no policy. That is a day of work that makes the future model a change
@@ -149,14 +147,15 @@ it explicitly into the turn. Read it at the tool-execution boundary. Two rules
 hold whatever the carrier: identity is never reconstructed from the conversation,
 and never taken from a tool argument.
 
-**What the snapshot carries, and what it must not.** It carries *identity* — who
-is asking, and which tenant they are asking within. It does not carry the *verdict
-inputs*: roles, scopes, plan, entitlements. Those change while a conversation is
-open, and a copy taken at the edge is a decision frozen at turn start wearing the
-costume of a fact. Where a turn is short and the attributes are cheap, copying
-them is a defensible optimisation; where a turn is long, or the tools write, the
-boundary re-reads them for the call it is about to run. That distinction is the
-whole difference between a snapshot and a stale authorization.
+**What the snapshot carries, and what it re-reads.** It carries *identity* — who
+is asking, and which tenant they are asking within. The *verdict inputs* — roles,
+scopes, plan, entitlements — are re-read at the boundary for the call it is about
+to run, because they change while a conversation is open and a copy taken at the
+edge is a decision frozen at turn start wearing the costume of a fact. Where a
+turn is short and the attributes are cheap, copying them is a defensible
+optimisation; where a turn is long, or the tools write, the boundary re-reads
+them. That distinction is the whole difference between a snapshot and a stale
+authorization.
 
 **Where there is no edge to capture from** — a scheduled, queued or retried run —
 the authority is decided explicitly: either a service principal with a
@@ -221,24 +220,20 @@ never hides it** — is outside what this filter can reach. It goes in front of
 every caller, on every turn, regardless of what the filter would have decided
 about any of them, and it does so without a search having been performed at all.
 
-That is not a defect in either feature. It is what always-visible is *for*: the
-tool a turn cannot fail to find, the management tool the model needs in order to
-reach anything else, the fallback a graceful failure depends on
-(`STRATEGY-AND-DESCRIPTIONS.md` carries when to reach for it). The failure is
-architectural rather than mechanical, and it happens because the two features are
-configured in different places by people reasoning about different things: an
-availability argument produces the marking, a permissions argument produces the
-scope, both are correct on their own terms, and **the tool the scope was written
-to hide is now in front of everybody with nothing red anywhere.** The scope
-document still describes a narrowing that no longer covers that tool.
+That is what always-visible is *for*: the tool a turn cannot fail to find, the
+management tool the model needs in order to reach anything else, the fallback a
+graceful failure depends on. `STRATEGY-AND-DESCRIPTIONS.md`, *Always-visible
+tools*, carries when to reach for it and the cross-check every marking passes
+before the gate — an availability argument and a permissions argument are made in
+different files by different people, and **the tool the scope was written to hide
+ends up in front of everybody in silence**.
 
 Two consequences for how this pass runs.
 
-**Every always-visible marking is checked against the census's `principals`
-column before it reaches the gate**, and the gate says the check was made — that
-is gate item 8 in `SKILL.md`. A tool whose `principals` cell holds a real
-restriction may not be marked, and a tool that must be marked for availability
-reasons is a tool whose restriction has to be enforced somewhere else.
+**A tool whose `principals` cell holds a real restriction stays unmarked**, and a
+tool that must be marked for availability reasons is a tool whose restriction has
+to be enforced somewhere else. Gate item 8 in `SKILL.md` is where that check is
+shown.
 
 **Somewhere else is layer 3.** An always-visible tool bypasses the discovery
 filter, which costs nothing in enforcement terms because the discovery filter was
@@ -365,9 +360,7 @@ conversation** and design against that. It is the assumption that costs nothing
 when it turns out to be wrong: a guardrail written for a long window is still
 correct on a short one, while the reverse fails exactly on the turns where a
 permission was revoked and the conversation kept going. `SKILL.md`, Step 2
-carries the same default for `maxResults`, and for the same reason — the
-conservative branch of an unmeasured question is cheap here and expensive
-nowhere.
+carries the same default for `maxResults`, and for the same reason.
 
 **What the guardrail is.** One interceptor around every tool invocation, which
 sees the tool name, the arguments and the principal, and answers both questions:
@@ -395,19 +388,16 @@ the agent layer is the only thing standing between one caller and everything the
 service is allowed to do. Establish which of the two you have before crediting
 downstream with anything.
 
-**Do not write the same check three times.** Three copies of one coarse capability
-check at three levels is not depth; it is one control with three places to forget
-it. The layers earn their places by answering *different* questions: layer 1 asks
-what this caller should be led toward, the boundary asks whether this call may run
-right now with these arguments, downstream asks whether it is permitted on the
-real resource.
+**Give each layer a different question.** Layer 1 asks what this caller should be
+led toward, the boundary asks whether this call may run right now with these
+arguments, downstream asks whether it is permitted on the real resource. Three
+copies of one coarse capability check at three levels is not depth; it is one
+control with three places to forget it.
 
 **The last thing to say out loud:** the only position that holds universally is
 also the position most likely to have lost the principal, for exactly the reasons
-in the gap section above. That is not a coincidence — it is the same fact seen
-twice. The boundary is precisely where the framework calls a tool with nothing but
-the model's arguments, which is why every call passes through it and why nothing
-about the caller is there by default.
+in the gap section above. Plan the guardrail and the principal's carrier
+together.
 
 ## What a refusal returns to the model
 
@@ -469,8 +459,7 @@ that detail is useful and where it does no harm.
 | Refusal wording | the message is terminal, actionable, about the account, and contains none of the five rows above |
 
 The execution-guardrail row is the one that matters, and it is the only test in
-this pass that
-distinguishes a scoped tool layer from a tool layer whose model has merely been
-told less. Write it first. If it cannot be written — because identity does not
+this pass that distinguishes a scoped tool layer from a tool layer whose model
+has merely been told less. Write it first. If it cannot be written — because identity does not
 reach the execution boundary — that is the finding, and it belongs at the gate in
 those words, not in a footnote.

@@ -21,7 +21,8 @@ the delegation is load-bearing rather than decorative. A tool census and a
 permission survey are hours of reading whose raw material the executing agent
 will never look at twice — the exact shape a sub-agent is for.
 `subagent-context-isolation` owns that doctrine; `RESEARCH-BRIEFS.md` carries the
-briefs this pass sends.
+three briefs, their return schemas and how to read what comes back — open it at
+Step 1, and again when the returns land.
 
 ## Two facts govern everything below
 
@@ -39,7 +40,9 @@ runs. Search never revealed it, and search is not the thing that would have
 stopped it.
 
 **Tool search is discovery. It is not access control.** Every permission sentence
-in this skill and in `SCOPED-TOOLS.md` rests on that one.
+in this skill rests on that one, and so does `SCOPED-TOOLS.md` — how each of the
+three layers below is built, reached at Step 2 on the branch where brief 2 found
+a permission model.
 
 ### 2. A dynamic tool provider is invisible to search, in both directions
 
@@ -65,18 +68,12 @@ Three consequences run through the rest of the pass.
   reaches the model**, because only the static and non-dynamic-provider paths are
   searchable at all.
 - `SearchBehavior.ALWAYS_VISIBLE` is **inert while the provider its tool arrives
-  through is dynamic**: that tool was never at risk of being hidden, so there is
-  nothing for the marking to exempt it from. The rule that follows is *not*
-  "strip the marking" — it is that **the marking is load-bearing exactly when
-  the provider is, or can become, non-dynamic.** A provider's answer is
-  frequently computed rather than constant: LangChain4j's skills module answers
-  with `!skillScopedProviders.isEmpty()`, so one and the same provider is
-  dynamic on a deployment where some skill carries tools and non-dynamic on one
-  where none does. On the second deployment the marking is the only thing
-  keeping those tools in front of the model — which is why the library ships it
-  on its own two management tools rather than omitting it as redundant. Read the
-  marking as a claim about every state the provider can be in, never as a claim
-  about the state it happens to be in today.
+  through is dynamic** — that tool was never at risk of being hidden — and
+  **load-bearing exactly when the provider is, or can become, non-dynamic.** A
+  provider's answer is frequently computed rather than constant, so the marking
+  is kept and read as a claim about every state the provider can reach.
+  `STRATEGY-AND-DESCRIPTIONS.md` carries the worked case, and is where each
+  marking is decided.
 - A repository can hold dynamic providers without anyone having decided to. In
   LangChain4j's skills module a provider reports itself dynamic as soon as any
   skill carries tools, and a skill's own `@Tool` methods are wrapped into a
@@ -94,13 +91,12 @@ Three consequences run through the rest of the pass.
 | A **strategy decision** with the countable inputs that produced it | you, from the census |
 | A **diff proposal** — every literal string that will change | you |
 | The **executed change**, plus the verification that closes the pass | you, after approval |
-| A **standing retrieval check** in the build, and a **record of what search does in production** | you, inside the executed change |
+| A **standing retrieval check** in the build, and a **record of what search does in production** (`STRATEGY-AND-DESCRIPTIONS.md`) | you, inside the executed change |
 
-The census and the permission finding are worth committing to the repository even
-if the rollout is abandoned. They outlive this pass and the next one starts from
-them. The last row outlives it in a stronger sense: every other artefact here
-describes the layer on the day it was measured, and those two are what notice
-when that stops being true.
+Commit the census and the permission finding to the repository even if the
+rollout is abandoned: the next pass starts from them. Every artefact above
+describes the layer on the day it was measured; the last row is what notices when
+that stops being true.
 
 ## When not to run this pass
 
@@ -121,10 +117,10 @@ always needs. Mark those tools always-visible and stop; there may be nothing lef
 to hide.
 
 **No permission model exists and nobody has asked for one.** Scoping is one part
-of this pass, not its justification. A project with a single class of caller
-should get the census and the strategy and none of `SCOPED-TOOLS.md`'s
-machinery — and specifically must not have a permission model invented so that a
-scoping step has something to scope to.
+of this pass, not its justification. A project with a single class of caller gets
+the census, the strategy, and the absence written down as a finding;
+`SCOPED-TOOLS.md`, *Finding it, and the branch where there is nothing*, carries
+that branch's three deliverables.
 
 **Every tool reaches the model through a dynamic provider.** Then search filters
 an empty set, and enabling it changes nothing except the standing cost of one
@@ -154,31 +150,15 @@ evidence. The strategy decision, the rewrites and the plan are yours.
   material is the query set.
 
 **Briefs 1 and 2 have one dependency, and a parallel send has to survive it.**
-Brief 1's `principals` column is filled from checks on each tool's execution
-path — and the verbs those checks are spelled with, together with the name of
-this codebase's principal type, are exactly what brief 2's tiers 2 and 4 go and
-discover. Sent in parallel, brief 1 is grepping for names nobody has given it
-yet, and its honest return is a column of `unknown`. That is not a failed run;
-it is the column behaving as designed. So the census arrives with `principals`
-**provisional**, and **the parent completes that column after both returns
-land**, by matching brief 2's quoted decision points and principal type against
-brief 1's per-tool execution paths.
-
-The parent is bound by the same rule the child was: **evidence or `unknown`.** A
-verb list from brief 2 tells you what to go and look for; it never tells you
-what any particular tool checks. A cell filled in because the survey found a
-permission model *somewhere in the repository* is an inferred permission with
-the parent's authority behind it, which is worse than the child's version rather
-than better. The completion pass reads code and quotes it, or it leaves the cell
-alone.
-
-Brief 1 carries its own fallback verb list for the branch where brief 2 finds no
-permission model at all — a live outcome of this pass, not a degenerate one. The
-list is brief 2's own tier-2 verbs, copied into brief 1 verbatim so the two
-briefs cannot drift apart, and it exists so that the census's `principals` sweep
-has something concrete to grep for on a run where the survey has nothing to hand
-it. On that branch a column of `unknown` backed by a named list of patterns and
-their hit counts is a finding; a column of `unknown` backed by nothing is a gap.
+Brief 1's `principals` column is filled from checks whose verbs, and this
+codebase's principal type, are exactly what brief 2's tiers 2 and 4 go and
+discover. Sent in parallel, brief 1 returns that column **provisional** — a
+column of `unknown` backed by the fallback verb list brief 1 carries is the
+column behaving as designed. **The parent completes it after both returns land**,
+by matching brief 2's quoted decision points and principal type against brief 1's
+per-tool execution paths, under the same rule the child had: **evidence or
+`unknown`.** `RESEARCH-BRIEFS.md`, *Reading the returns*, carries why a cell
+filled from anything else is worse in the parent's hands than in the child's.
 
 ### The census schema
 
@@ -192,49 +172,43 @@ their hit counts is a finding; a column of `unknown` backed by nothing is a gap.
 | `effect` | `read`, or `write` plus whether the write is reversible |
 | `principals` | who may run it: a check quoted verbatim with its location, or `unknown` |
 
-The `principals` column has one rule, and it is the whole reason the column is
-safe to have: **evidence or `unknown`.** A census that infers a permission fact
-from surrounding code is a fabricated authorization claim arriving with a green
-build and an approved plan behind it. `unknown` never becomes "all principals"
-and never becomes "admins only" — the first is a vulnerability, the second is an
-outage, and neither was measured. An `unknown` row is a question for whoever owns
-the tool, and it stays `unknown` in the artefact until they answer.
+**Evidence or `unknown`** is the whole reason this column is safe to have. An
+inferred permission fact is a fabricated authorization claim arriving with a
+green build and an approved plan behind it, and an `unknown` resolved either way
+is guesswork: "all principals" is a vulnerability, "admins only" is an outage,
+and neither was measured. The cell stays `unknown` in the artefact — a question
+for whoever owns the tool — until they answer it.
 
 `vocabulary` is not decoration either. Under a keyword strategy it is the literal
 input to the rewrite, and under a semantic one it is the query set the rewrite is
 measured with.
 
 `wording` exists because the rewrite step assumes an editable string and a large
-share of real tool layers do not have one. Tools arriving over MCP or any other
-external protocol come with a name and a description their publisher wrote, and
-so do tools from a vendored library or a shared internal package. Those rows are
-searchable — `reach` says so, and nothing about being externally supplied hides
-them — but they are **findable only by whatever their publisher happened to
-write**, which was written to document the tool, not to match how your users
-speak. A census that does not carry this column produces a rewrite plan that
-quietly cannot be executed for a third of its rows.
-`STRATEGY-AND-DESCRIPTIONS.md` carries what to do for an `upstream` row, and the
-move is never "leave it and hope". `unknown` here means nobody established
-ownership; it does not collapse to `ours`.
+share of real tool layers do not have one — anything arriving over MCP, from a
+vendored library or from a shared internal package ships its publisher's wording.
+Those rows are searchable, `reach` says so, but they are **findable only by
+whatever their publisher happened to write**, which was written to document the
+tool rather than to match how your users speak. A census without this column
+produces a rewrite plan that quietly cannot be executed for a third of its rows.
+`STRATEGY-AND-DESCRIPTIONS.md`, *When the wording is not yours*, carries the
+four moves and the order to try them; every `upstream` row leaves this pass with
+one of them named. `unknown` here means nobody established ownership, and it goes to the
+gate as that question.
 
 **A row that is `unknown` in *both* `wording` and `principals` gets its own
-disposition**, because it is the row most likely to stall the pass and the two
-columns' separate rules leave it with two half-answers otherwise. Nobody
-established who owns its text, and nothing was measured about who may run it. So
-it enters **neither** the rewrite set nor any per-caller filter: there is no
-string this repository may edit, and no principal evidence a filter could narrow
-on, and supplying either from inference is the exact fabrication each column
-exists to prevent. It goes to the gate as **one line naming both gaps and the
-person who resolves each**, not as two entries in two lists that get answered by
-two different people at two different times.
-
-What such a row does not lose is its `reach`. That column was read out of the
-provider and is untouched by the other two, so a both-`unknown` row that is
+disposition**, because each column's rule leaves it with half an answer. It
+enters **neither** the rewrite set nor any per-caller filter — there is no string
+this repository may edit and no principal evidence a filter could narrow on — and
+it goes to the gate as **one line naming both gaps and the person who resolves
+each**. Its `reach` is untouched by either gap, so a both-`unknown` row that is
 `static` or `provider` **stays in the standing retrieval check** and fails it if
-no query reaches it. Being unresolved is a question about the row, never an
-exemption for it — a row dropped from the check because two of its cells are
-open is the unfindable tool this pass exists to prevent, arriving with
-paperwork.
+no query reaches it: unresolved is a question about the row, and never an
+exemption for it. `RESEARCH-BRIEFS.md`, *Reading the returns*, carries why.
+
+**Step 1 ends** when every registration route brief 1 listed has its tools in the
+census, every `principals` cell holds a quoted check or `unknown`, and every
+`unknown` in any cell appears in the *could not determine* list beside the
+artefact or the person who would fill it.
 
 ## Step 2 — Decide
 
@@ -246,10 +220,9 @@ rollout covers those and the dynamic ones stay permanently visible; say so
 explicitly in the plan rather than letting the reader assume search covers
 everything.
 
-**How long one search's disclosure lasts — measure it, do not assume it.** The
-filter runs inside the assembly of each model call and is handed that call's
-messages, and the same ordering repeats inside the tool-execution loop. So the
-visible set is **recomputed every model call rather than accumulated**, and the
+**How long one search's disclosure lasts — measure it.** The filter runs inside
+the assembly of each model call and is handed that call's messages, and the same
+ordering repeats inside the tool-execution loop. So the visible set is **recomputed every model call rather than accumulated**, and the
 only open question — the one the table below turns into a plan — is what that
 recomputation reads out of the conversation: whether a search performed on call
 one still puts its tools in the specifications on call three, and whether it
@@ -280,12 +253,12 @@ setting.
 **When the measurement is not affordable, the step has a default and it is named
 as one.** Serializing the specifications sent on every model call needs a seam in
 the framework's request assembly that some deployments do not expose and some
-readers cannot add inside the time this pass has. That must not stall the pass,
-and it must not license a guess either — so take the **most conservative of the
-three rows above**: assume the disclosure holds for **one model call only**, and
-size `maxResults` by the largest number of tools any single step of a real task
-uses, counted from the query set's multi-step rows rather than from the
-framework's `5`. That floor is correct under all three outcomes: sized for the
+readers cannot add inside the time this pass has. The pass continues on a named
+default rather than a guess: take the **most conservative of the three rows
+above** — assume the disclosure holds for **one model call only**, and size
+`maxResults` by the largest number of tools any single step of a real task uses,
+counted from the query set's multi-step rows rather than from the framework's
+`5`. That floor is correct under all three outcomes: sized for the
 non-accumulating case it is not wrong when disclosure turns out to accumulate,
 only slightly generous, and generous costs tokens per search while the opposite
 error costs the turn.
@@ -295,9 +268,8 @@ number. The gate item says **defaulted, not observed**, and shows the tool count
 that sized the floor. The multi-search verification row asserts that the turn
 completes, rather than that it completed in a particular number of searches.
 And the staleness window in `SCOPED-TOOLS.md` is treated as *as long as the
-conversation*, which is the assumption that costs nothing when it is wrong. Write
-the missing measurement into the plan as a named follow-up with the seam that
-would make it possible: a defaulted `maxResults` that nobody recorded as
+conversation*. Write the missing measurement into the plan as a named follow-up
+with the seam that would make it possible: a defaulted `maxResults` that nobody recorded as
 defaulted is an observed one by the second retelling.
 
 **Keyword or semantic.** LangChain4j ships `SimpleToolSearchStrategy` (keyword
@@ -311,8 +283,9 @@ description rewrites off the scoring rule that is actually running.
 `SCOPED-TOOLS.md` maps the model onto the three layers below, and the one
 sentence that decides its shape: filter the candidate list **before** it is
 scored, never the results after. Post-filtering leaks names through the refusal
-channel, and it also loses recall — a tool the caller may use gets displaced out
-of the top five by tools they may not.
+channel — the **enumeration oracle** that file closes — and it also loses recall:
+a tool the caller may use gets displaced out of the top five by tools they may
+not.
 
 ### The three layers are not equal
 
@@ -324,6 +297,17 @@ of the top five by tools they may not.
 
 Only the third is enforcement. The first two are accuracy and token spend, and
 they are worth having for that; they are not worth reporting as security.
+
+One optional addition, and it is not one of the four: where a cheap classifier
+already runs in front of the agent and its verdict reaches the turn's prompt,
+that verdict can carry a suggested search query.
+`STRATEGY-AND-DESCRIPTIONS.md`, *Seeding the first search from a turn
+classifier*, carries the seam and the two failure modes that go into the plan
+with it.
+
+**Step 2 ends** with four decisions recorded, each carrying the count or the
+observation that produced it — and, where the disclosure lifetime was defaulted
+rather than measured, the word *defaulted* beside its number.
 
 ## Step 3 — The approval gate
 
@@ -339,13 +323,9 @@ Nothing is edited before this. The user is shown, in one place:
 4. **Every tool name and description that changes, before and after, in full.**
 5. *(Conditional — only where some census row's `wording` is not `ours`.)*
    **Every census row whose `wording` is not `ours`**, and the move proposed for
-   each one, in the order `STRATEGY-AND-DESCRIPTIONS.md` sets — vocabulary
-   carried in the strategy instead of in the description, a specification
-   published from a provider you own, a request to whoever publishes the tool,
-   and only then an exemption from search, which is not a retrieval fix and puts
-   that tool in the standing prompt permanently. A row left with no move is a
-   tool this pass is choosing to make unfindable, and it goes to the gate in
-   those words.
+   each one, named from the four in `STRATEGY-AND-DESCRIPTIONS.md` and in that
+   file's order. A row left with no move is a tool this pass is choosing to make
+   unfindable, and it goes to the gate in those words.
 6. **The framework version this ships against, pinned exactly**, with the search
    SPI's experimental status named and the short list an upgrade has to re-read
    before it lands.
@@ -357,19 +337,16 @@ Nothing is edited before this. The user is shown, in one place:
    `maxResults`, and the seam whose absence made the measurement unaffordable.
    The one thing this item may never do is present a defaulted number in the
    grammar of a measured one.
-8. **Every tool proposed for `ALWAYS_VISIBLE`**, with the reason it must not be
-   hideable, and two things that reason has to survive. First: **none of them is
-   a tool the scope was meant to hide.** The marking's guarantee is that search
-   never hides the tool; the per-caller filter of layer 1 works by narrowing what
-   search returns — so a marked tool sits outside anything that filter can
-   narrow, and marking a sensitive tool always-visible quietly removes it from
-   the scope while the rest of the plan still reads as though the scope covers
-   it. Check this item against the census's `principals` column, row by row, and
-   say at the gate that you did. Second: for each marked tool, the `reach` cell
-   of the provider it arrives through, **including the expression where that
-   answer is computed** — the marking is inert while the provider is dynamic and
-   load-bearing the moment it is not, so what is being approved is a claim about
-   every state that provider can reach, not the one it is in this week.
+8. **Every tool proposed for `ALWAYS_VISIBLE`**, with the reason it must stay
+   visible, and two things that reason has to survive. First: **none of them is a
+   tool the scope was meant to hide** — a marked tool sits outside anything the
+   per-caller filter of layer 1 can narrow. Check this item against the census's
+   `principals` column, row by row, and say at the gate that you did. Second: for
+   each marked tool, the `reach` cell of the provider it arrives through,
+   **including the expression where that answer is computed** — what is being
+   approved is a claim about every state that provider can reach, not the one it
+   is in this week. `SCOPED-TOOLS.md`, layer 1, and
+   `STRATEGY-AND-DESCRIPTIONS.md`, *Always-visible tools*, carry why.
 9. *(Conditional — the per-caller filter half exists only where brief 2 found a
    model.)* **The permission finding**, and the per-caller filter proposed on top
    of it. Where no model was found, this item **is** the negative finding — the
@@ -396,12 +373,13 @@ Nothing is edited before this. The user is shown, in one place:
     is really asking for: the check cannot land while a searchable tool has no
     query-set row, so say how many rows had to be **written by hand** rather
     than harvested from real turns. Approving this item is approving those
-    sentences. The alternative that must not happen quietly is a check scoped to
-    "the tools that already have rows", which restores exactly the hole it was
-    built to close.
+    sentences, and it is approving a check whose scope is **every searchable
+    tool** — scoped instead to "the tools that already have rows", it restores
+    exactly the hole it was built to close.
 14. **The instrumentation** shipping with the change: the fields recorded per
-    search and per tool call, where they are written, how long they are kept, and
-    what is redacted before they get there.
+    search and per tool call — the set is in `STRATEGY-AND-DESCRIPTIONS.md`,
+    *What the record shows once it ships* — where they are written, how long they
+    are kept, and what is redacted before they get there.
 15. **The rollback** — what reverting looks like, and what the layer behaves like
     with search switched back off.
 16. **What this pass will not do**, named: the `unknown` rows it cannot resolve,
@@ -412,13 +390,10 @@ Nothing is edited before this. The user is shown, in one place:
 appears in one of two forms — and a run that skips one is still a complete
 gate.** Items 9, 10 and 11 turn on whether brief 2 found a permission
 model — 10 and 11 disappear without one, and 9 changes into its negative branch
-rather than vanishing. Item 5 turns on whether some census row's `wording` is
-not `ours`. A gate
-showing fewer than sixteen because a condition did not fire is finished, and it
-says which items and which condition. A gate missing an *unconditional* item is
-unfinished, and the difference has to be legible at a glance — otherwise a
-reader sees a short list and cannot tell a legitimate skip from an omission. The
-alternative that looks tidier and is worse is presenting all sixteen every time
+rather than vanishing. Item 5 turns on whether some census row's `wording` is not
+`ours`. A gate showing fewer than sixteen because a condition did not fire is
+finished, and it names which items and which condition. A gate missing an *unconditional* item is
+unfinished. Name the skipped items rather than presenting all sixteen every time
 with *n/a* in four of them, which trains everyone reading the gate to skim past
 exactly the rows carrying the permission claims.
 
@@ -448,7 +423,7 @@ In this order, because each step's failures are easiest to read in isolation:
 5. Register the strategy on the AI-service builder
    (`AiServices.builder(X.class)....toolSearchStrategy(strategy)`), with the
    configuration from gate item 3 — and with the search record from gate item 14
-   in the same change.
+   (`STRATEGY-AND-DESCRIPTIONS.md`) in the same change.
 6. Add the execution guardrail, if the pass has one.
 7. Add the per-caller filter inside the strategy, if the pass has one.
 
@@ -456,19 +431,20 @@ Steps 6 and 7 in that order, not the reverse. The guardrail is the control; the
 filter is the optimisation on top of it, and a filter shipped without a guardrail
 is the plan claiming enforcement it does not have.
 
-The record is inside step 5 rather than after it for a reason that does not
-improve with age: instrumentation added a month later starts its history a month
-late, and the month it missed is the one where the vocabulary was wrong, the
-`maxResults` was guessed and every question anyone asks afterwards is about
-exactly that period.
+The record is inside step 5 rather than after it because instrumentation added a
+month later starts its history a month late, and the month it missed is the one
+where the vocabulary was wrong and the `maxResults` was guessed.
+
+**Step 4 ends** when every literal string approved at the gate is in the tree,
+and nothing the gate sent back is.
 
 ## Step 5 — Verify
 
 | Check | What a pass looks like |
 |---|---|
 | Standing cost fell | serialize the specifications the framework actually sends, before and after; the hidden tools are gone and the search tool is there |
-| Every searchable tool is reachable | each `static` / `provider` tool is returned by at least one query set entry, within `maxResults` and **at or above** `minScore`. This is the one check that must not stop when the pass does — `STRATEGY-AND-DESCRIPTIONS.md` turns it into a standing build check, partitioned by `reach`, that a later unfindable tool fails |
-| Every census row's reach path still holds | re-derive each searchable row's `reach` from the **real provider graph the application assembles**, and fail on any row now arriving through a provider that answers dynamic. Not from the census file, which records the day it was written, and **not from a test double**, which answers whatever it was constructed to answer and therefore cannot catch this at all. This is the regression the ordering fact makes consequential and it is the one that ships in silence: a provider whose dynamic answer is computed flips when a condition somewhere else changes, and in that instant its tools stop being hideable and stop being findable, with no exception, no failing assertion and no diff anybody reads as related |
+| Every searchable tool is reachable | each `static` / `provider` tool is returned by at least one query set entry, within `maxResults` and **at or above** `minScore`. This is the one check that outlives the pass — `STRATEGY-AND-DESCRIPTIONS.md` turns it into a standing build check, partitioned by `reach`, that a later unfindable tool fails |
+| Every census row's reach path still holds | re-derive each searchable row's `reach` from the **real provider graph the application assembles** — not from the census file, which records the day it was written, and not from a test double — and fail on any row now arriving through a provider that answers dynamic. This is the regression the ordering fact makes consequential and it is the one that ships in **silence**: a provider whose dynamic answer is computed flips when a condition somewhere else changes, and in that instant its tools stop being hideable and stop being findable, with no exception, no failing assertion and no diff anybody reads as related. `STRATEGY-AND-DESCRIPTIONS.md` says why a test double cannot catch it, and turns this into the standing check |
 | Always-visible tools need no search | a turn using one of them shows no search call |
 | Multi-tool turns behave as measured | a request needing two tools completes, and the way it completes matches the disclosure lifetime observed in Step 2 — one search or two. A model that searches once and gives up against an accumulating disclosure is a finding about `maxResults` or about the search tool's description; against a non-accumulating one it is the framework working as observed, and `maxResults` was sized wrong. Where Step 2 defaulted rather than measured, this row asserts only that the turn completes |
 | A turn needing **two searches** completes | drive a turn whose tools cannot all come back from one search — more targets than `maxResults`, or targets no single query reaches — and assert it finishes with the right tools rather than with a confident partial answer. This is the failure that ships silently: with every hidden tool behind a search call, a model that searches once, takes the partial set and proceeds produces a fluent answer, no error and no red build. Before treating it as a `maxResults` problem, read the search tool's own description: **if it does not say the tool may be called again, the model was never told it may**, and the fix is one clause there |
@@ -476,7 +452,7 @@ exactly that period.
 | The filter is per-caller | the same query under two principals returns different candidate sets, and the smaller one is a *strict* subset of the larger |
 | No cache crosses callers | if the pass added a cache anywhere on the search path, the per-caller check above still passes with the cache warm, and passes in both principal orders |
 | A refusal reads correctly | the message is terminal, actionable, about the account rather than the agent, and names no tool the caller was never offered |
-| The record is there and is readable | one search and one tool call produce the fields below, and the provenance field is populated with one of its three values rather than left empty |
+| The record is there and is readable | one search and one tool call produce every field in `STRATEGY-AND-DESCRIPTIONS.md`, *What the record shows once it ships*, and the provenance field is populated with one of its three values rather than left empty |
 
 **What green does not prove.** That the model will actually search rather than
 answering from memory — that is a behavioural property of the prompt, and only
@@ -494,97 +470,9 @@ somebody on this team wrote down**, and a team writes down the words it uses. A
 green standing check six months from now means the vocabulary of the day the pass
 ran still retrieves; it says nothing about the words users have started using
 since. Only production says that, and only if the pass left something behind that
-records it.
-
-## What search leaves behind, once it ships
-
-Every number this pass produced came from a query set written by the people who
-wrote the tools. That is the best available input before launch and it is a
-sample of one team's vocabulary. The mechanism that corrects it afterwards is a
-record of what search was actually asked for and what it actually returned, and
-it costs a handful of fields.
-
-**Per search:**
-
-| Field | Why it is the one you will want |
-|---|---|
-| The query **as the model sent it**, verbatim | the input to every other conclusion. Under a keyword strategy record the cleaned terms beside it, because cleaning is where a sentence becomes a dozen indiscriminate terms |
-| The names returned, **with their scores and their ranks** | a target arriving consistently at rank four under a `maxResults` of five is a week from disappearing, and nothing else shows that coming. Record the rank **as observed** and read it as a symptom rather than a guarantee: what the framework specifies is a score and a cut, not an ordering or a tie-break, so a target sitting at the cut line is a warning without being a prediction. The **score** beside it is the sturdier of the two numbers |
-| The size of the candidate set the scorer actually saw | separates "scored badly" from "was filtered out before scoring" — under per-caller narrowing those look identical downstream |
-| Whether the search returned **nothing** | the highest-value row in the whole record: it is a user's phrasing, in production, that reaches no tool. These are query-set rows waiting to be added |
-
-**Per tool call, one field: where this tool came from.** Make it three-valued,
-because two values throw away the interesting case.
-
-| Value | Meaning |
-|---|---|
-| `from-search` | this name appeared in a search result earlier in this conversation |
-| `always-visible` | it never needed a search; it is in the standing set by design |
-| `neither` | **the alarm.** The model called a tool that no search offered it and that is not always-visible |
-
-The first two values buy the split every offline measurement in this pass is
-built on: *search never returned it* versus *search returned it and the model
-chose something else*. Those two produce the same symptom — the wrong tool ran —
-and they have nothing in common as problems. The first is a retrieval failure and
-belongs to the rewrite; the second is a routing failure and belongs to the
-descriptions' other job.
-
-The third value is fact 1 in production. The guardrail test proves refusal for
-one name you drove by hand; this field counts how often it happens for real, on
-names nobody predicted. A non-zero count is not automatically an attack — a
-resumed conversation and a model reusing a name from earlier both land here — but
-it is the only place the system ever says out loud that the executable set is
-wider than the visible one.
-
-**What the record is read for**, on a fixed cadence rather than when something
-breaks: empty searches become new query-set rows and new `vocabulary` cells;
-rank-versus-`maxResults` *argues for* a `maxResults`, under the hedge above —
-observed rank is not a documented guarantee, so a tool that must survive the cut
-gets fixed at the description rather than by tuning the window around where it
-happened to land; the scores of results nobody used set `minScore`; a searchable tool that has never been returned is either unfindable
-or dead, and the census says which; and an always-visible tool whose provenance
-value never appears was exempted for a turn nobody makes, so its permanent place
-in the standing prompt has no buyer. Each of those edits then re-enters this pass
-at the rewrite step, where it is measured against the query set like any other.
-
-**Two constraints on how it is written.** Search terms are user text — they carry
-whatever a user typed, so they are subject to the same retention and redaction
-rules as any other message content, not looser ones because they look like
-telemetry. And tool names are a bounded set while query terms are unbounded: name
-a metric dimension after the tool, never after the query, and keep the queries
-themselves in whatever store already holds turn-level detail.
-`llm-cost-observability` owns the plumbing that makes a turn attributable; this
-is the one search-shaped record to put on top of it.
-
-## Optional — seed the first search from the turn's classifier
-
-Some systems already run a cheap classifier in front of the agent and route its
-verdict into the turn's prompt as a hint — a category, a route label, a skill
-hint in a turn-context block. `llm-triage-gate` owns that classifier. Where one
-exists, the same verdict can carry a **suggested search query**, so the model's
-first search is seeded rather than guessed. It is the cheapest recall improvement
-available, because it fixes the query at the one point in the system that has
-already read the user's message and decided what it is about.
-
-The seam is generic: the classifier's structured verdict grows one optional
-field; the prompt assembly renders it inside the same block the other hints go
-in; the model is free to ignore it. Two failure modes, both worth writing into
-the plan.
-
-**A suggestion the model reads as an instruction.** Rendered as "use the invoice
-tool", the hint stops being a seed and becomes a routing decision made by a model
-too cheap to make it, and the search that would have corrected a bad hint never
-runs. Render it as *terms to start from*, and never let a hint be the only path
-by which a tool is reachable — every tool must still be findable from a query
-typed by a user who has never heard of the classifier.
-
-**A hint that names a tool this caller may not use.** The classifier does not
-know the caller. A hint that names tools re-opens exactly the enumeration channel
-the scoping closed: the model narrates the name, the user learns a tool exists
-that they were deliberately never shown, and a refusal follows for something they
-were never offered. Two fixes, in preference order — have the hint carry search
-*terms* rather than tool names, or pass it through the same per-caller filter
-before it reaches the prompt.
+records it — `STRATEGY-AND-DESCRIPTIONS.md`, *What the record shows once it
+ships*, is the handful of fields that does, approved as gate item 14 and shipped
+in step 4.
 
 ## Done when
 

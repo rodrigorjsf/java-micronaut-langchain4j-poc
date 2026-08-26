@@ -2,8 +2,8 @@
 
 Reference for [`tool-search-rollout`](SKILL.md), Step 2 and Step 4. Which search
 strategy to run, what to configure on the search tool, how to rewrite names and
-descriptions for the scoring rule that is actually running, and how to prove the
-rewrite helped.
+descriptions for the scoring rule that is actually running, how to prove the
+rewrite helped, and what the layer records once it ships.
 
 ## One axis, two ends
 
@@ -172,7 +172,7 @@ caller, so the cache stays correct however narrowly discovery is scoped. The
 hazard is any cache *you* add on top: a cache of search **results**, or of a
 candidate set, or of the search tool's own specification. Those do vary by
 caller, in a layer specifically built to make them vary, and `SCOPED-TOOLS.md`
-carries the key rule for them. Read it before adding one, not after.
+carries the key rule for them. Read it before adding one.
 
 Its `minScore` default is `0.0`, which means **nothing is filtered out by score
 at all**: `maxResults` is doing every bit of the work, and the five returned
@@ -266,12 +266,9 @@ calls after it, a task can search twice and accumulate, and `maxResults` only ha
 to cover one step. Where they do not, every tool a step needs must return from a
 *single* search, and the floor is the largest number of tools any one step of a
 real task uses — a number you take from the query set's multi-step rows, not from
-the framework's `5`. Tuning `maxResults` against ranking data while that question
-is unanswered is tuning the wrong end of it. **Where the lifetime could not be
-measured at all**, that same largest-single-step count *is* the answer rather
-than a floor under one: it is what `SKILL.md`, Step 2 defaults to, it is correct
-under every outcome the measurement could have had, and it goes to the gate
-labelled as a default.
+the framework's `5`. **Where the lifetime could not be measured at all**, that
+same largest-single-step count *is* the answer rather than a floor under one: it
+is `SKILL.md`, Step 2's default, and it goes to the gate labelled as one.
 
 **Say in the description that the tool may be called again.** A model that
 searches once, receives `maxResults` specifications and proceeds has done
@@ -287,6 +284,35 @@ tokens on every search forever.
 **Rename the search tool only with a reason.** `tool_search_tool` is graceless
 but stable across upgrades and matches every example a reader will find; a rename
 is a routing change like any other and goes to the gate as one.
+
+### Seeding the first search from a turn classifier
+
+Reached only where a cheap classifier already runs in front of the agent and its
+verdict reaches the turn's prompt — a category, a route label, a skill hint in a
+turn-context block. `llm-triage-gate` owns that classifier. Where one exists, the
+same verdict can carry a **suggested search query**, so the model's first search
+is seeded rather than guessed. It is the cheapest recall improvement available,
+because it fixes the query at the one point in the system that has already read
+the user's message and decided what it is about.
+
+The seam is generic: the classifier's structured verdict grows one optional
+field; the prompt assembly renders it inside the same block the other hints go
+in; the model is free to ignore it. Two failure modes, both worth writing into
+the plan.
+
+**A suggestion the model reads as an instruction.** Rendered as "use the invoice
+tool", the hint stops being a seed and becomes a routing decision made by a model
+too cheap to make it, and the search that would have corrected a bad hint never
+runs. Render it as *terms to start from*, and keep every tool findable from a
+query typed by a user who has never heard of the classifier.
+
+**A hint that names a tool this caller may not use.** The classifier does not
+know the caller. A hint that names tools re-opens the enumeration oracle the
+scoping closed: the model narrates the name, the user learns a tool exists that
+they were deliberately never shown, and a refusal follows for something they were
+never offered. Two fixes, in preference order — have the hint carry search
+*terms* rather than tool names, or pass it through the same per-caller filter
+before it reaches the prompt.
 
 ## The rewrite
 
@@ -374,9 +400,8 @@ description. Under a keyword strategy this is precisely what the `protected`
 `score()` and `clean()` hooks are for: the upstream text is never touched, an
 upstream release cannot revert your work, and the vocabulary sits in one
 reviewable file instead of being smuggled into forty descriptions. Under a
-semantic strategy, establish first whether your version exposes a comparable hook
-— do not assume one because the keyword strategy has it. The fallback that always
-exists is implementing the SPI: `search` receives `searchableTools()` and returns
+semantic strategy, read your version to establish whether it exposes a comparable
+hook of its own. The fallback that always exists is implementing the SPI: `search` receives `searchableTools()` and returns
 the result, so the text you compare against and the ranking you return are both
 yours. Either way the cost is real and must be written down: retrieval vocabulary
 now lives in two places, so the census row for that tool has to say which file
@@ -435,20 +460,15 @@ Each marking is a permanent line item in the standing prompt, so it goes to the
 gate individually with the turn it protects. Two further things are true of every
 marking, and both change what a follower does with one.
 
-**The marking bypasses the per-caller discovery filter, so it must never land on
-a tool the scope was meant to hide.** What the marking guarantees is that search
-never hides the tool. The per-caller filter in `SCOPED-TOOLS.md`, layer 1, works
-by narrowing what search returns — it is a narrowing of the search path, and a
-tool carrying a never-hidden-by-search guarantee sits outside anything that path
-can narrow. So an always-visible tool is in front of **every** caller, whatever
-the filter would have decided about them, and it is in front of them on every
-turn rather than only after a search. The two features are built for opposite
-purposes and they are configured in different files by different people, which
-is exactly how a sensitive tool acquires a marking from someone reasoning about
-availability while the scope is documented by someone reasoning about
-permissions, and neither of them is wrong on their own terms. Cross-check this
-list against the census's `principals` column before it goes to the gate, and
-show that you did.
+**The marking bypasses the per-caller discovery filter, so a tool the scope was
+meant to hide stays unmarked.** The filter in `SCOPED-TOOLS.md`, layer 1, narrows
+what search returns, and a tool carrying a never-hidden-by-search guarantee sits
+outside anything that path can narrow. The two features are configured in
+different files by different people — a sensitive tool acquires its marking from
+someone reasoning about availability while the scope is written by someone
+reasoning about permissions, and neither of them is wrong on their own terms.
+Cross-check this list against the census's `principals` column before it goes to
+the gate, and show that you did.
 
 **The marking is inert while the provider is dynamic — and that is a reason to
 keep it, not to strip it.** A tool arriving through a dynamic provider was never
@@ -508,9 +528,8 @@ default of `0.0` filters nothing: every query returns the five nearest tools, so
 a `none` row is failed by construction and a neighbour row's margin is a
 similarity gap rather than an integer difference. Set the floor first, from the
 scores your own positive rows produce, then run the negative classes against it.
-That ordering is not extra work — it is the same "the first tuning you do" from
-*What semantic search actually does*, arriving with the rows that make it
-decidable.
+That is "the first tuning you do" from *What semantic search actually does*,
+arriving with the rows that make it decidable.
 
 Run all three classes **before** the rewrite as well as after. A negative class
 measured only afterwards has no baseline, so a description set that was already
@@ -560,9 +579,7 @@ keyword the culprit is almost always a term you added to one description that no
 outscores a better tool.
 
 Any figure in this file or in your plan that you did not produce from your own
-set is illustrative and must say so in the sentence. A recall number that reads
-as measured, and was not, is the one thing that gets an otherwise correct plan
-thrown out of the room.
+set is illustrative and says so in the sentence.
 
 ### The check that outlives the pass
 
@@ -642,6 +659,65 @@ One more thing this check earns its place with: it is what you run after a
 framework upgrade. A moved signature is a compile error and needs no help; a
 changed default or a changed scoring weight is silent, and this is the only thing
 in the repository that goes red when retrieval quietly moved.
+
+## What the record shows once it ships
+
+The query set is a sample of one team's vocabulary, and `SKILL.md`, Step 5 says
+what a green verification therefore leaves unproven. The mechanism that corrects
+it after launch is a record of what search was actually asked for and what it
+actually returned, it costs a handful of fields, and it ships in the same change
+as the strategy — gate item 14 in `SKILL.md` is where it is approved.
+
+**Per search:**
+
+| Field | Why it is the one you will want |
+|---|---|
+| The query **as the model sent it**, verbatim | the input to every other conclusion. Under a keyword strategy record the cleaned terms beside it, because cleaning is where a sentence becomes a dozen indiscriminate terms |
+| The names returned, **with their scores and their ranks** | a target arriving consistently at rank four under a `maxResults` of five is a week from disappearing, and nothing else shows that coming. Record the rank **as observed** and read it as a symptom, under the hedge in *What keyword search actually does*: what the framework specifies is a score and a cut, not an ordering or a tie-break, so a target sitting at the cut line is a warning without being a prediction. The **score** beside it is the sturdier of the two numbers |
+| The size of the candidate set the scorer actually saw | separates "scored badly" from "was filtered out before scoring" — under per-caller narrowing those look identical downstream |
+| Whether the search returned **nothing** | the highest-value row in the whole record: it is a user's phrasing, in production, that reaches no tool. These are query-set rows waiting to be added |
+
+**Per tool call, one field: where this tool came from.** Make it three-valued,
+because two values throw away the interesting case.
+
+| Value | Meaning |
+|---|---|
+| `from-search` | this name appeared in a search result earlier in this conversation |
+| `always-visible` | it never needed a search; it is in the standing set by design |
+| `neither` | **the alarm.** The model called a tool that no search offered it and that is not always-visible |
+
+The first two values buy in production the split *Measure the strategy directly*
+buys offline — *search never returned it* versus *search returned it and the
+model chose something else*. Those two produce the same symptom, the wrong tool
+ran, and they have nothing in common as problems.
+
+The third value is fact 1 in production. The guardrail test proves refusal for
+one name you drove by hand; this field counts how often it happens for real, on
+names nobody predicted. A non-zero count is not automatically an attack — a
+resumed conversation and a model reusing a name from earlier both land here — but
+it is the only place the system ever says out loud that the executable set is
+wider than the visible one.
+
+**What the record is read for**, on a fixed cadence rather than when something
+breaks: empty searches become new query-set rows and new `vocabulary` cells;
+rank-versus-`maxResults` *argues for* a `maxResults`, under the hedge above — so
+a tool that must survive the cut gets fixed at the description rather than by
+tuning the window around where it happened to land; the scores of results nobody
+used set `minScore`; a searchable tool that has never been returned is either
+unfindable or dead, and the census says which; and an always-visible tool whose
+provenance value never appears was exempted for a turn nobody makes, so its
+permanent place in the standing prompt has no buyer. Each of those edits then
+re-enters this pass at the rewrite step, where it is measured against the query
+set like any other.
+
+**Two constraints on how it is written.** Search terms are user text — they carry
+whatever a user typed, so they are subject to the same retention and redaction
+rules as any other message content, not looser ones because they look like
+telemetry. And tool names are a bounded set while query terms are unbounded: name
+a metric dimension after the tool, never after the query, and keep the queries
+themselves in whatever store already holds turn-level detail.
+`llm-cost-observability` owns the plumbing that makes a turn attributable; this
+is the one search-shaped record to put on top of it.
 
 ## Failure signatures
 
