@@ -26,9 +26,9 @@ in both tables below.
 | **the model** | the harness matches the turn against the `description` and loads the body | you do not ask for it; you describe the problem, and a description written for that sentence pulls the skill in |
 | **by name** | the frontmatter carries `disable-model-invocation: true`, so nothing fires it automatically | a person runs it deliberately — these are sweeps and audits, work with a start and an artefact, not advice mid-turn |
 
-Four skills carry `disable-model-invocation: true`. The by-name ones are the passes
+Five skills carry `disable-model-invocation: true`. The by-name ones are the passes
 that produce a document: an audit, a sweep, a migration plan, a committed query
-set. A skill that would only ever be right on a turn nobody types is better as a
+set, a tool-search rollout. A skill that would only ever be right on a turn nobody types is better as a
 procedure someone invokes than as a description paid for on every turn of every
 conversation.
 
@@ -403,6 +403,7 @@ the census column recording how each tool reaches the model rests on the second.
 | `authoring-agent-tools` | hands to | **a description that cannot be written.** When no phrasing separates two tools, the honest finding is one tool where the layer has two, and that is a request for the interview rather than a wording problem |
 | `agentic-evals` | handed by | **the set's size versus its shape.** How many rows a claim needs, where a threshold goes, and what a build may gate on rather than only report are that page's; the three classes this particular claim needs — the turn the tool should serve, the turn a neighbour should, and the turn nothing should — are this one's |
 | `subagent-context-isolation` | handed by | **the doctrine versus the three briefs.** Why a sub-agent earns its cost, what a brief carries and how a return is read live there; [`RESEARCH-BRIEFS.md`](../.claude/skills/tool-search-rollout/RESEARCH-BRIEFS.md) is the instance — a census, a permission survey and a vocabulary pass, each with a literal return template |
+| `agentic-codebase-audit` | handed by | **the absence versus the pass that closes it.** *Tool discovery that does not scale* is one of the absences the audit hunts, and it arrives here as a finding rather than a plan. The audit's inventory does not discharge brief 1 either: it records that a tool exists, and the census records how it reaches the model — the column the whole rollout turns on |
 | `prompt-injection-layers` | hands to | **who wins the attention.** Telling the model which tools this caller may use is a prompt, and a prompt competes with injected text for the same attention. That fight is that page's, and it is exactly why the prompt layer here is reinforcement and the execution guardrail is the control |
 | `llm-triage-gate`, `llm-cost-observability` | handed by | **the seam versus the field added to it.** Whether a cheap classifier should run in front at all, and the plumbing that makes a turn attributable, belong to those pages. A verdict that already routes carrying a *suggested search query*, and the one search-shaped record laid on top of the turn — query sent, tools returned, tool finally called — are this page's optional step and its standing signal |
 
@@ -427,7 +428,7 @@ naming the skill that owns its **doctrine**, then asks probes that establish
 |---|---|---|
 | `agentic-service-composition`, `agentic-tool-boundary`, `conversation-memory-and-compaction`, `agentic-evals`, `llm-cost-observability`, `subagent-context-isolation` | hands to | **fact versus doctrine.** One seam each, except `agentic-service-composition`, which takes two — model access and prompt assembly. The probe records what the code does; the named skill says what it should have been. The audit never argues |
 | `llm-triage-gate`, `prompt-injection-layers`, `retrieval-that-earns-its-place` | hands to | the same split at the seams that share a probe set — *whether* to fail open, how the layers are ordered, whether this codebase should retrieve at all |
-| `progressive-tool-disclosure`, `reviewing-agent-tools-and-skills` | hands to | **the tool seam splits two ways.** Routing quality goes to the sweep, disclosure economics to that page; the audit keeps only the inventory |
+| `progressive-tool-disclosure`, `reviewing-agent-tools-and-skills`, `tool-search-rollout` | hands to | **the tool seam splits three ways.** Routing quality goes to the sweep, disclosure economics to that page, and *tool discovery that does not scale* — one of the absences the audit is built to detect — to the rollout, which **a model cannot load: ask the user to run it, which they invoke by name.** The audit keeps only the inventory, and its inventory is not the rollout's census: one records that a tool exists, the other how it reaches the model |
 | `prompt-to-corpus-migration` | both ways | **absent control versus present content.** The audit's prompt-assembly seam scores whether configuration or user data reaches the standing instructions; whether the content *belongs* there is the migration's question, and **a model cannot load it: ask the user to run it, which they invoke by name.** The migration reads the audit's prompt-assembly row in the other direction, and a row naming two assembly points tells it there are two containers before it starts |
 | `corpus-retrieval-tests` | handed by | **the wrong-layer catch.** A query-set failure that turns out to be an absent control at a seam — no output guardrail, a catalogue that loads eleven of twelve entries — leaves the corpus chain and comes here |
 
