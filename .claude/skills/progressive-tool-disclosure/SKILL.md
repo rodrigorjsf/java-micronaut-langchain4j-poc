@@ -1,6 +1,6 @@
 ---
 name: progressive-tool-disclosure
-description: Keep a large tool set affordable by showing the model only what the turn needs. Use when an agent has more than ~15 tools, when the system prompt is dominated by tool schemas, when tool selection accuracy drops as tools are added, or when deciding between skills and tool search. With fewer than about fifteen tools, a wrong pick is one description's fault — use agentic-tool-boundary.
+description: Keep a large tool set affordable by showing the model only what the turn needs. Use when an agent has more than ~15 tools, when the system prompt is dominated by tool schemas, when tool selection accuracy drops as tools are added, or when deciding between skills and tool search. With fewer than about fifteen tools, a wrong pick is one description's fault — use agentic-tool-boundary. Once search is the chosen mechanism, rolling it out over a real layer is a pass a person runs: ask the user to run tool-search-rollout.
 ---
 
 # Progressive tool disclosure
@@ -58,7 +58,9 @@ calls a search tool, which reveals matching ones.
 Check whether the two can coexist in your framework before choosing. In
 LangChain4j they cannot: skills expose their tools through a *dynamic* tool
 provider, and a dynamic provider bypasses the tool-search filter entirely.
-Enabling both silently disables one.
+Enabling both leaves the filter running over whatever is *not* behind that
+provider, so the skills' own tools are neither hidden by it nor findable
+through it — and nothing reports the gap.
 
 Choose skills when:
 
@@ -73,6 +75,12 @@ Choose tool search when:
 - tools do not group naturally, or one tool belongs to several groups;
 - you need **cross-group recall** — "refund" surfacing a billing tool whose group
   name never mentions refunds.
+
+Choosing it is where this page stops. Actually rolling it out — the census that
+records how each tool reaches the model, keyword against semantic, the rewrites
+that make descriptions retrievable, per-caller scope and the guardrail that
+enforces it — is `tool-search-rollout`, and a model cannot load it: **ask the user
+to run it, which they invoke by name.**
 
 ## The failure mode: disclosure state is invisible
 
