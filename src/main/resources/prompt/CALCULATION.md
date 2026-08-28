@@ -33,9 +33,9 @@ rounding and the scale that produced them.
 `{"steps":[{"id":"diarias","operation":"MULTIPLY","operands":["3","189.90"]},{"id":"total","operation":"SUM","operands":["#diarias","60"]},{"id":"cada","operation":"DIVIDE","operands":["#total","3"]}],"currency":"BRL"}`
 → "O total fica em R$ 629,70, o que dá R$ 209,90 para cada pessoa."
 
-**"uma fatura de US$ 1.200 em reais"** — the rate is a fact too, so it comes from
-`get_ptax_usd` on this turn, never from one you have seen before, and goes in as
-a literal operand. The figure below stands for whatever that call returned.
+**"uma fatura de US$ 1.200 em reais"** — the rate is a fact too: activate
+`brazil-finance`, call `get_ptax_usd` this turn, never reuse one you have seen,
+and pass it as a literal. The figure below stands for what that call returned.
 `{"steps":[{"id":"reais","operation":"MULTIPLY","operands":["1200","5.4321"]}],"currency":"BRL"}`
 → "Pelo PTAX de venda, US$ 1.200,00 equivalem a R$ 6.518,52."
 

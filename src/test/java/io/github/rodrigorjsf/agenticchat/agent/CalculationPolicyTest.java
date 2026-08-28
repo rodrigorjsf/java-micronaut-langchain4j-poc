@@ -109,9 +109,12 @@ class CalculationPolicyTest {
     @DisplayName("the calculator is wired into the assistant's construction — "
             + "this does NOT prove the model is offered it on every turn")
     void theCalculatorIsDeclaredOnTheAssistant() {
-        // What this proves: AiServiceFactory cannot build a ChatAssistant without a
-        // CalculatorTools, so removing the .tools(calculator) line and its parameter
-        // together is a red test rather than a silent loss of the tool.
+        // What this proves, and no more: AiServiceFactory declares a CalculatorTools
+        // parameter, so removing the parameter goes red here. Deleting the
+        // .tools(calculator) CALL while leaving the parameter in place stays green —
+        // an earlier version of this comment claimed otherwise, which is the kind of
+        // overstatement that makes a suite feel safer than it is. The wiring the model
+        // actually depends on is the call, and nothing here reaches it.
         //
         // What it does not prove: that the static specification reaches the provider
         // on every turn. That is a property of LangChain4j's ToolService, measured in
