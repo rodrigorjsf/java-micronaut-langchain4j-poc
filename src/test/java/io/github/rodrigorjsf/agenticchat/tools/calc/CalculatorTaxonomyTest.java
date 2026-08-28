@@ -53,6 +53,29 @@ class CalculatorTaxonomyTest {
     }
 
     @Test
+    @DisplayName("missing_currency — a null currency is refused, never defaulted to BRL")
+    void aNullCurrencyIsRefused() {
+        // The asymmetry with rounding is deliberate and this test is what holds it.
+        // `rounding` is declared optional with a defaultValue, so substituting one is
+        // honouring the contract; `currency` is declared required, so substituting one
+        // invents the unit of the money. P's javadoc records that a required OBJECT
+        // parameter is not validated in 1.x and null reaches the method regardless, so
+        // this is the reachable case, not a defensive one. Defaulting it would answer a
+        // dollar invoice "ANSWER: 1385.10 BRL" with nothing anywhere reading as wrong.
+        String output = calculator.calculate(
+                List.of(new CalculationStep("total", Operation.SUM, List.of("10", "20"))),
+                null, Rounding.HALF_EVEN);
+
+        assertThat(output).startsWith("CALCULATION FAILED · missing_currency");
+        assertThat(output).contains("the currency is required");
+        assertThat(output).contains("BRL").contains("USD");
+        // The correction must send the model back to the user rather than to a guess.
+        assertThat(output).contains("do not assume one");
+        // And it must not have answered anyway.
+        assertThat(output).doesNotContain("ANSWER:");
+    }
+
+    @Test
     @DisplayName("too_many_steps — 51 steps against a limit of 50")
     void tooManySteps() {
         List<CalculationStep> steps = new ArrayList<>();

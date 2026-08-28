@@ -237,13 +237,29 @@ public class CalculatorTools {
      * state is machinery that can only ever be wrong.
      */
     private String run(List<CalculationStep> steps, Currency currency, Rounding rounding) {
-        // Defaulted rather than rejected, and safe only because the header prints
-        // what was used: a stated default is one parameter the user can correct,
-        // whereas a silent one is a wrong total nobody can see. The framework
-        // substitutes the rounding default at the tool door, but a direct Java
-        // caller — every test in this package — bypasses that, so the guard stays.
-        Currency money = currency == null ? Currency.BRL : currency;
+        // The two nulls are answered differently, and the difference is the whole
+        // point. `rounding` is declared optional with defaultValue = "HALF_EVEN", so
+        // the framework substitutes at the tool door and a null here can only come
+        // from a direct Java caller — every test in this package — for which the
+        // declared default is the right answer.
+        //
+        // `currency` is declared required with no default, so a null is a protocol
+        // violation and defaulting it would convert that into a silent assumption.
+        // It is reachable: P's own javadoc records that in 1.x an object parameter
+        // marked required is NOT validated and null is passed to the method anyway.
+        // The failure it would cause is the one this whole class exists to remove —
+        // a dollar invoice answered "ANSWER: 1385.10 BRL", where the header naming
+        // BRL is not a warning but a confirmation of something the model never sent.
+        // A tool that bypasses ToolGuardProvider on the argument that it never lies
+        // does not get to guess the unit of the money it is counting.
         Rounding mode = rounding == null ? Rounding.HALF_EVEN : rounding;
+        if (currency == null) {
+            throw failure("missing_currency", null,
+                    "no currency was sent, and the currency is required.",
+                    "resend the same steps with \"currency\":\"BRL\" or \"currency\":\"USD\". "
+                            + "If the user has not said which, ask them — do not assume one.");
+        }
+        Currency money = currency;
 
         if (steps == null || steps.isEmpty()) {
             throw failure("empty_program", null,
