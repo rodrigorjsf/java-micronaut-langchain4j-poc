@@ -236,7 +236,9 @@ has started refusing real users.
   and the blocklist refuses them — two sentences of exactly that shape were real
   false positives here, caught by the corpus in [chapter 5](05-evaluation.md).
 - The untrusted text is a *tool result*, not a user message, and nothing screens
-  it — the only place indirect injection can be caught.
+  it — the only place indirect injection can be caught. (The one statically
+  declared tool, `calculate`, is outside that screen and reads nothing untrusted;
+  see [chapter 3](03-security.md).)
 - A rule is about to be narrowed to fix one complaint, with nothing that says which
   attacks the narrowing loses.
 

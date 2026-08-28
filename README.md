@@ -99,8 +99,8 @@ question from the two above is
 | | |
 |---|---|
 | **Triage gate** | a small, fast model decides whether a turn reaches the expensive one — and pre-filters and a cache mean most turns never reach it either |
-| **Skills** | 102 tools over free public APIs, disclosed progressively: the prompt carries skill names, not tool schemas |
-| **Guardrails** | normalize → deterministic score → gray-zone classifier on the way in; canary and exfiltration checks on the way out; and a tool-result screen, which is the only place indirect injection can be caught |
+| **Skills** | 102 tools over free public APIs, disclosed progressively: the prompt carries skill names, not tool schemas — with one argued exception, the deterministic calculator, which is always visible |
+| **Guardrails** | normalize → deterministic score → gray-zone classifier on the way in; canary and exfiltration checks on the way out; and a tool-result screen on every skill tool, which is the only place indirect injection can be caught |
 | **Voice** | a brand's tone-of-voice contract, last in the cacheable prefix rather than behind a skill, with a startup assertion that it reached the model and an output check that repairs what the document defines and never withholds an answer |
 | **RAG** | over the assistant's own documentation, routed so it only runs when a tool is not going to answer |
 | **Memory** | Valkey in front of DynamoDB, with compaction that never drops a skill activation |

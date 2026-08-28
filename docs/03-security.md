@@ -45,6 +45,14 @@ RAG content *is* reachable from an input guardrail, via
 instructions planted in data the agent fetches — arrives through tool output, so
 `ToolGuardProvider` decorating `ToolExecutor` is the only place it can be caught.
 
+That holds for every tool that fetches anything, which is every tool in the skills
+catalogue. One tool is outside it: `calculate` is declared statically on the
+assistant, so it never passes through the decorator. It is exempt because it has
+no upstream to be injected from — no network call, no third-party data, no file
+and no store, and a result it formatted from its own arithmetic. **That exemption
+is a property of the tool, not a category.** Give it an FX rate or a tax table and
+it belongs behind the catalogue like everything else.
+
 Two traps in building that decorator, both of which fail silently:
 
 - **Decorate `executeWithContext`, not `execute`.** The framework only ever calls
