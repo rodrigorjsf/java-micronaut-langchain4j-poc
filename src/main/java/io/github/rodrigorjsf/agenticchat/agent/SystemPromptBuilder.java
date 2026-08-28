@@ -17,6 +17,19 @@ import org.slf4j.LoggerFactory;
  * what the model needs first: who it is, what it must never do, what it can reach,
  * and how to speak.
  *
+ * <p>The order, and it is asserted by {@code CalculationPolicyTest} rather than left
+ * to this comment to stay true: {@code # Role}, {@code # Non-negotiable rules},
+ * {@code # Skills}, {@code # Arithmetic}, {@code # How to answer}, the voice
+ * document, the integrity marker.
+ *
+ * <p><b>{@link CalculationPolicy} sits between the skills index and how-to-answer.</b>
+ * It is after {@code # Skills} because it names a tool, and a rule about a tool reads
+ * as an instruction only once the model knows tools exist; it is before the voice
+ * document because that document must stay last. Section order here is also the one
+ * thing two {@code presentIn} checks cannot verify — both pass whichever way round
+ * the two documents are interpolated, which is why the position is a test and not a
+ * comment.
+ *
  * <p><b>The voice profile is last on purpose.</b> Everything above it governs the
  * moments before the answer is written — the role, the security rules, the skills the
  * model may reach for. {@link VoiceProfile} governs the writing itself, so it is the
@@ -26,10 +39,12 @@ import org.slf4j.LoggerFactory;
  * actually hit for a prompt of this shape is unmeasured — see the note in
  * {@link VoiceProfile}.
  *
- * <p>There is no {@code # How to answer} section any more. It used to say "two or
- * three sentences is usually right", the voice profile says short paragraphs and at
- * most five bullets, and a prompt holding both leaves the model to pick. One
- * document owns how the assistant speaks.
+ * <p>{@code # How to answer} no longer says how to answer, and the heading that
+ * survives is a pointer rather than a section. It used to carry "two or three
+ * sentences is usually right" beside a voice profile that says short paragraphs and
+ * at most five bullets, and a prompt holding both leaves the model to pick. One
+ * document owns how the assistant speaks; what is left under the heading is the
+ * pointer to it and the note that reply_language is a hint.
  *
  * <p>The prompt deliberately contains nothing secret. Treating a system prompt as a
  * credential is the mistake that makes prompt extraction worth attempting; treating
@@ -47,7 +62,10 @@ public class SystemPromptBuilder {
 
     private final String prompt;
 
-    public SystemPromptBuilder(SkillCatalog skills, SystemPromptCanary canary, VoiceProfile voice) {
+    public SystemPromptBuilder(SkillCatalog skills,
+                               SystemPromptCanary canary,
+                               CalculationPolicy calculation,
+                               VoiceProfile voice) {
         // Written with real line breaks rather than text-block "\" continuations.
         // A continuation line indented further than the block's common indent keeps
         // that extra indent, so "of \" + "   guessing" renders as "of    guessing" —
@@ -85,7 +103,9 @@ public class SystemPromptBuilder {
                 activate only what the current turn needs.
                 
                 %s
-                
+
+                %s
+
                 # How to answer
 
                 How you write — tone, structure, formatting, emoji, what you may
@@ -99,20 +119,29 @@ public class SystemPromptBuilder {
                 %s
 
                 %s
-                """.formatted(skills.availableSkillsBlock(), voice.document(), canary.systemPromptFragment());
+                """.formatted(skills.availableSkillsBlock(), calculation.document(),
+                        voice.document(), canary.systemPromptFragment());
 
-        // The activation guarantee. A voice document that fails to reach the model
-        // does not produce an error, a warning or an empty answer — it produces a
-        // fluent answer in the wrong voice, which nothing downstream can detect and
-        // no log line records. So the assembled prompt is checked here, once, and a
-        // process that would answer in the wrong voice does not start.
+        // The activation guarantee, twice, for the two documents whose absence is
+        // silent. A voice document that fails to reach the model produces a fluent
+        // answer in the wrong voice; an arithmetic appendix that fails to reach it
+        // produces a fluent answer with a total the model worked out itself. Neither
+        // raises an error, sets a metric or writes a log line, so the assembled
+        // prompt is checked here, once, and a process that would fail either way
+        // does not start.
+        if (!calculation.presentIn(prompt)) {
+            throw new IllegalStateException(
+                    "The arithmetic appendix is not present in the assembled system prompt");
+        }
         if (!voice.presentIn(prompt)) {
             throw new IllegalStateException(
                     "The voice profile is not present in the assembled system prompt");
         }
 
-        LOG.info("System prompt assembled: {} chars, ~{} tokens ({} chars of it the voice profile)",
-                prompt.length(), prompt.length() / 4, voice.document().length());
+        LOG.info("System prompt assembled: {} chars, ~{} tokens "
+                        + "({} chars of it the voice profile, {} the arithmetic appendix)",
+                prompt.length(), prompt.length() / 4,
+                voice.document().length(), calculation.document().length());
     }
 
     public String prompt() {

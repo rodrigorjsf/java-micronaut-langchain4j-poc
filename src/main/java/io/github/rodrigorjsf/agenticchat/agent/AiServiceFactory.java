@@ -19,6 +19,7 @@ import io.github.rodrigorjsf.agenticchat.observability.trace.LangfuseAiServiceLi
 import io.github.rodrigorjsf.agenticchat.observability.trace.LangfuseGuardrailListener;
 import io.github.rodrigorjsf.agenticchat.observability.trace.LangfuseToolListener;
 import io.github.rodrigorjsf.agenticchat.skills.SkillCatalog;
+import io.github.rodrigorjsf.agenticchat.tools.calc.CalculatorTools;
 import io.github.rodrigorjsf.agenticchat.triage.FailoverTriageJudge;
 import io.github.rodrigorjsf.agenticchat.triage.TriageJudge;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -89,6 +90,7 @@ public class AiServiceFactory {
     ChatAssistant chatAssistant(ChatModelRegistry models,
                                 SystemPromptBuilder systemPrompt,
                                 SkillCatalog skills,
+                                CalculatorTools calculator,
                                 ChatMemoryStore memoryStore,
                                 RetrievalAugmentor retrievalAugmentor,
                                 NormalizingInputGuardrail normalizer,
@@ -143,6 +145,29 @@ public class AiServiceFactory {
                 // prose into every later prompt in the conversation. Retrieval is cheap
                 // enough to redo per turn; storing it is not.
                 .storeRetrievedContentInChatMemory(false)
+
+                // The one tool that is NOT skill-scoped, and the reason is the same one
+                // that keeps the voice document out of a skill: a capability needed on
+                // SOME turns is routed, a rule that applies to EVERY turn is not.
+                // Arithmetic can turn up in any question, and a calculator behind
+                // activate_skill fails the way a voice document behind activate_skill
+                // fails — the model does not recognise that the turn qualifies, adds the
+                // numbers in its head, and returns a fluent wrong total that no log line
+                // records. Static specs land in effectiveTools on every turn and compose
+                // with the provider below rather than replacing it.
+                //
+                // The consequence, written down rather than engineered around: a
+                // statically declared tool does not pass through ToolGuardProvider, so
+                // this result is not screened for indirect prompt injection and these
+                // arguments are not screened for credential shapes. That is correct HERE
+                // and only here — calculate makes no network call, reads no third-party
+                // data and returns only text it formatted from its own arithmetic, so
+                // there is no channel an attacker can write into. Do not build a second
+                // guard path for it; a guard over a closed loop screens this
+                // application's own output and buys nothing. Give this class an upstream
+                // and the argument collapses, at which point it belongs behind the
+                // provider like everything else.
+                .tools(calculator)
 
                 // Skill-scoped tools: only activate_skill and read_skill_resource are
                 // visible until the model activates a skill. Wrapped so every tool

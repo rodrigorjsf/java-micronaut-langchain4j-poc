@@ -32,6 +32,17 @@ import java.util.stream.Collectors;
  * after the model calls {@code activate_skill}, and the full instructions arrive at
  * the same moment. That is progressive disclosure applied to the tool surface itself.
  *
+ * <p><b>The doctrine has exactly one exception, and it is not a loophole.</b>
+ * {@code CalculatorTools} is declared statically on the assistant builder in
+ * {@code AiServiceFactory} and is never disclosed by {@code activate_skill}. The test
+ * is not how useful a tool is but whether the model can be trusted to notice that the
+ * turn qualifies: routing costs a round trip and buys nothing for a capability every
+ * turn may need, and the turn where the model fails to notice looks exactly like the
+ * turn that correctly needed nothing — a fluent wrong total, in the right voice, that
+ * no log line records. That is the same argument the voice document makes, and it
+ * holds for one tool. Anything with an upstream belongs behind this catalogue, where
+ * {@code ToolGuardProvider} can screen what it returns.
+ *
  * <p><b>Why not tool search.</b> LangChain4j also ships a {@code ToolSearchStrategy}
  * that hides tools until the model searches for them. It is a real alternative, but
  * the two do not compose: a dynamic {@code ToolProvider} — which is what

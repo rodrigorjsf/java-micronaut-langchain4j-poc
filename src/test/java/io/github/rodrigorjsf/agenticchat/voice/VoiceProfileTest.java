@@ -189,9 +189,17 @@ class VoiceProfileTest {
         // in a log nobody reads. It has been raised twice since, each time in the
         // commit that grew the document; raising it without saying why is how it
         // stops measuring anything.
+        //
+        // Raised 20_000 -> 23_000 for the arithmetic appendix: prompt/CALCULATION.md,
+        // 2577 characters, interpolated between "# Skills" and "# How to answer".
+        // Measured either side of that change — 19_078 chars before, 21_657 after.
+        // The appendix carries its own tighter ceiling in CalculationPolicyTest
+        // (2_600 characters), because the slack in this gate would swallow a doubling
+        // of it without going red, and the appendix is the part most likely to grow:
+        // it is prose, and prose invites a paragraph.
         assertThat(systemPrompt.prompt().length())
                 .as("system prompt characters, paid on every turn of every conversation")
-                .isLessThan(20_000);
+                .isLessThan(23_000);
     }
 
     private static VoiceProperties propertiesPointingAt(String resource) {
