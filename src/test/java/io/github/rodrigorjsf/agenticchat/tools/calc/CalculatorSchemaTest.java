@@ -74,18 +74,45 @@ class CalculatorSchemaTest {
     }
 
     @Test
-    @DisplayName("the operation enum reaches the model with all sixteen values")
+    @DisplayName("the operation enum reaches the model with all seventeen values")
     void theOperationEnumCarriesEveryValue() {
         JsonSchemaElement operation = stepSchema().properties().get("operation");
 
         assertThat(operation).isInstanceOf(JsonEnumSchema.class);
         // Named one by one rather than derived from Operation.values(): a test that
         // reads the enum it is checking agrees with any future edit to that enum,
-        // including the accidental ones. §3 of the contract froze this set at 16.
+        // including the accidental ones. §3 of the contract froze this set at 16;
+        // ROUND is the seventeenth, added after a review found that reporting a
+        // rounded figure and being able to feed one forward are different things.
         assertThat(((JsonEnumSchema) operation).enumValues()).containsExactlyInAnyOrder(
                 "SUM", "SUBTRACT", "MULTIPLY", "DIVIDE", "NEGATE", "AVERAGE", "MIN", "MAX",
                 "PERCENT_OF", "ADD_PERCENT", "SUBTRACT_PERCENT", "PERCENT_CHANGE",
-                "RATIO_PERCENT", "SIMPLE_INTEREST", "COMPOUND_INTEREST", "INSTALLMENT_PAYMENT");
+                "RATIO_PERCENT", "SIMPLE_INTEREST", "COMPOUND_INTEREST", "INSTALLMENT_PAYMENT",
+                "ROUND");
+    }
+
+    @Test
+    @DisplayName("every order-sensitive operation states its operand order where the model reads it")
+    void theOperationDescriptionCarriesTheOperandOrders() {
+        // The finding this test exists for: Operation's per-constant javadoc is
+        // source-only, so the model receives a bare enum of names. An order it has to
+        // guess is one it gets wrong silently — a swap passes every arity guard and
+        // returns a plausible number. This description is the only place it can read
+        // them, so a future edit that trims it for tokens goes red here.
+        String description = stepSchema().properties().get("operation").description();
+
+        assertThat(description).isNotNull();
+        assertThat(description)
+                .contains("PERCENT_OF [percent, base]")
+                .contains("ADD_PERCENT [base, percent]")
+                .contains("SUBTRACT_PERCENT [base, percent]")
+                .contains("PERCENT_CHANGE [from, to]")
+                .contains("RATIO_PERCENT [part, whole]")
+                .contains("[principal, ratePerPeriodInPercent, numberOfPeriods]")
+                .contains("ROUND [value, decimalPlaces]");
+        // The two mirrored ones carry a worked figure, because naming the slots is
+        // what separates 230 from 45 and the names alone read as interchangeable.
+        assertThat(description).contains("gives 30").contains("gives 230");
     }
 
     @Test

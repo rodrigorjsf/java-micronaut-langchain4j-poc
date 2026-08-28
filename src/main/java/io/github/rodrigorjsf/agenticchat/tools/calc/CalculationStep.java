@@ -48,9 +48,33 @@ public record CalculationStep(
                 32 characters, unique within the call. Examples: subtotal, discount, icms, total.""")
         String id,
 
+        // The operand ORDER of every fixed-arity operation is stated here, and this
+        // is the only place the model can read it. Operation's own per-constant
+        // javadoc is source-only — the generated schema is a bare JsonEnumSchema of
+        // sixteen names — and an order it has to guess is one it gets wrong silently:
+        // a swap passes every arity guard and returns a plausible number, which is
+        // the exact failure this whole tool exists to remove. It costs tokens on
+        // every turn because the tool is always visible; a wrong invoice costs more.
         @Description("""
                 What this step does. Percent operands are always in percent units:
-                15 means 15 percent, never 0.15.""")
+                15 means 15 percent, never 0.15.
+                Order matters, and these take their operands in a fixed order:
+                PERCENT_OF [percent, base] — "15% of 200" is ["15","200"] and gives 30.
+                ADD_PERCENT [base, percent] — "200 plus 15%" is ["200","15"] and gives 230.
+                SUBTRACT_PERCENT [base, percent] — a discount; ["200","15"] gives 170.
+                PERCENT_CHANGE [from, to] — ["200","230"] gives 15, the change in percent.
+                RATIO_PERCENT [part, whole] — ["30","200"] gives 15, the share in percent.
+                SIMPLE_INTEREST, COMPOUND_INTEREST and INSTALLMENT_PAYMENT all take
+                [principal, ratePerPeriodInPercent, numberOfPeriods] — 1000 at 2% a month
+                for 12 months is ["1000","2","12"]. The first two return the final amount;
+                INSTALLMENT_PAYMENT returns the payment due each period (Price table).
+                ROUND [value, decimalPlaces] rounds a value so a later step can use the
+                rounded figure — ["#linha","2"] for centavos. Use it only when the rounding
+                is really part of the answer, such as an invoice that rounds each line
+                before summing; otherwise let the chain run at full precision.
+                SUBTRACT and DIVIDE take the first operand and then apply the rest to it
+                left to right. NEGATE takes one operand. SUM, MULTIPLY, AVERAGE, MIN and
+                MAX do not depend on order.""")
         Operation operation,
 
         @Description("""

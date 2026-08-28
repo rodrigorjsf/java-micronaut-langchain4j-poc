@@ -45,6 +45,22 @@ public enum Operation {
     /** {@code -x}. */
     NEGATE(1, 1, "[value]"),
 
+    /**
+     * {@code [value, decimalPlaces]} — {@code value} rounded to that many decimal
+     * places, using the call's rounding mode.
+     *
+     * <p>This is the one operation that exists to change a value rather than to
+     * compute one, and it is here because reporting a rounded figure and being
+     * able to <em>feed one forward</em> are different things. Every step's result
+     * is stored at full precision and a {@code #ref} resolves to that, which is
+     * right for a chain that is one calculation. It is wrong for an invoice whose
+     * issuer rounds each line to cents before summing: those centavos are part of
+     * the total the customer is charged, and without this the model has to read a
+     * rounded line back out of one result and start a second call — the round trip
+     * the batch shape exists to avoid.
+     */
+    ROUND(2, 2, "[value, decimalPlaces]"),
+
     /** Arithmetic mean of every operand. */
     AVERAGE(1, Arity.MANY),
 
@@ -148,14 +164,6 @@ public enum Operation {
 
     Operation(int minOperands, int maxOperands) {
         this(minOperands, maxOperands, "[value, value, ...]");
-    }
-
-    public int minOperands() {
-        return minOperands;
-    }
-
-    public int maxOperands() {
-        return maxOperands;
     }
 
     public boolean accepts(int operandCount) {

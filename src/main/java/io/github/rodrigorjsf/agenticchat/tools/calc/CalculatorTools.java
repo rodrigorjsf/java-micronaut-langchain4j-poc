@@ -69,8 +69,18 @@ import java.util.regex.Pattern;
  *
  * <h2>Nothing throws</h2>
  *
- * <p>{@link #calculate} has no path that lets a {@code Throwable} escape. The
- * catch of last resort returns {@code CALCULATION FAILED · internal_error}
+ * <p>{@link #calculate} has no path that lets a {@code RuntimeException} escape,
+ * and no reachable path that produces anything else. The distinction is
+ * deliberate and the catch is <em>not</em> widened to {@code Throwable}: catching
+ * an {@code OutOfMemoryError} would mean allocating the error string at the
+ * moment allocation is failing, which turns a crash into an unreliable one, and
+ * {@code catch (Throwable)} would swallow a {@code LinkageError} or a
+ * {@code StackOverflowError} into a permanent silent {@code internal_error}. An
+ * {@code OutOfMemoryError} was in fact reachable here once — see
+ * {@link #numeralCorrection} — and it was closed by removing the unbounded
+ * allocation rather than by catching its consequence.
+ *
+ * <p>The catch of last resort returns {@code CALCULATION FAILED · internal_error}
  * because the framework's {@code toolExecutionErrorHandler} would otherwise tell
  * the model "this data source is temporarily unavailable" — for a tool that has
  * no data source, which is a sentence the model would repeat to the user and a
@@ -301,7 +311,7 @@ public class CalculatorTools {
             }
             List<BigDecimal> operands = operandsOf(step, id, operation, earlier);
 
-            BigDecimal value = inRange(apply(operation, operands, id), id);
+            BigDecimal value = inRange(apply(operation, operands, id, mode), id);
             earlier.put(id, value);
             body.append(line(id, operation, value, money, mode)).append('\n');
             answerId = id;
@@ -312,11 +322,38 @@ public class CalculatorTools {
                 + "ANSWER: " + answerId + " = " + present(answerValue, money, mode) + " " + money;
     }
 
+    /**
+     * Anything the model sent, cut to a length that is safe to hand back to it.
+     *
+     * <p>Every error message here quotes the argument it rejected, because an
+     * error naming nothing is an error the model cannot act on. But the argument
+     * is model-supplied and unbounded, and the message is the next thing the model
+     * reads — so quoting it whole makes the tool's own error the payload. This is
+     * the third instance of that shape found in this class: an operand carrying a
+     * large exponent, a result rendered at a huge scale, and now the two branches
+     * below, which run <em>before</em> any length check could have fired.
+     *
+     * <p>A reference is checked against the map before the operand-length guard,
+     * and an id is checked against {@code STEP_ID} before anything else — so the
+     * 40-character and 32-character bounds elsewhere in the class do not cover
+     * either of them. {@code STEP_ID} bounds the ids a call <em>defines</em>, never
+     * the string it <em>references</em>.
+     */
+    private static String clip(String raw) {
+        if (raw == null) {
+            return "";
+        }
+        return raw.length() <= MAX_OPERAND_CHARS
+                ? raw
+                : raw.substring(0, MAX_OPERAND_CHARS) + "… (" + raw.length() + " characters)";
+    }
+
     private static String validId(String raw, int position) {
         String id = raw == null ? "" : raw.strip();
         if (!STEP_ID.matcher(id).matches()) {
             throw failure("invalid_step_id", null,
-                    "step number " + (position + 1) + " has the id '" + raw + "', which is not usable.",
+                    "step number " + (position + 1) + " has the id '" + clip(raw)
+                            + "', which is not usable.",
                     "use 1 to 32 characters, lower-case letters, digits and underscores only — "
                             + "for example 'subtotal', 'icms' or 'total_com_frete'.");
         }
@@ -368,7 +405,7 @@ public class CalculatorTools {
             BigDecimal value = earlier.get(reference);
             if (value == null) {
                 throw failure("unknown_reference", stepId,
-                        "'" + operand + "' does not name any step that has already run.",
+                        "'" + clip(operand) + "' does not name any step that has already run.",
                         "a # reference reaches only a step that appears BEFORE this one in the "
                                 + "list. Available here: " + known(earlier) + ".");
             }
@@ -392,7 +429,8 @@ public class CalculatorTools {
     // Arithmetic
     // ------------------------------------------------------------------
 
-    private static BigDecimal apply(Operation operation, List<BigDecimal> v, String stepId) {
+    private static BigDecimal apply(Operation operation, List<BigDecimal> v, String stepId,
+                                    Rounding mode) {
         return switch (operation) {
             case SUM -> v.stream().reduce(BigDecimal.ZERO, (a, b) -> a.add(b, WORKING));
             case SUBTRACT -> leftToRight(v, (a, b) -> a.subtract(b, WORKING));
@@ -401,6 +439,11 @@ public class CalculatorTools {
                     quotient(a, b, stepId, "a divisor in this DIVIDE step is zero.",
                             "check the operands after the first one; none of them may be zero."));
             case NEGATE -> v.getFirst().negate();
+            // The one operation that changes a value rather than computing one. It
+            // takes the call's rounding mode rather than a mode of its own: two
+            // rounding modes in one result is a number nobody can reproduce, and the
+            // header names only one of them.
+            case ROUND -> round(v, mode, stepId);
             // The operand-count guard has already made the list non-empty, so the
             // divisor here cannot be zero. §5 of the contract routes "AVERAGE with no
             // operands" to division_by_zero; that path is unreachable behind the 1..200
@@ -432,6 +475,35 @@ public class CalculatorTools {
     }
 
     /** {@code P × (1 + i×n)} — interest that is not put back to work. */
+    /**
+     * {@code [value, decimalPlaces]}, rounded with the call's mode.
+     *
+     * <p>{@code decimalPlaces} is an operand like any other, so it arrives as a
+     * {@code BigDecimal} and may be anything the grammar accepts. It is bounded
+     * here rather than trusted: {@code setScale} takes an {@code int}, and a scale
+     * of two hundred million is the render defect this class has already been bitten
+     * by twice. The ceiling is the same {@link #MAX_FRACTION_DIGITS} every result
+     * passes, so a value this operation could produce is a value {@code inRange}
+     * would accept.
+     */
+    private static BigDecimal round(List<BigDecimal> v, Rounding mode, String stepId) {
+        BigDecimal places = v.get(1);
+        if (places.stripTrailingZeros().scale() > 0) {
+            throw failure("invalid_number", stepId,
+                    "ROUND takes a whole number of decimal places, and '"
+                            + places.toPlainString() + "' is not one.",
+                    "use 2 for centavos, 0 for whole units.");
+        }
+        if (places.compareTo(BigDecimal.ZERO) < 0
+                || places.compareTo(BigDecimal.valueOf(MAX_FRACTION_DIGITS)) > 0) {
+            throw failure("value_out_of_range", stepId,
+                    "ROUND was asked for " + places.toPlainString() + " decimal places, and the "
+                            + "range is 0 to " + MAX_FRACTION_DIGITS + ".",
+                    "use 2 for centavos, 0 for whole units.");
+        }
+        return v.getFirst().setScale(places.intValueExact(), mode.mode());
+    }
+
     private static BigDecimal simpleInterest(List<BigDecimal> v, String stepId) {
         BigDecimal principal = v.getFirst();
         BigDecimal rate = v.get(1).divide(HUNDRED, WORKING);

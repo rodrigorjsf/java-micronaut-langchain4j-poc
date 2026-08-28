@@ -263,4 +263,48 @@ class CalculatorArithmeticTest {
 
         assertThat(output).startsWith("CALCULATION · currency=BRL · rounding=HALF_EVEN · scale=2");
     }
+
+    @Test
+    void roundGivesALaterStepTheRoundedFigureRatherThanTheExactOne() {
+        // The gap this operation closes. An invoice whose issuer rounds each line to
+        // centavos before summing charges those centavos, and a #ref alone resolves to
+        // the full-precision value — so without ROUND the model has to read a rounded
+        // line back out of one result and start a second call.
+        //
+        // Two lines of 10/3 = 3.333... Summed exactly that is 6.666..., presented 6.67.
+        // Rounded to centavos first it is 3.33 + 3.33 = 6.66. The one-centavo gap is
+        // the whole point, and it is what the customer is actually billed.
+        String exact = calculator.calculate(
+                List.of(new CalculationStep("linha", Operation.DIVIDE, List.of("10", "3")),
+                        new CalculationStep("total", Operation.SUM, List.of("#linha", "#linha"))),
+                Currency.BRL, Rounding.HALF_EVEN);
+
+        String rounded = calculator.calculate(
+                List.of(new CalculationStep("linha", Operation.DIVIDE, List.of("10", "3")),
+                        new CalculationStep("cents", Operation.ROUND, List.of("#linha", "2")),
+                        new CalculationStep("total", Operation.SUM, List.of("#cents", "#cents"))),
+                Currency.BRL, Rounding.HALF_EVEN);
+
+        assertThat(exact).endsWith("ANSWER: total = 6.67 BRL");
+        assertThat(rounded).endsWith("ANSWER: total = 6.66 BRL");
+    }
+
+    @Test
+    void roundRefusesAFractionalNumberOfPlaces() {
+        assertThat(calculator.calculate(
+                List.of(new CalculationStep("r", Operation.ROUND, List.of("10.555", "2.5"))),
+                Currency.BRL, Rounding.HALF_EVEN))
+                .startsWith("CALCULATION FAILED \u00b7 invalid_number")
+                .contains("whole number of decimal places");
+    }
+
+    @Test
+    void roundRefusesAScaleThatWouldRunTheRenderAway() {
+        // Same defect family as the two the review reproduced: setScale takes an int,
+        // and the operand is model-supplied. Bounded to the ceiling every result passes.
+        assertThat(calculator.calculate(
+                List.of(new CalculationStep("r", Operation.ROUND, List.of("1", "100000000"))),
+                Currency.BRL, Rounding.HALF_EVEN))
+                .startsWith("CALCULATION FAILED \u00b7 value_out_of_range");
+    }
 }
