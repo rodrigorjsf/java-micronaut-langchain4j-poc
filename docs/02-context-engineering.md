@@ -24,16 +24,21 @@ would accept.
 
 | Region | Budget | Paid |
 |---|---|---|
-| System prompt | ~1 500 | every turn, unchanged |
+| Role, rules, skills index, canary | ~1 750 | every turn, unchanged |
 | Voice document | ~3 020 | every turn, unchanged |
-| Skills index | ~970 at 12 skills | every turn, unchanged |
+| Arithmetic appendix | ~640 | every turn, unchanged |
 | Retrieved content | 0–1 000 | only on routed turns |
 | Conversation | up to ~14 400 before compaction | every turn, growing |
 | This turn's tool results | ≤ 32 KB per call at the transport, ~8k tokens | this turn, then in memory |
 | Reserve for the answer | ~4 000 | — |
 
 The first three rows are the *standing* cost — the number that multiplies by every
-turn of every conversation, so it gets the most attention.
+turn of every conversation, so it gets the most attention. Together they are the
+assembled system prompt, and it is measured rather than budgeted: the line
+`SystemPromptBuilder` logs at startup reads **21 657 chars, ~5 414 tokens
+(12 068 chars of it the voice profile, 2 577 the arithmetic appendix)**, leaving
+7 012 chars for everything else. `VoiceProfileTest` fails the build above 23 000
+characters, so the next unplanned growth is red rather than a log line.
 
 The voice document is the largest single line in that block, and the interesting
 thing about it is that **moving it did not help**. A ~3000-token tone-of-voice
@@ -91,6 +96,19 @@ The mechanism and its two silent failure modes are in
 [ADR 0005](adr/0005-progressive-tool-disclosure-through-skills.md); the general
 version is in
 [`.claude/skills/progressive-tool-disclosure`](../.claude/skills/progressive-tool-disclosure/SKILL.md).
+
+**One tool is outside the lever, and it is an exception rather than a loophole.**
+`calculate` is declared straight onto the assistant with `.tools(...)`, so its
+schema is in the prompt on every turn and no `activate_skill` precedes it. The
+test that admits it is not how useful a tool is — it is whether the model can be
+trusted to *notice that the turn qualifies*. Routing a capability every turn may
+need buys nothing and costs a round trip, and the turn where the model fails to
+notice looks exactly like the turn that correctly needed nothing: a fluent wrong
+total, in the right voice, that no log line records. That is the voice document's
+argument, and it holds for one tool. Anything with an upstream stays behind the
+catalogue, where `ToolGuardProvider` can screen what it returns — a statically
+declared tool bypasses that guard, which is only safe because this one reads
+nothing and returns text it formatted from its own arithmetic.
 
 ## Lever 2 — the stable prefix
 
@@ -202,3 +220,18 @@ Each of these is real, works, and is wrong at this size.
 The last row is the one worth internalising. Every measurement in this chapter
 points the same way — **the fix for a model behaving badly is almost never one
 more sentence in the prompt.**
+
+**And the arithmetic appendix is 2 577 characters that were added to the prompt
+to fix a behaviour, so it owes that row an answer rather than an exemption.** The
+answer is the word *one*. What the row rejects is a sentence shipped *instead of*
+a mechanism — "be careful with numbers" has nothing behind it, cannot be tested,
+and degrades the file it is added to. The appendix ships *with* one: a
+deterministic tool that makes the rule checkable, and whose absence from the
+prompt stops the process rather than softening the rule. It is the tool's
+documentation, positioned where the model reads it. The honest cost is stated and
+not amortised away — ~640 tokens on every turn of every conversation, on top of
+the tool's own always-visible schema — and the appendix carries a 2 600-character
+ceiling of its own in `CalculationPolicyTest`, tighter than the prompt gate,
+because prose invites a paragraph and the slack in the larger gate would swallow
+a doubling without going red. A prompt rule that cannot name its mechanism still
+belongs in the row above.
