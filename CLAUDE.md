@@ -129,6 +129,10 @@ When something fails repeatedly, when User has to re-explain, or when a workarou
 - Micronaut Serde cannot serialize `ChatMessage`; use LangChain4j's `ChatMessageSerializer`.
 - Langfuse v3 scores name their target in `subject.kind`, not an `observationId` field.
 - `head` ignores its RTK deny (alias bypass); use Read or `/usr/bin/head`.
+- `@P` is `@Target(PARAMETER)`; describe record components with `@Description`.
+- Every record component lands in the schema's `required` array; none opt out.
+- LangChain4j required OBJECT params are unvalidated; `null` reaches the method.
+- Static `.tools(...)` composes with a dynamic `toolProvider()` and skips its guard.
 
 
 
