@@ -594,7 +594,7 @@ a child receives is being written.
 | Neighbour | Way | The discriminator |
 |---|---|---|
 | `agentic-service-composition` | both ways | **across agents versus inside one process**, stated in both descriptions |
-| `gauntlet-loop` | handed by | **the brief versus the bar.** That page defers *what a child agent's brief may carry and what its answer may be trusted for* to here; what the loop adds on top is narrow — the critic must not receive the builder's reasoning |
+| `gauntlet-loop` | handed by | **the brief versus the bar.** That page defers *what a child agent's brief may carry and what its answer may be trusted for* to here; what the loop adds on top is narrow — the critic must not learn the round count or the effort |
 | `llm-cost-observability` | hands to | **the extra calls, measured.** Whether a child is worth spawning is this page's; the hit rate and the spend are that page's |
 | `agentic-tool-boundary` | hands to | **which retry.** A bounded transport retry inside one call is the boundary's; re-spawning a child is not a transport concern |
 | `prompt-injection-layers` | hands to | **the wrapper around returned text**, which is that page's |
@@ -614,10 +614,12 @@ when quality is being self-reported by whoever produced it.
   unreachable rather than the work being bad.
 - Two independent drafts exist and the comparison must not know which one is
   whose.
+- The findings do not fall across rounds, or rise after each fix — the loop is
+  oscillating, and its own fix waves are writing what the next critic attacks.
 
 | Neighbour | Way | The discriminator |
 |---|---|---|
-| `subagent-context-isolation` | hands to | **the brief versus the loop.** Everything about what a child may carry and what its answer may be trusted for is that page's; the loop's own addition is that the critic must not receive the builder's reasoning |
+| `subagent-context-isolation` | hands to | **the brief versus the loop.** Everything about what a child may carry and what its answer may be trusted for is that page's; the loop's own addition is that the critic must not learn the round count or the effort |
 | `agentic-evals` | both ways | **driving versus measuring.** A blind comparison names a winner only when the same side wins both orders; whether the judge's verdicts track a human's at all is evals', and both descriptions carry the clause |
 | a harness runner skill | hands to | **the technique versus the machinery.** Which tool fans out, where state survives a session and how a run resumes are properties of a harness. **This repository ships no runner skill**, and a skill that guessed those would be wrong on every other harness |
 
@@ -741,7 +743,7 @@ rounds in a row.
 | # | Step | Fired by | Consumes | Produces |
 |---|---|---|---|---|
 | 1 | `gauntlet-loop` | the model | the adjective, and whatever standard is currently implied | a bar named **before** the work, a split cut where a critic can judge one piece alone, and a blind comparison protocol |
-| 2 | `subagent-context-isolation` | the model | that split | each child's brief, the discard test applied before spawning, and a call budget for the fan-out. The critic's brief must not carry the builder's reasoning — that is the loop's one addition on top |
+| 2 | `subagent-context-isolation` | the model | that split | each child's brief, the discard test applied before spawning, and a call budget for the fan-out. The critic's brief must not carry the builder's reasoning — that is this skill's; the loop adds that the critic must not learn the round count or the effort |
 | 3 | `agentic-evals` | the model | the critic's verdicts | the judge-versus-human agreement measurement, on the rows people actually argue about |
 | 3a | `agentic-service-composition` | the model | the roles step 2 spread across agents | the alternative, when the split does not need separate agents at all: roles inside one process |
 
