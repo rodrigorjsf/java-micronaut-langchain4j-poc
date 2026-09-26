@@ -1,12 +1,13 @@
 package io.github.rodrigorjsf.agenticchat.evals.scenario;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonValue;
 
 import java.net.URI;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * One row of the scenario dataset: a scripted conversation and what must be true after it.
@@ -56,9 +57,19 @@ public record Scenario(String id,
         /**
          * The configuration that points {@link #catalogueKey} at the stub's failure route.
          *
+         * <p>The key must already be in the catalogue. Catalogue entries bind per key, so a
+         * mistyped one would create a new, unused entry: the real upstream would stay real while
+         * the report still said it was faked.
+         *
          * @param stubServer root URL of a server running the test {@code StubApiController}
+         * @param catalogue  the catalogue keys of the application without the override
+         * @throws IllegalArgumentException when {@link #catalogueKey} is not one of them
          */
-        public Map<String, Object> properties(URI stubServer) {
+        public Map<String, Object> properties(URI stubServer, Set<String> catalogue) {
+            if (!catalogue.contains(catalogueKey)) {
+                throw new IllegalArgumentException("Upstream override names '" + catalogueKey
+                        + "', which is not a catalogue key; known keys: " + new java.util.TreeSet<>(catalogue));
+            }
             var prefix = "agentic.tools.apis." + catalogueKey + ".";
             var properties = new LinkedHashMap<String, Object>();
             properties.put(prefix + "base-url", stubServer.resolve("/stub/fail/" + failure.route()).toString());
@@ -76,27 +87,23 @@ public record Scenario(String id,
 
     /** The three ways an upstream fails that the tool door must turn into a value. */
     public enum FailureShape {
-        @JsonProperty("server-error")
-        SERVER_ERROR("server-error", null, "HTTP 500"),
+        SERVER_ERROR("server-error", null),
         /**
          * The stub answers after three seconds; the faked key's timeout drops to one so the
          * turn does not wait out the real six-second budget and its retry.
          */
-        @JsonProperty("timeout")
-        TIMEOUT("timeout", Duration.ofSeconds(1), "no answer within the 1 s timeout"),
-        @JsonProperty("oversized")
-        OVERSIZED("oversized", null, "a body larger than any response ceiling in the catalogue");
+        TIMEOUT("timeout", Duration.ofSeconds(1)),
+        OVERSIZED("oversized", null);
 
         private final String route;
         private final Duration timeout;
-        private final String description;
-
-        FailureShape(String route, Duration timeout, String description) {
+        FailureShape(String route, Duration timeout) {
             this.route = route;
             this.timeout = timeout;
-            this.description = description;
         }
 
+        /** The name a row uses for the shape, which is also the stub route that produces it. */
+        @JsonValue
         String route() {
             return route;
         }
@@ -106,7 +113,11 @@ public record Scenario(String id,
         }
 
         String description() {
-            return description;
+            return switch (this) {
+                case SERVER_ERROR -> "HTTP 500";
+                case TIMEOUT -> "no answer within the " + timeout.toSeconds() + " s timeout";
+                case OVERSIZED -> "a body larger than any response ceiling in the catalogue";
+            };
         }
     }
 }

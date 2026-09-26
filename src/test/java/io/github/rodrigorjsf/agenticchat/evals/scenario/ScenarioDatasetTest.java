@@ -4,10 +4,13 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ScenarioDatasetTest {
 
@@ -55,6 +58,16 @@ class ScenarioDatasetTest {
                 .orElseThrow();
 
         assertThat(weather.upstream()).isNull();
+    }
+
+    @Test
+    @DisplayName("an override naming a key outside the catalogue is refused, so it cannot fake nothing and report a fake")
+    void anOverrideOutsideTheCatalogueIsRefused() {
+        var typo = new Scenario.UpstreamFailure("open-meteo-forcast", Scenario.FailureShape.SERVER_ERROR);
+
+        assertThatThrownBy(() -> typo.properties(URI.create("http://localhost:1"), Set.of("open-meteo-forecast")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("open-meteo-forcast");
     }
 
     @Test

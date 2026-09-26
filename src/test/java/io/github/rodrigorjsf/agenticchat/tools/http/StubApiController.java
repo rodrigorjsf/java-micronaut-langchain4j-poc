@@ -192,8 +192,7 @@ public class StubApiController {
     /** Longer than the one-second timeout the timeout shape gives its catalogue key. */
     @Get("/fail/timeout/{+path}")
     public String failWithTimeout(String path) throws InterruptedException {
-        Thread.sleep(3_000);
-        return "{\"late\":true}";
+        return slow();
     }
 
     /**

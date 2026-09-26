@@ -177,7 +177,11 @@ flowchart LR
 
   `UpstreamFailureScenarioTest` runs each committed failure row with a scripted model
   and checks the text the tool door hands the model. The report names the faked
-  upstream on every row ("none: every upstream was real" otherwise).
+  upstream on every row ("none: every upstream was real" otherwise). An override
+  naming a key that is not in the catalogue is refused rather than silently faking
+  nothing. What the real model then tells the user is shown in the report; the
+  failure rows assert only the trajectory (answered, `get_weather` called) until
+  answer checks land.
 - **The report.** After the eval, `eval-report.html` is written at the repository
   root: one self-contained page (inline CSS, no script, nothing fetched) with each
   scenario's turns, expectation, activations, tool calls, answer, checks, latency and

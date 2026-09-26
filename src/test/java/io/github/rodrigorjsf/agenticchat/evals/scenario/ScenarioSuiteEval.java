@@ -1,6 +1,7 @@
 package io.github.rodrigorjsf.agenticchat.evals.scenario;
 
 import io.github.rodrigorjsf.agenticchat.testsupport.RecordingAgentTracer;
+import io.github.rodrigorjsf.agenticchat.tools.http.ToolHttpClient;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.junit.jupiter.api.AfterAll;
@@ -84,7 +85,8 @@ class ScenarioSuiteEval {
             return runner.run(scenario);
         }
         var stubServer = URI.create("http://localhost:" + stub.getPort());
-        try (var faked = startApp(scenario.upstream().properties(stubServer))) {
+        var catalogue = app.getApplicationContext().getBean(ToolHttpClient.class).knownApis();
+        try (var faked = startApp(scenario.upstream().properties(stubServer, catalogue))) {
             return runnerFor(faked).run(scenario);
         }
     }

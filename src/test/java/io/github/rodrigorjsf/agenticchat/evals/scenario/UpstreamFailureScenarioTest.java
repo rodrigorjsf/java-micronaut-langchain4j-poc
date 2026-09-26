@@ -5,6 +5,7 @@ import dev.langchain4j.data.message.AiMessage;
 import io.github.rodrigorjsf.agenticchat.llm.ChatModelRegistry;
 import io.github.rodrigorjsf.agenticchat.testsupport.RecordingAgentTracer;
 import io.github.rodrigorjsf.agenticchat.testsupport.StubChatModelRegistry;
+import io.github.rodrigorjsf.agenticchat.tools.http.ToolHttpClient;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.junit.jupiter.api.AfterAll;
@@ -62,8 +63,9 @@ class UpstreamFailureScenarioTest {
                 .findFirst()
                 .orElseThrow();
 
-        Map<String, Object> config = new HashMap<>(scenario.upstream().properties(URI.create(
-                "http://localhost:" + stub.getPort())));
+        var catalogue = stub.getApplicationContext().getBean(ToolHttpClient.class).knownApis();
+        Map<String, Object> config = new HashMap<>(scenario.upstream().properties(
+                URI.create("http://localhost:" + stub.getPort()), catalogue));
         config.put("micronaut.server.port", -1);
         config.put("agentic.test.stub-models", "true");
         config.put("agentic.test.recording-agent-tracer", "true");
