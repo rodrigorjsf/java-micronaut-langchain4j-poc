@@ -110,12 +110,14 @@ Intent labels are reported as **drift, not gated**. A wrong intent changes a
 metric dimension and a refusal template; a wrong decision changes whether the user
 gets an answer.
 
-## Level 2 — end-to-end scenarios
+## End-to-end scenarios
 
 The golden set measures one component, the Judge. A **scenario** measures a whole
 turn: user text in, triage, guardrails, skill activation, tool calls, answer out.
 It is how a change to a system prompt, a tool description or a skill body shows up
-as "the weather flow broke" instead of as nothing at all.
+as "the weather flow broke" instead of as nothing at all. Its checks are level-1
+assertions, but they run against a real model, so it runs where level 2 does:
+before a release, not on every commit.
 
 Each scenario is one row in a JSON file per scenario domain under
 `src/test/resources/evals/scenarios/` — today one happy path for the weather domain.
@@ -163,7 +165,7 @@ flowchart LR
 - **The report.** After the eval, `eval-report.html` is written at the repository
   root: one self-contained page (inline CSS, no script, nothing fetched) with each
   scenario's turns, expectation, activations, tool calls, answer, checks, latency and
-  tokens. Model text is HTML-escaped. The file is gitignored: it is a run artefact.
+  tokens. Model text is HTML-escaped. The file is gitignored: it is a run artifact.
 
 ## What is not built, and why
 

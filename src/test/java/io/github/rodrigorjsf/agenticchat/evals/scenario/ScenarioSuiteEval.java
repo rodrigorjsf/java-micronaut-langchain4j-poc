@@ -52,8 +52,10 @@ class ScenarioSuiteEval {
         app = ApplicationContext.run(EmbeddedServer.class, Map.of(
                 "micronaut.server.port", -1,
                 "agentic.test.recording-agent-tracer", "true",
-                // Rows are an eval, not traffic: kept out of the production dashboards.
-                "agentic.observability.environment", "experiment"));
+                // The report shows each tool call's arguments and result, which the tool
+                // listener only records while content capture is on. Pinned here so a
+                // deployment-level switch cannot silently empty the report.
+                "agentic.observability.capture-content", "true"));
         runner = new ScenarioRunner(URI.create("http://localhost:" + app.getPort()),
                 app.getApplicationContext().getBean(RecordingAgentTracer.class));
     }
