@@ -121,15 +121,47 @@ before a release, not on every commit.
 
 Each scenario is one row in a JSON file per scenario domain under
 `src/test/resources/evals/scenarios/` — today one happy path for the weather domain.
-A row says what the user types (`turns`) and what must be true afterwards
-(`expect.trajectory`: the final `outcome`, and the tools that must have run):
+A row says what the user types (`turns`) and what must be true afterwards:
+`expect.trajectory` (the final `outcome`, and the tools that must have run) and,
+optionally, `expect.answer` (what the answer itself must satisfy):
 
 ```json
 {"id": "weather-happy-forecast-tomorrow", "domains": ["weather"], "kind": "happy",
  "source": "synthetic", "turns": ["Vai chover amanhã em São Paulo?"],
- "expect": {"trajectory": {"outcome": "ANSWERED", "toolsCalled": ["get_weather"]}},
+ "expect": {"trajectory": {"outcome": "ANSWERED", "toolsCalled": ["get_weather"]},
+            "answer": {"language": "pt-BR",
+                       "grounded": ["(-?\\d+(?:[.,]\\d+)?)\\s*(?:mm|milímetros|°C|ºC|°|graus|%)"]}},
  "critical": true}
 ```
+
+The checks run in layers, cheapest first, and each one reports pass or fail with a
+reason in the report:
+
+| Order | Layer | Check | Passes when |
+|---|---|---|---|
+| 1 | trajectory | `outcome` | the last turn's `outcome` is the expected one |
+| 1 | trajectory | `tool called: <name>` | that tool ran at least once |
+| 2 | answer | `no link outside the catalogue` | every link in the answer is to a tool-catalogue host — on **every** answer, whether the row asks or not. The allow-list is the application's own `LinkPolicy`, so "outside" means what the output guardrail means |
+| 2 | answer | `language` | the answer reads as the expected tag, measured by the same stopword ratio triage uses (`pt-BR` or `en` only; a non-English answer reads as `pt-BR`, see #48) |
+| 2 | answer | `contains: <text>` | the answer contains the text, case-insensitively |
+| 2 | answer | `grounded: <regex>` | the regex finds at least one value in the answer, and **every** value it finds appears in a tool result captured during the same run |
+| 3 | rubric | — | not built yet; it will run after these and never gate |
+
+**Grounding, by example.** The row cannot say "12.4 mm" — tomorrow's rainfall
+changes daily. So it says *where* a value sits in the answer, and the check looks
+for that value in what the tools actually returned:
+
+| Answer says | Tool returned | Verdict | Why |
+|---|---|---|---|
+| `12,4 mm` | `"precipitation_sum":[0.0,12.4]` | pass | numbers compare as numbers; the decimal comma is read |
+| `20 °C` | `"temperature_2m_max":[24.1,19.8]` | pass | 19.8 rounds to 20 at the precision the answer wrote (the tolerance applies against any captured number, see #49) |
+| `2 °C` | `"temperature_2m_max":[24.1,19.8]` | fail | the `2` inside `temperature_2m_max` or `12.4` is not a number standing alone |
+| `dia 27` | `"time":["2026-09-27"]` | fail | a date's parts are not numbers standing alone |
+| `31,7 mm` | `"precipitation_sum":[0.0,12.4]` | fail | a number no tool returned is a number the model made up |
+| `não sei` | anything | fail | the row asked for a value and the answer holds none |
+
+A value quoted from `activate_skill` or `read_skill_resource` grounds nothing: a
+skill body is instructions, not data about the world.
 
 ```mermaid
 flowchart LR
@@ -139,14 +171,16 @@ flowchart LR
     tools --> tracer[RecordingAgentTracer]
     tracer -- "tool calls: name, arguments, result" --> checks[trajectory checks]
     app -- "outcome, reply, tokens" --> checks
-    checks --> html[eval-report.html]
+    checks --> answer[answer checks: links, language, content, grounding]
+    tracer -- "tool results" --> answer
+    answer --> html[eval-report.html]
     classDef input fill:#2d6cdf,stroke:#9ec1ff,color:#ffffff
     classDef seam fill:#b86e00,stroke:#ffc870,color:#ffffff
     classDef step fill:#5a6275,stroke:#aab3c5,color:#ffffff
     classDef out fill:#1f7a3f,stroke:#8fd9a8,color:#ffffff
     class row input
     class app,tracer seam
-    class runner,tools,checks step
+    class runner,tools,checks,answer step
     class html out
     linkStyle default stroke:#8892b0
 ```
@@ -159,7 +193,8 @@ flowchart LR
 - **Two runs of the same row.** `ScenarioRunnerTest` runs the committed row in the
   ordinary build with a scripted model and the local weather stub: a scripted
   trajectory that calls `get_weather` passes, and one that answers without it fails
-  with a reason naming the missing tool. `ScenarioSuiteEval` runs the same row
+  with a reason naming the missing tool; an answer citing a value the stub never
+  returned fails grounding. `ScenarioSuiteEval` runs the same row
   against the real model and real upstream APIs, tagged `evals`, with
   `./mvnw test -Pevals`.
 - **The report.** After the eval, `eval-report.html` is written at the repository

@@ -73,6 +73,12 @@ public final class EvalReportRenderer {
         var expected = scenario.expect().trajectory();
         row(html, "Expected", "outcome " + escape(expected.outcome()) + "; tools "
                 + escape(String.valueOf(expected.toolsCalled())));
+        var answer = scenario.expect().answer();
+        if (answer != null) {
+            row(html, "Expected answer", "language " + escape(answer.language())
+                    + "; contains " + escape(String.valueOf(answer.contains()))
+                    + "; grounded " + escape(String.valueOf(answer.grounded())));
+        }
         row(html, "Outcome", escape(trajectory.outcome()));
         row(html, "Activations", escape(String.join(", ", trajectory.activations())));
         row(html, "Tool calls", toolCalls(trajectory.toolCalls()));

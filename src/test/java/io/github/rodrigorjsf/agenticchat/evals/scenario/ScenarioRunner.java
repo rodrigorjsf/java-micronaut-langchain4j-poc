@@ -7,6 +7,7 @@ import io.github.rodrigorjsf.agenticchat.evals.scenario.ScenarioResult.ToolCall;
 import io.github.rodrigorjsf.agenticchat.evals.scenario.ScenarioResult.Trajectory;
 import io.github.rodrigorjsf.agenticchat.observability.trace.ObservationType;
 import io.github.rodrigorjsf.agenticchat.testsupport.RecordingAgentTracer;
+import io.github.rodrigorjsf.agenticchat.tools.http.LinkPolicy;
 
 import java.io.IOException;
 import java.net.URI;
@@ -22,7 +23,8 @@ import java.util.Objects;
 
 /**
  * Runs one scenario end to end: every turn through {@code POST /api/chat}, the trajectory read
- * back from the recording tracer, then the checks.
+ * back from the recording tracer, then the checks: trajectory first, then the deterministic
+ * answer checks — before any rubric a model would have to grade.
  *
  * <p>Plain {@code java.net.http} rather than Micronaut's client, so the request is exactly the
  * JSON a caller outside this JVM would send.
@@ -38,11 +40,17 @@ public final class ScenarioRunner {
 
     private final URI chatEndpoint;
     private final RecordingAgentTracer tracer;
+    private final LinkPolicy links;
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
 
-    public ScenarioRunner(URI serverUrl, RecordingAgentTracer tracer) {
+    /**
+     * @param links the application's own allow-list, so "outside the catalogue" means exactly
+     *              what the output guardrail means by it
+     */
+    public ScenarioRunner(URI serverUrl, RecordingAgentTracer tracer, LinkPolicy links) {
         this.chatEndpoint = serverUrl.resolve("/api/chat");
         this.tracer = tracer;
+        this.links = links;
     }
 
     public ScenarioResult run(Scenario scenario) {
@@ -67,7 +75,8 @@ public final class ScenarioRunner {
         }
         var latency = Duration.ofNanos(System.nanoTime() - started);
         var trajectory = trajectory(outcome);
-        var checks = TrajectoryCheck.evaluate(scenario.expect().trajectory(), trajectory);
+        var checks = new ArrayList<>(TrajectoryCheck.evaluate(scenario.expect().trajectory(), trajectory));
+        checks.addAll(AnswerCheck.evaluate(scenario.expect().answer(), answer, trajectory.toolCalls(), links::allows));
         return new ScenarioResult(scenario, trajectory, answer, checks, latency, inputTokens, outputTokens);
     }
 

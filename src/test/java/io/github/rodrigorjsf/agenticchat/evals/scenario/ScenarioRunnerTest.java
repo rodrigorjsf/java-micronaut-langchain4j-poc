@@ -4,6 +4,7 @@ import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.data.message.AiMessage;
 import io.github.rodrigorjsf.agenticchat.llm.ChatModelRegistry;
 import io.github.rodrigorjsf.agenticchat.testsupport.RecordingAgentTracer;
+import io.github.rodrigorjsf.agenticchat.tools.http.LinkPolicy;
 import io.github.rodrigorjsf.agenticchat.testsupport.StubChatModelRegistry;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.runtime.server.EmbeddedServer;
@@ -64,7 +65,8 @@ class ScenarioRunnerTest {
         app = ApplicationContext.run(EmbeddedServer.class, config);
         models = (StubChatModelRegistry) app.getApplicationContext().getBean(ChatModelRegistry.class);
         runner = new ScenarioRunner(URI.create("http://localhost:" + app.getPort()),
-                app.getApplicationContext().getBean(RecordingAgentTracer.class));
+                app.getApplicationContext().getBean(RecordingAgentTracer.class),
+                app.getApplicationContext().getBean(LinkPolicy.class));
     }
 
     @AfterEach
@@ -99,6 +101,9 @@ class ScenarioRunnerTest {
         assertThat(result.checks()).allSatisfy(check -> assertThat(check.passed())
                 .as("%s: %s", check.name(), check.reason()).isTrue());
         assertThat(result.passed()).isTrue();
+        assertThat(result.checks())
+                .as("the value is grounded in what the stub returned, through the recorded tool result")
+                .anySatisfy(check -> assertThat(check.name()).startsWith("grounded: "));
         assertThat(result.trajectory().outcome()).isEqualTo("ANSWERED");
         assertThat(result.trajectory().activations()).containsExactly("geo-and-weather");
 
@@ -127,9 +132,40 @@ class ScenarioRunnerTest {
 
         assertThat(result.passed()).isFalse();
         assertThat(result.checks())
-                .filteredOn(check -> !check.passed())
+                .filteredOn(check -> check.name().equals("tool called: get_weather"))
                 .singleElement()
-                .satisfies(check -> assertThat(check.reason()).contains("get_weather"));
+                .satisfies(check -> {
+                    assertThat(check.passed()).isFalse();
+                    assertThat(check.reason()).contains("get_weather");
+                });
+    }
+
+    @Test
+    @DisplayName("a value no tool returned fails grounding, and answer checks follow the trajectory checks")
+    void anInventedValueFailsGrounding() {
+        models.model("judge").fallbackTo(IN_SCOPE);
+        var agent = models.model("agent");
+        agent.reply(request -> AiMessage.from(ToolExecutionRequest.builder()
+                .id("call-1").name("get_weather")
+                .arguments("{\"latitude\":\"-23.55\",\"longitude\":\"-46.63\",\"forecastDays\":\"2\"}").build()));
+        agent.replyWith("Sim, amanhã deve chover em São Paulo: 31,7 mm previstos.");
+
+        var result = runner.run(weather);
+
+        assertThat(result.passed()).isFalse();
+        var names = result.checks().stream().map(check -> check.name()).toList();
+        assertThat(names).containsSubsequence("outcome", "tool called: get_weather",
+                "no link outside the catalogue", "language");
+        assertThat(result.checks())
+                .filteredOn(check -> check.name().startsWith("grounded: "))
+                .singleElement()
+                .satisfies(check -> {
+                    assertThat(check.passed()).isFalse();
+                    assertThat(check.reason()).contains("31,7").contains("get_weather");
+                });
+        assertThat(result.checks())
+                .filteredOn(check -> !check.name().startsWith("grounded: "))
+                .allSatisfy(check -> assertThat(check.passed()).as("%s: %s", check.name(), check.reason()).isTrue());
     }
 
     @Test
