@@ -3,10 +3,12 @@ package io.github.rodrigorjsf.agenticchat.evals.scenario;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.rodrigorjsf.agenticchat.evals.scenario.ScenarioResult.CheckResult;
+import io.github.rodrigorjsf.agenticchat.evals.scenario.ScenarioResult.Cost;
 import io.github.rodrigorjsf.agenticchat.evals.scenario.ScenarioResult.ToolCall;
 import io.github.rodrigorjsf.agenticchat.evals.scenario.ScenarioResult.Trajectory;
 import io.github.rodrigorjsf.agenticchat.observability.trace.ObservationType;
 import io.github.rodrigorjsf.agenticchat.testsupport.RecordingAgentTracer;
+import io.github.rodrigorjsf.agenticchat.triage.FailoverTriageJudge;
 
 import java.io.IOException;
 import java.net.URI;
@@ -45,6 +47,23 @@ public final class ScenarioRunner {
         this.tracer = tracer;
     }
 
+    /**
+     * Runs the scenario {@code times} times, each on a fresh conversation.
+     *
+     * @param pause called between two repetitions, never after the last — where a real run paces
+     *              itself under the provider's rate limit
+     */
+    public ScenarioRuns repeat(Scenario scenario, int times, Runnable pause) {
+        var repetitions = new ArrayList<ScenarioResult>(times);
+        for (int i = 0; i < times; i++) {
+            if (i > 0) {
+                pause.run();
+            }
+            repetitions.add(run(scenario));
+        }
+        return new ScenarioRuns(scenario, repetitions);
+    }
+
     public ScenarioResult run(Scenario scenario) {
         tracer.reset();
         String conversationId = null;
@@ -68,14 +87,29 @@ public final class ScenarioRunner {
         var latency = Duration.ofNanos(System.nanoTime() - started);
         var trajectory = trajectory(outcome);
         var checks = TrajectoryCheck.evaluate(scenario.expect().trajectory(), trajectory);
-        return new ScenarioResult(scenario, trajectory, answer, checks, latency, inputTokens, outputTokens);
+        return new ScenarioResult(scenario, trajectory, answer, checks, latency, inputTokens, outputTokens,
+                Cost.of(tracer.recorded()));
     }
 
+    /**
+     * The endpoint answers every failure with the same opaque 500, on purpose, so the cause is read
+     * from the trace instead: the last model call that failed. A rate limit there means the
+     * repetition measured the provider's quota, not the agent — SKIPPED rather than failed.
+     */
     private ScenarioResult failedRequest(Scenario scenario, HttpResponse<String> response, long elapsedNanos) {
+        var latency = Duration.ofNanos(elapsedNanos);
+        var lastError = tracer.recorded().stream()
+                .map(RecordingAgentTracer.Recorded::error)
+                .filter(Objects::nonNull)
+                .reduce((first, second) -> second);
+        if (lastError.isPresent() && FailoverTriageJudge.isRateLimit(lastError.get())) {
+            return ScenarioResult.skipped(scenario, "SKIPPED: the provider rate-limited the turn ("
+                    + lastError.get().getMessage() + ")", latency);
+        }
         var check = new CheckResult("request", false,
                 "POST /api/chat answered HTTP " + response.statusCode() + ": " + response.body());
         return new ScenarioResult(scenario, trajectory(null), null, List.of(check),
-                Duration.ofNanos(elapsedNanos), 0, 0);
+                latency, 0, 0, Cost.of(tracer.recorded()));
     }
 
     private Trajectory trajectory(String outcome) {

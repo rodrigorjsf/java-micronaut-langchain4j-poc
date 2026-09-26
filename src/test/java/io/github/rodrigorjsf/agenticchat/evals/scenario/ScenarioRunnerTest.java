@@ -150,4 +150,71 @@ class ScenarioRunnerTest {
                     assertThat(check.reason()).contains("ANSWERED").contains("REFUSED");
                 });
     }
+
+    @Test
+    @DisplayName("a turn the provider refuses on quota is SKIPPED, not failed")
+    void aRateLimitedTurnIsSkipped() {
+        models.model("judge").fallbackTo(IN_SCOPE);
+        models.model("agent").reply(request -> {
+            throw new IllegalStateException("429 RESOURCE_EXHAUSTED: quota exceeded for this model");
+        });
+
+        var result = runner.run(weather);
+
+        assertThat(result.skipped()).isTrue();
+        assertThat(result.passed()).isFalse();
+        assertThat(result.checks()).singleElement()
+                .satisfies(check -> assertThat(check.reason()).contains("RESOURCE_EXHAUSTED"));
+    }
+
+    @Test
+    @DisplayName("a server error that is not a rate limit is still a failure")
+    void anyOtherServerErrorIsAFailure() {
+        models.model("judge").fallbackTo(IN_SCOPE);
+        models.model("agent").reply(request -> {
+            throw new IllegalStateException("missing thought_signature");
+        });
+
+        var result = runner.run(weather);
+
+        assertThat(result.skipped()).isFalse();
+        assertThat(result.passed()).isFalse();
+        assertThat(result.checks()).singleElement()
+                .satisfies(check -> assertThat(check.reason()).contains("HTTP 500"));
+    }
+
+    @Test
+    @DisplayName("each repetition is its own run: one right and one wrong trajectory make a flaky scenario")
+    void eachRepetitionIsItsOwnRun() {
+        models.model("judge").fallbackTo(IN_SCOPE);
+        var agent = models.model("agent");
+        agent.reply(request -> AiMessage.from(ToolExecutionRequest.builder()
+                .id("call-1").name("get_weather")
+                .arguments("{\"latitude\":\"-23.55\",\"longitude\":\"-46.63\",\"forecastDays\":\"2\"}").build()));
+        agent.replyWith("Sim, amanhã deve chover em São Paulo: 12,4 mm previstos.");
+        agent.replyWith("Acho que vai chover amanhã em São Paulo.");
+        var pauses = new java.util.concurrent.atomic.AtomicInteger();
+
+        var runs = runner.repeat(weather, 2, pauses::incrementAndGet);
+
+        assertThat(runs.repetitions()).hasSize(2);
+        assertThat(runs.repetitions().get(0).passed()).isTrue();
+        assertThat(runs.repetitions().get(1).passed()).isFalse();
+        assertThat(runs.verdict()).isEqualTo(ScenarioRuns.Verdict.FLAKY);
+        assertThat(pauses).as("paced between repetitions, not after the last").hasValue(1);
+    }
+
+    @Test
+    @DisplayName("the cost of a run is read from the tracer, and a model with no price is counted rather than priced at zero")
+    void costComesFromTheTracer() {
+        models.model("judge").fallbackTo(IN_SCOPE);
+        models.model("agent").replyWith("Acho que vai chover amanhã em São Paulo.");
+
+        var result = runner.run(weather);
+
+        assertThat(result.cost().usd()).isZero();
+        assertThat(result.cost().unpricedCalls())
+                .as("the scripted models carry no model name, so no call is priced")
+                .isPositive();
+    }
 }

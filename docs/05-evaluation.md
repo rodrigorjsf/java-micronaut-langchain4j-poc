@@ -167,6 +167,35 @@ flowchart LR
   scenario's turns, expectation, activations, tool calls, answer, checks, latency and
   tokens. Model text is HTML-escaped. The file is gitignored: it is a run artifact.
 
+### Repetitions, the gate and flakiness
+
+A real model does not answer the same way twice, so one run of a scenario is a coin
+flip. Each scenario runs **3 times** by default (`-Dscenarios.repetitions=N` to
+change it), every repetition on a fresh conversation, and the report shows each one.
+What the repetitions add up to depends on whether the row is `critical`:
+
+| Repetitions that ran | `critical: true` | `critical: false` |
+|---|---|---|
+| 3 of 3 passed | PASSED | PASSED |
+| 2 of 3 passed | **fails the eval**, and listed as flaky | FLAKY — reported, never fails the eval |
+| 0 of 3 passed | **fails the eval** | FAILED — reported, never fails the eval |
+| every one rate limited | SKIPPED | SKIPPED |
+
+- **A rate limit is not a regression.** The endpoint answers every failure with
+  the same opaque HTTP 500, on purpose, so the runner reads the cause from the
+  recording tracer instead: when the last model call that failed carries a quota
+  error (`RESOURCE_EXHAUSTED`, 429, "rate limit" — the same test the triage
+  failover uses), that repetition is **SKIPPED** and counts neither as a pass nor
+  as a failure. A critical row with 2 passes and 1 skip passes. When nothing ran at
+  all, the eval is aborted rather than passed.
+- **The summary** at the top of the page lists the gate failures, the flaky
+  scenarios with their pass rate (`reported-two-of-three (2/3)`), the skipped
+  repetitions, the total tokens and the **estimated cost**. The cost is not a
+  second price table: it is the sum of the cost `CostCalculator` already put on
+  every model call (judge, agent and sub-agents alike) from `agentic.llm.pricing`.
+  A call to a model with no configured price is counted as unpriced and left out,
+  never priced at zero.
+
 ## What is not built, and why
 
 **An LLM-as-judge for answer quality.** The obvious level-2 addition, and the one
@@ -188,7 +217,9 @@ consumes them yet.
 1. `./mvnw test` — the deterministic gates, including the injection corpus.
 2. `./mvnw test -Pevals` — the golden set, if the triage prompt or its schema
    moved, and the scenario suite; open `eval-report.html` at the repository root
-   for every scenario's trajectory and the reason behind each failed check.
+   for every scenario's trajectory and the reason behind each failed check;
+   a critical scenario failing any of its 3 repetitions fails the eval, and
+   the summary names the flaky ones.
 3. Read the intent-drift table the golden set prints. A decision that stayed
    right while the labels moved is still a regression, because the metrics and
    the refusal templates key on those labels.
