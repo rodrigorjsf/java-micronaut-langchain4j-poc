@@ -187,7 +187,9 @@ What the repetitions add up to depends on whether the row is `critical`:
   error (`RESOURCE_EXHAUSTED`, 429, "rate limit" — the same test the triage
   failover uses), that repetition is **SKIPPED** and counts neither as a pass nor
   as a failure. A critical row with 2 passes and 1 skip passes. When nothing ran at
-  all, the eval is aborted rather than passed.
+  all, the eval is aborted rather than passed. Only a quota error on a *model* call is detected: an upstream
+  tool API answering 429 reaches the model as a tool result and the repetition is
+  still scored failed (see #50).
 - **The summary** at the top of the page lists the gate failures, the flaky
   scenarios with their pass rate (`reported-two-of-three (2/3)`), the skipped
   repetitions, the total tokens and the **estimated cost**. The cost is not a

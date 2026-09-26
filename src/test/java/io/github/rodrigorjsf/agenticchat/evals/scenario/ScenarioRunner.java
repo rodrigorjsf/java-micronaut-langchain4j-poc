@@ -95,6 +95,7 @@ public final class ScenarioRunner {
      * The endpoint answers every failure with the same opaque 500, on purpose, so the cause is read
      * from the trace instead: the last model call that failed. A rate limit there means the
      * repetition measured the provider's quota, not the agent — SKIPPED rather than failed.
+     * An upstream tool's 429 never gets here: it reaches the model as a tool result (see #50).
      */
     private ScenarioResult failedRequest(Scenario scenario, HttpResponse<String> response, long elapsedNanos) {
         var latency = Duration.ofNanos(elapsedNanos);
