@@ -1,0 +1,17 @@
+[
+  {
+    "id": "weather-happy-forecast-tomorrow",
+    "domains": ["weather"],
+    "kind": "happy",
+    "source": "synthetic",
+    "turns": ["Vai chover amanhã em São Paulo?"],
+    "expect": {
+      "trajectory": {
+        "outcome": "ANSWERED",
+        "toolsCalled": ["get_weather"]
+      }
+    },
+    "dependsOn": ["geo-and-weather", "get_weather", "open-meteo-forecast"],
+    "critical": true
+  }
+]

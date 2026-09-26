@@ -157,6 +157,19 @@ public class StubApiController {
                 """;
     }
 
+    /**
+     * Open-Meteo's forecast route, trimmed to the fields a rain question reads. The
+     * scenario-suite test grounds its scripted answer on {@code 12.4}.
+     */
+    @Get("/open-meteo/v1/forecast")
+    public String openMeteoForecast() {
+        return """
+                {"latitude":-23.55,"longitude":-46.63,"timezone":"America/Sao_Paulo",
+                "daily":{"time":["2026-09-26","2026-09-27"],
+                "precipitation_sum":[0.0,12.4],"temperature_2m_max":[24.1,19.8]}}
+                """;
+    }
+
     @Get("/slow")
     public String slow() throws InterruptedException {
         Thread.sleep(3_000);
