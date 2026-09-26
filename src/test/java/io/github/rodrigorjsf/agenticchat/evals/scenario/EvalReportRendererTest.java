@@ -19,7 +19,7 @@ class EvalReportRendererTest {
             "happy",
             "synthetic",
             List.of("Vai chover amanhã em São Paulo?"),
-            new Scenario.Expectation(new Scenario.TrajectoryExpectation("ANSWERED", List.of("get_weather"))),
+            new Scenario.Expectation(new Scenario.TrajectoryExpectation("ANSWERED", List.of("get_weather")), null),
             List.of("get_weather"),
             true);
 
@@ -101,5 +101,28 @@ class EvalReportRendererTest {
                 .doesNotContain("src=")
                 .doesNotContain("url(")
                 .doesNotContain("@import");
+    }
+
+    @Test
+    @DisplayName("the answer expectation and each deterministic answer check appear with their verdict and reason")
+    void rendersTheAnswerLayer() {
+        var scenario = new Scenario(WEATHER.id(), WEATHER.domains(), WEATHER.kind(), WEATHER.source(), WEATHER.turns(),
+                new Scenario.Expectation(WEATHER.expect().trajectory(), new Scenario.AnswerExpectation(
+                        "pt-BR", List.of("São Paulo"), List.of("(\\d+)\\s*mm<"))),
+                WEATHER.dependsOn(), WEATHER.critical());
+        var run = result("Vai chover 31,7 mm.", List.of(
+                new CheckResult("no link outside the catalogue", true, "the answer carries no link"),
+                new CheckResult("grounded: (\\d+)\\s*mm<", false, "[31,7] appear in no captured tool result")));
+
+        var html = EvalReportRenderer.render(List.of(new ScenarioResult(scenario, run.trajectory(), run.answer(),
+                run.checks(), run.latency(), run.inputTokens(), run.outputTokens())));
+
+        assertThat(html)
+                .contains("Expected answer")
+                .contains("language pt-BR")
+                .contains("contains [São Paulo]")
+                .contains("grounded [(\\d+)\\s*mm&lt;]")
+                .contains("<span class=\"pass\">PASS</span> no link outside the catalogue: the answer carries no link")
+                .contains("<span class=\"fail\">FAIL</span> grounded: (\\d+)\\s*mm&lt;: [31,7] appear in no captured tool result");
     }
 }

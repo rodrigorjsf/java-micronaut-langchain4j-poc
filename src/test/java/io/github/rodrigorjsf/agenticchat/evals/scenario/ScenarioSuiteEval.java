@@ -1,6 +1,7 @@
 package io.github.rodrigorjsf.agenticchat.evals.scenario;
 
 import io.github.rodrigorjsf.agenticchat.testsupport.RecordingAgentTracer;
+import io.github.rodrigorjsf.agenticchat.tools.http.LinkPolicy;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.junit.jupiter.api.AfterAll;
@@ -57,7 +58,8 @@ class ScenarioSuiteEval {
                 // deployment-level switch cannot silently empty the report.
                 "agentic.observability.capture-content", "true"));
         runner = new ScenarioRunner(URI.create("http://localhost:" + app.getPort()),
-                app.getApplicationContext().getBean(RecordingAgentTracer.class));
+                app.getApplicationContext().getBean(RecordingAgentTracer.class),
+                app.getApplicationContext().getBean(LinkPolicy.class));
     }
 
     @AfterAll

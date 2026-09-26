@@ -23,7 +23,11 @@ public record Scenario(String id,
                        List<String> dependsOn,
                        boolean critical) {
 
-    public record Expectation(TrajectoryExpectation trajectory) {
+    /**
+     * @param trajectory how the agent must have reached its answer
+     * @param answer     what the answer itself must satisfy; absent when the row asserts nothing on it
+     */
+    public record Expectation(TrajectoryExpectation trajectory, AnswerExpectation answer) {
     }
 
     /**
@@ -31,5 +35,18 @@ public record Scenario(String id,
      * @param toolsCalled tools that must each have executed at least once during the scenario
      */
     public record TrajectoryExpectation(String outcome, List<String> toolsCalled) {
+    }
+
+    /**
+     * The deterministic answer checks a row asks for. A link outside the tool catalogue is
+     * checked on every answer, whether or not the row names this.
+     *
+     * @param language the tag the answer must read as ({@code pt-BR} or {@code en}); null skips the check
+     * @param contains text the answer must contain, each compared case-insensitively
+     * @param grounded regular expressions that each find a value in the answer, capture group 1
+     *                 when there is one, the whole match otherwise; every value found must appear in
+     *                 a tool result captured during the same run
+     */
+    public record AnswerExpectation(String language, List<String> contains, List<String> grounded) {
     }
 }

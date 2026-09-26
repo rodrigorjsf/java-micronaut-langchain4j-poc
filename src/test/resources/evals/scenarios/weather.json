@@ -9,6 +9,10 @@
       "trajectory": {
         "outcome": "ANSWERED",
         "toolsCalled": ["get_weather"]
+      },
+      "answer": {
+        "language": "pt-BR",
+        "grounded": ["(-?\\d+(?:[.,]\\d+)?)\\s*(?:mm|milímetros|°C|ºC|°|graus|%)"]
       }
     },
     "dependsOn": ["geo-and-weather", "get_weather", "open-meteo-forecast"],
