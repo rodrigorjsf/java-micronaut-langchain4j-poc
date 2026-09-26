@@ -331,7 +331,12 @@ Nothing is edited before this. The user is shown, in one place:
    whose change would flip it.
 3. **The search tool's configuration as literal strings** — tool name, tool
    description, argument name, argument description, `maxResults`, `minScore` —
-   with the framework default beside each one you are changing.
+   with the framework default beside each one you are changing. Under semantic
+   search `minScore` is not a builder setting: `VectorToolSearchStrategy.Builder`
+   has no `minScore` setter `[verified — javap on langchain4j 1.18.1]`
+   `[sourced — source at tag 1.20.1]`, so its floor is a fixed `0.0` that filters nothing, and a real
+   floor ships as a constant in your own `ToolSearchStrategy` —
+   `STRATEGY-AND-DESCRIPTIONS.md`, *What semantic search actually does*.
 4. **Every tool name and description that changes, before and after, in full.**
 5. *(Conditional — only where some census row's `wording` is not `ours`.)*
    **Every census row whose `wording` is not `ours`**, and the move proposed for
@@ -455,7 +460,7 @@ and nothing the gate sent back is.
 | Check | What a pass looks like |
 |---|---|
 | Standing cost fell | serialize the specifications the framework actually sends, before and after; the hidden tools are gone and the search tool is there |
-| Every searchable tool is reachable | each `static` / `provider` tool is returned by at least one query set entry, within `maxResults` and **at or above** `minScore`. This is the one check that outlives the pass — `STRATEGY-AND-DESCRIPTIONS.md` turns it into a standing build check, partitioned by `reach`, that a later unfindable tool fails |
+| Every searchable tool is reachable | each `static` / `provider` tool is returned by at least one query set entry, within `maxResults` and **at or above** `minScore` (the score floor — under semantic search a constant in your own strategy, since the library builder has no setter). This is the one check that outlives the pass — `STRATEGY-AND-DESCRIPTIONS.md` turns it into a standing build check, partitioned by `reach`, that a later unfindable tool fails |
 | Every census row's reach path still holds | re-derive each searchable row's `reach` from the **real provider graph the application assembles** — not from the census file, which records the day it was written, and not from a test double — and fail on any row now arriving through a provider that answers dynamic. This is the regression the ordering fact makes consequential and it is the one that ships in **silence**: a provider whose dynamic answer is computed flips when a condition somewhere else changes, and in that instant its tools stop being hideable and stop being findable, with no exception, no failing assertion and no diff anybody reads as related. `STRATEGY-AND-DESCRIPTIONS.md` says why a test double cannot catch it, and turns this into the standing check |
 | Always-visible tools need no search | a turn using one of them shows no search call |
 | Multi-tool turns behave as measured | a request needing two tools completes, and the way it completes matches the disclosure lifetime observed in Step 2 — one search or two. A model that searches once and gives up against an accumulating disclosure is a finding about `maxResults` or about the search tool's description; against a non-accumulating one it is the framework working as observed, and `maxResults` was sized wrong. Where Step 2 defaulted rather than measured, this row asserts only that the turn completes |
