@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * The committed scenarios, run end to end against the real model and the real upstream APIs.
@@ -29,6 +30,12 @@ import static org.assertj.core.api.Assertions.assertThat;
  * it runs with {@code ./mvnw test -Pevals} and never in the default build. Each turn goes
  * through {@code POST /api/chat} on an embedded server; the trajectory comes back through the
  * recording {@code AgentTracer}.
+ *
+ * <p>Each scenario runs {@value ScenarioRuns#DEFAULT_REPETITIONS} times — override with
+ * {@code -Dscenarios.repetitions=N}. A {@code critical} scenario must pass every repetition that
+ * ran; any other scenario reports its pass rate and never fails the eval. A repetition the
+ * provider rate-limited is SKIPPED, and when no repetition ran at all the eval is aborted
+ * (reported as skipped) rather than passed or failed.
  *
  * <p>{@code eval-report.html} is written at the repository root after the run — in
  * {@link AfterAll}, so a failing gate still leaves the page that explains it. The file is
@@ -46,7 +53,7 @@ class ScenarioSuiteEval {
 
     private EmbeddedServer app;
     private ScenarioRunner runner;
-    private final List<ScenarioResult> results = new ArrayList<>();
+    private final List<ScenarioRuns> scenarioRuns = new ArrayList<>();
 
     @BeforeAll
     void startApp() {
@@ -65,7 +72,7 @@ class ScenarioSuiteEval {
     @AfterAll
     void writeReportAndStop() throws IOException {
         try {
-            Files.writeString(REPORT, EvalReportRenderer.render(results), StandardCharsets.UTF_8);
+            Files.writeString(REPORT, EvalReportRenderer.render(scenarioRuns), StandardCharsets.UTF_8);
             System.out.printf("%nscenario suite: report written to %s%n", REPORT);
         } finally {
             if (app != null) {
@@ -75,25 +82,28 @@ class ScenarioSuiteEval {
     }
 
     @Test
-    @DisplayName("scenario suite: every critical scenario passes against the real model")
+    @DisplayName("scenario suite: every critical scenario passes every repetition against the real model")
     void everyCriticalScenarioPasses() {
         var scenarios = ScenarioDataset.loadCommitted();
         assertThat(scenarios).isNotEmpty();
+        int repetitions = ScenarioRuns.parseRepetitions(System.getProperty(ScenarioRuns.REPETITIONS_PROPERTY));
 
         for (int i = 0; i < scenarios.size(); i++) {
             if (i > 0) {
                 pace();
             }
-            var result = runner.run(scenarios.get(i));
-            results.add(result);
-            System.out.printf("  %s %s%n", result.passed() ? "PASS" : "FAIL", result.scenario().id());
+            var runs = runner.repeat(scenarios.get(i), repetitions, ScenarioSuiteEval::pace);
+            scenarioRuns.add(runs);
+            System.out.printf("  %s %s (%d/%d passed, %d skipped)%n", runs.status(), runs.scenario().id(),
+                    runs.passes(), runs.executed(), runs.skipped());
         }
 
-        assertThat(results)
-                .filteredOn(result -> result.scenario().critical())
-                .allSatisfy(result -> assertThat(result.passed())
-                        .as("%s: %s", result.scenario().id(), result.checks())
-                        .isTrue());
+        assumeTrue(scenarioRuns.stream().anyMatch(runs -> runs.executed() > 0),
+                "every repetition was rate limited: nothing was measured");
+        assertThat(scenarioRuns)
+                .filteredOn(ScenarioRuns::failsGate)
+                .as("critical scenarios that failed a repetition")
+                .isEmpty();
     }
 
     private static void pace() {

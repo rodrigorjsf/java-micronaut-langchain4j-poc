@@ -60,7 +60,7 @@ public class FailoverTriageJudge implements TriageJudge {
      * LangChain4j does not normalise it into one exception type: Google answers
      * {@code RESOURCE_EXHAUSTED}, OpenAI a 429 with "rate limit".
      */
-    static boolean isRateLimit(Throwable error) {
+    public static boolean isRateLimit(Throwable error) {
         for (Throwable cause = error; cause != null; cause = cause.getCause()) {
             String message = cause.getMessage();
             if (message == null) {

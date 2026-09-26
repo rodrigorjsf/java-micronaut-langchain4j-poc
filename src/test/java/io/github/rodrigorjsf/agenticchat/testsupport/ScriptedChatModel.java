@@ -2,6 +2,7 @@ package io.github.rodrigorjsf.agenticchat.testsupport;
 
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.chat.listener.ChatModelErrorContext;
 import dev.langchain4j.model.chat.listener.ChatModelListener;
 import dev.langchain4j.model.chat.listener.ChatModelRequestContext;
 import dev.langchain4j.model.chat.listener.ChatModelResponseContext;
@@ -103,11 +104,19 @@ public class ScriptedChatModel implements ChatModel {
                 new ChatModelRequestContext(chatRequest, null, attributes)));
 
         AiMessage message;
-        if (router != null) {
-            message = router.apply(chatRequest);
-        } else {
-            var responder = script.poll();
-            message = responder == null ? fallback : responder.apply(chatRequest);
+        try {
+            if (router != null) {
+                message = router.apply(chatRequest);
+            } else {
+                var responder = script.poll();
+                message = responder == null ? fallback : responder.apply(chatRequest);
+            }
+        } catch (RuntimeException error) {
+            // A real provider model reports a failed call to its listeners before it
+            // throws; without this a scripted failure would be invisible to tracing.
+            listeners.forEach(listener -> listener.onError(
+                    new ChatModelErrorContext(error, chatRequest, null, attributes)));
+            throw error;
         }
         var response = ChatResponse.builder()
                 .aiMessage(message)

@@ -37,8 +37,12 @@ public class RecordingAgentTracer implements AgentTracer {
      *
      * @param input  the value passed to {@link Observation#input}, or {@code null}
      * @param output the value passed to {@link Observation#output}, or {@code null}
+     * @param usage  the value passed to {@link Observation#usage}, or {@code null}
+     * @param cost   the value passed to {@link Observation#cost}, or {@code null}
+     * @param error  the value passed to {@link Observation#failed}, or {@code null}
      */
-    public record Recorded(String name, ObservationType type, Object input, Object output) {
+    public record Recorded(String name, ObservationType type, Object input, Object output,
+                           TokenUsageDetails usage, Map<String, BigDecimal> cost, Throwable error) {
     }
 
     private final List<RecordingObservation> observations = new CopyOnWriteArrayList<>();
@@ -61,7 +65,7 @@ public class RecordingAgentTracer implements AgentTracer {
     /** Every observation started since the last {@link #reset()}, in start order. */
     public List<Recorded> recorded() {
         return observations.stream()
-                .map(o -> new Recorded(o.name, o.type, o.input, o.output))
+                .map(o -> new Recorded(o.name, o.type, o.input, o.output, o.usage, o.cost, o.error))
                 .toList();
     }
 
@@ -76,6 +80,9 @@ public class RecordingAgentTracer implements AgentTracer {
         private final ObservationRef ref;
         private volatile Object input;
         private volatile Object output;
+        private volatile TokenUsageDetails usage;
+        private volatile Map<String, BigDecimal> cost;
+        private volatile Throwable error;
 
         private RecordingObservation(String name, ObservationType type, ObservationRef ref) {
             this.name = name;
@@ -107,6 +114,7 @@ public class RecordingAgentTracer implements AgentTracer {
 
         @Override
         public Observation failed(Throwable error) {
+            this.error = error;
             return this;
         }
 
@@ -117,11 +125,13 @@ public class RecordingAgentTracer implements AgentTracer {
 
         @Override
         public Observation usage(TokenUsageDetails usage) {
+            this.usage = usage;
             return this;
         }
 
         @Override
         public Observation cost(Map<String, BigDecimal> costDetails) {
+            this.cost = costDetails;
             return this;
         }
 
