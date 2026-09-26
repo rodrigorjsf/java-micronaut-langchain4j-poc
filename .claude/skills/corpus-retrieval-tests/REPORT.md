@@ -55,7 +55,12 @@ tree — edited, added, deleted, renamed, untracked — and name, per document:
 1. every positive row whose `expected_source` is that document; and
 2. **every negative row.** Top-k is a competition and the threshold is absolute: an
    edit to any document can lift a question that used to retrieve nothing over the
-   gate, and a new document can take the slot an old positive row relied on.
+   gate.
+
+The list is the rows an edit touches **directly**, not every row it can move. A new
+or edited document can also take the top-k slot another document's positive row
+relied on; that row is not named here, and it does not need to be, because the next
+section keeps the whole set running and the row goes red in *Queries*.
 
 List a rename as a deletion plus an addition (`git diff --no-renames`). Otherwise
 only the new name appears and the rows still pointing at the old one — the ones that
@@ -66,7 +71,7 @@ diff says so by listing only the negatives, and *Uncovered documents* lists it
 again. Both are the same finding: write its row before it ships.
 
 The diff mode selects nothing out of the run. Retrieval is cheap, so the whole set
-still runs — a regression lands on the row that *used to be* rank 3, which is rarely
+still runs — which is what catches the displaced positive rows above — a regression lands on the row that *used to be* rank 3, which is rarely
 a row the edit's author would have picked.
 
 ## In this repository

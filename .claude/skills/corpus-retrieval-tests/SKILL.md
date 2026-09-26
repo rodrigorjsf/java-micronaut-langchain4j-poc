@@ -63,7 +63,10 @@ beside each document, and `prompt-to-corpus-migration` commits an acceptance lis
 at its step 0, before the document exists. Extend whichever exists. A second list
 nobody reconciles is how a question passes in one file and is unknown to the other.
 
-**One home, one owner.** The query set is committed **beside the corpus**, and
+**One home, one owner.** The query set is committed **beside the corpus** — or,
+where the corpus directory is itself read off the classpath and a sibling would
+shadow it, beside the repository's other eval datasets ([`REPORT.md`](REPORT.md)
+names this repository's case) — and
 **this skill owns its schema** — the field table below is that schema, and there is
 no second copy of it anywhere. Every document that names the set is naming this one
 artifact in that one home: `prompt-to-corpus-migration`'s acceptance list and
@@ -452,7 +455,7 @@ Run in order; done is the right-hand column.
 | 9 | Diagnose every failure before editing anything | `DIAGNOSIS.md` ran, the verdict names which of the four layers failed, and the fix went to the skill that owns that layer — no document was edited on a hunch. Where the verdict is *never migrated*, the owner is `prompt-to-corpus-migration` and a model cannot hand off to it: ask the user to run it, which they invoke by name |
 | 10 | Check both directions | every corpus document is some positive row's `expected_source`, and every `expected_source` names a document that exists |
 | 11 | Read the report after the run | every document appears in the coverage table with at least one passing row, *Uncovered documents* is empty, and after a corpus edit the diff mode ran against the base ref and every row it named was read |
-| 12 | Commit the set beside the corpus | rows in a stable order, each with its provenance; any edited row in its own commit with its reason |
+| 12 | Commit the set in its one home | rows in a stable order, each with its provenance; any edited row in its own commit with its reason |
 
 A green run of positives alone closes none of this. The row that certifies a
 corpus is the negative one — the question in the product's own words that the
