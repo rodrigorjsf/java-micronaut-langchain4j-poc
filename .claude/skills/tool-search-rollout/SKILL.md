@@ -331,7 +331,12 @@ Nothing is edited before this. The user is shown, in one place:
    whose change would flip it.
 3. **The search tool's configuration as literal strings** — tool name, tool
    description, argument name, argument description, `maxResults`, `minScore` —
-   with the framework default beside each one you are changing.
+   with the framework default beside each one you are changing. Under semantic
+   search `minScore` is not a builder setting: `VectorToolSearchStrategy.Builder`
+   has no `minScore` setter `[verified — javap on langchain4j 1.18.1; source at
+   tag 1.20.1]`, so its floor is a fixed `0.0` that filters nothing, and a real
+   floor ships as a constant in your own `ToolSearchStrategy` —
+   `STRATEGY-AND-DESCRIPTIONS.md`, *What semantic search actually does*.
 4. **Every tool name and description that changes, before and after, in full.**
 5. *(Conditional — only where some census row's `wording` is not `ours`.)*
    **Every census row whose `wording` is not `ours`**, and the move proposed for
