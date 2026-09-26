@@ -177,6 +177,33 @@ turn is the single exception, and it is the root.
 and never over OTLP. It is the only part of the Langfuse data model that is not a
 span, and the reason is that scores aggregate across traces where attributes do not.
 
+### Evaluation
+
+**Scenario domain** — one flow or resource the agent can use to serve a turn:
+looking up the weather, looking up a CNPJ, briefing a trip. It is whatever a user
+can reach through the agent, whether that is packaged as a skill's territory, a
+bare tool, or a sub-agent. Not every agentic backend has skills, so a domain is
+never defined as "a skill". It is the unit of coverage for end-to-end scenarios:
+every domain gets its happy paths and its bad paths.
+_Avoid_: using "domain" for a bounded context (triage, guardrails, memory) — those
+are the sections below, not what a user asks for.
+
+**Scenario** — one scripted conversation run end to end against the real model,
+with what must be true afterwards: the trajectory (outcome, activation, tool
+calls), the answer, and optionally a rubric. A scenario belongs to one domain, or
+to several when the turn crosses them, and declares the artifacts it depends on so
+that a change to one of them names the scenarios to revisit. Its kind is a happy
+path or a bad path; injection, out-of-scope and multi-turn memory are kinds of
+scenario, not domains.
+
+**Grounding** — the check that a value in the answer appears in a tool result
+captured during the same run. It is how a scenario asserts on live data whose value
+changes daily.
+
+**Grader** — the model that scores a scenario's rubric. Not the **Judge**, which
+triages turns. It is the last layer of checks and the only one that is itself a
+model.
+
 ---
 
 ## Bounded contexts, and what may depend on what
