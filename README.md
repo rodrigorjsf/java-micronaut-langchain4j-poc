@@ -60,7 +60,7 @@ in-process and starting a real Valkey container for the cache.
 ```bash
 ./mvnw test                       # no network, no Docker, no API key
 ./mvnw test -Pit                  # + floci via Testcontainers
-./mvnw test -Pevals               # + the triage golden set against a live model
+./mvnw test -Pevals               # + the triage golden set and the scenario suite against a live model (writes eval-report.html)
 ./scripts/check-tool-catalogue.py # tool code vs configured endpoints, both ways, https only
 ./scripts/check-skill-docs.py     # skill directories vs docs/06-skills.md, both ways
 ```

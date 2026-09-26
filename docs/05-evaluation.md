@@ -110,6 +110,61 @@ Intent labels are reported as **drift, not gated**. A wrong intent changes a
 metric dimension and a refusal template; a wrong decision changes whether the user
 gets an answer.
 
+## Level 2 — end-to-end scenarios
+
+The golden set measures one component, the Judge. A **scenario** measures a whole
+turn: user text in, triage, guardrails, skill activation, tool calls, answer out.
+It is how a change to a system prompt, a tool description or a skill body shows up
+as "the weather flow broke" instead of as nothing at all.
+
+Each scenario is one row in a JSON file per scenario domain under
+`src/test/resources/evals/scenarios/` — today one happy path for the weather domain.
+A row says what the user types (`turns`) and what must be true afterwards
+(`expect.trajectory`: the final `outcome`, and the tools that must have run):
+
+```json
+{"id": "weather-happy-forecast-tomorrow", "domains": ["weather"], "kind": "happy",
+ "source": "synthetic", "turns": ["Vai chover amanhã em São Paulo?"],
+ "expect": {"trajectory": {"outcome": "ANSWERED", "toolsCalled": ["get_weather"]}},
+ "critical": true}
+```
+
+```mermaid
+flowchart LR
+    row[scenario row] --> runner[ScenarioRunner]
+    runner -- "POST /api/chat" --> app[embedded app]
+    app --> tools[tool listener]
+    tools --> tracer[RecordingAgentTracer]
+    tracer -- "tool calls: name, arguments, result" --> checks[trajectory checks]
+    app -- "outcome, reply, tokens" --> checks
+    checks --> html[eval-report.html]
+    classDef input fill:#2d6cdf,stroke:#9ec1ff,color:#ffffff
+    classDef seam fill:#b86e00,stroke:#ffc870,color:#ffffff
+    classDef step fill:#5a6275,stroke:#aab3c5,color:#ffffff
+    classDef out fill:#1f7a3f,stroke:#8fd9a8,color:#ffffff
+    class row input
+    class app,tracer seam
+    class runner,tools,checks step
+    class html out
+    linkStyle default stroke:#8892b0
+```
+
+- **The trajectory comes from the tracing seam that already exists.** A test-only
+  `RecordingAgentTracer` replaces `OtelAgentTracer` (which steps aside whenever
+  another `AgentTracer` bean exists), so every tool call the tool listener already
+  observes — `activate_skill` included — lands in memory. No production code
+  changed to make the run observable.
+- **Two runs of the same row.** `ScenarioRunnerTest` runs the committed row in the
+  ordinary build with a scripted model and the local weather stub: a scripted
+  trajectory that calls `get_weather` passes, and one that answers without it fails
+  with a reason naming the missing tool. `ScenarioSuiteEval` runs the same row
+  against the real model and real upstream APIs, tagged `evals`, with
+  `./mvnw test -Pevals`.
+- **The report.** After the eval, `eval-report.html` is written at the repository
+  root: one self-contained page (inline CSS, no script, nothing fetched) with each
+  scenario's turns, expectation, activations, tool calls, answer, checks, latency and
+  tokens. Model text is HTML-escaped. The file is gitignored: it is a run artefact.
+
 ## What is not built, and why
 
 **An LLM-as-judge for answer quality.** The obvious level-2 addition, and the one
@@ -130,7 +185,8 @@ consumes them yet.
 
 1. `./mvnw test` — the deterministic gates, including the injection corpus.
 2. `./mvnw test -Pevals` — the golden set, if the triage prompt or its schema
-   moved.
+   moved, and the scenario suite; open `eval-report.html` at the repository root
+   for every scenario's trajectory and the reason behind each failed check.
 3. Read the intent-drift table the golden set prints. A decision that stayed
    right while the labels moved is still a regression, because the metrics and
    the refusal templates key on those labels.
