@@ -180,7 +180,8 @@ caller, in a layer specifically built to make them vary, and `SCOPED-TOOLS.md`
 carries the key rule for them. Read it before adding one.
 
 Its score floor is `0.0`, which means **nothing is filtered out by score at
-all**: the store it searches reports relevance as `(cosine + 1) / 2`, which never
+all**: the store it searches reports relevance as `(cosine + 1) / 2` `[sourced — 1.18.1 sources jar,
+RelevanceScore.fromCosineSimilarity]`, which never
 drops below zero, so `maxResults` is doing every bit of the work, and the five
 returned tools are simply the five nearest, however far away they are. A query
 about something the layer cannot do returns five tools with the same confidence
@@ -189,8 +190,8 @@ do, and you can only set it once you have scores from your own query set to look
 at.
 
 **And you cannot set it on this class.** `VectorToolSearchStrategy.Builder` has
-**no `minScore` setter** `[verified — javap on langchain4j 1.18.1; source at tag
-1.20.1]`. The strategy keeps a private `minScore` field and the builder a private
+**no `minScore` setter** `[verified — javap on langchain4j 1.18.1]` `[sourced —
+source at tag 1.20.1]`. The strategy keeps a private `minScore` field and the builder a private
 `minScore` slot, but no public method writes either, so the floor is the
 `DEFAULT_MIN_SCORE` of `0.0` for every instance. The builder's public setters
 are `embeddingModel`, `maxResults`, `toolName`, `toolDescription`,
@@ -576,7 +577,8 @@ a similarity gap rather than an integer difference. Set the floor first — in t
 custom strategy, since `VectorToolSearchStrategy` offers no setter — from the
 scores your own positive rows produce, then run the negative classes against it.
 Reading those scores needs the same custom strategy: the library's
-`ToolSearchResult` returns names only.
+`ToolSearchResult` returns names only. So build it first with the floor at `0.0`
+and record every score, read the positive rows, then set the floor from them.
 That is "the first tuning you do" from *What semantic search actually does*,
 arriving with the rows that make it decidable.
 
@@ -773,7 +775,7 @@ is the one search-shaped record to put on top of it.
 | Symptom | Cause to check first | Move |
 |---|---|---|
 | One tool never returns for any real phrasing | its description shares no literal substring with how users speak | rewrite from brief 3's rows, name first |
-| Search returns five tools and the right one is sixth | `minScore` too low, so noise fills the window | raise `minScore`; shorten the query the model sends |
+| Search returns five tools and the right one is sixth | `minScore` too low, so noise fills the window | raise `minScore` (under semantic: in your own strategy — the library builder has no setter); shorten the query the model sends |
 | Nothing returns for a reasonable question | the query term is longer than the word in the description (`payments` vs `payment`), or the model sent a sentence | carry the plural; rewrite the argument description |
 | The search call throws | the argument was not a JSON array of strings | say so in the argument description; turn on `throwToolArgumentsExceptions` while debugging so the failure is typed |
 | The model answers without ever searching | the search tool's own description does not say when to call it | it is the only routing signal for the whole layer — write it as routing, and name the domain |
