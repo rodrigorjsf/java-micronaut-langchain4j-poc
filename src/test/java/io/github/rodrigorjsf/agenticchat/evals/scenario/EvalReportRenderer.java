@@ -69,6 +69,9 @@ public final class EvalReportRenderer {
                 .append(scenario.critical() ? " · critical" : "")
                 .append("</span></summary>\n<table>\n");
         row(html, "Source", escape(scenario.source()));
+        row(html, "Faked upstream", scenario.upstream() == null
+                ? "none: every upstream was real"
+                : escape(scenario.upstream().describe()));
         row(html, "Turns", list(scenario.turns()));
         var expected = scenario.expect().trajectory();
         row(html, "Expected", "outcome " + escape(expected.outcome()) + "; tools "

@@ -31,6 +31,33 @@ class ScenarioDatasetTest {
     }
 
     @Test
+    @DisplayName("an upstream-failure row declares which catalogue key it fakes and with which failure shape")
+    void anUpstreamFailureRowDeclaresItsOverride() {
+        var scenarios = ScenarioDataset.loadCommitted();
+
+        var faked = scenarios.stream()
+                .filter(s -> s.kind().equals("upstream-failure"))
+                .map(Scenario::upstream)
+                .toList();
+
+        assertThat(faked).extracting(Scenario.UpstreamFailure::catalogueKey)
+                .containsOnly("open-meteo-forecast");
+        assertThat(faked).extracting(Scenario.UpstreamFailure::failure)
+                .containsExactlyInAnyOrder(Scenario.FailureShape.values());
+    }
+
+    @Test
+    @DisplayName("a row without an upstream override runs against the real upstream")
+    void aHappyRowFakesNothing() {
+        var weather = ScenarioDataset.loadCommitted().stream()
+                .filter(s -> s.id().equals("weather-happy-forecast-tomorrow"))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(weather.upstream()).isNull();
+    }
+
+    @Test
     @DisplayName("rows come back in stable order: files by name, rows in file order")
     void ordersFilesByNameAndRowsByPosition(@TempDir Path dir) throws Exception {
         Files.writeString(dir.resolve("b-domain.json"), "[" + row("b1") + "]");

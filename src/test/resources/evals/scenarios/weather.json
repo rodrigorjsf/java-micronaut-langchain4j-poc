@@ -13,5 +13,53 @@
     },
     "dependsOn": ["geo-and-weather", "get_weather", "open-meteo-forecast"],
     "critical": true
+  },
+  {
+    "id": "weather-upstream-server-error",
+    "domains": ["weather"],
+    "kind": "upstream-failure",
+    "source": "synthetic",
+    "turns": ["Vai chover amanhã em Curitiba?"],
+    "expect": {
+      "trajectory": {
+        "outcome": "ANSWERED",
+        "toolsCalled": ["get_weather"]
+      }
+    },
+    "dependsOn": ["geo-and-weather", "get_weather", "open-meteo-forecast"],
+    "critical": false,
+    "upstream": {"catalogueKey": "open-meteo-forecast", "failure": "server-error"}
+  },
+  {
+    "id": "weather-upstream-timeout",
+    "domains": ["weather"],
+    "kind": "upstream-failure",
+    "source": "synthetic",
+    "turns": ["Qual a previsão do tempo para amanhã em Recife?"],
+    "expect": {
+      "trajectory": {
+        "outcome": "ANSWERED",
+        "toolsCalled": ["get_weather"]
+      }
+    },
+    "dependsOn": ["geo-and-weather", "get_weather", "open-meteo-forecast"],
+    "critical": false,
+    "upstream": {"catalogueKey": "open-meteo-forecast", "failure": "timeout"}
+  },
+  {
+    "id": "weather-upstream-oversized",
+    "domains": ["weather"],
+    "kind": "upstream-failure",
+    "source": "synthetic",
+    "turns": ["Vai fazer frio amanhã em Porto Alegre?"],
+    "expect": {
+      "trajectory": {
+        "outcome": "ANSWERED",
+        "toolsCalled": ["get_weather"]
+      }
+    },
+    "dependsOn": ["geo-and-weather", "get_weather", "open-meteo-forecast"],
+    "critical": false,
+    "upstream": {"catalogueKey": "open-meteo-forecast", "failure": "oversized"}
   }
 ]

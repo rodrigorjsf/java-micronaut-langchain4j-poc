@@ -21,7 +21,8 @@ class EvalReportRendererTest {
             List.of("Vai chover amanhã em São Paulo?"),
             new Scenario.Expectation(new Scenario.TrajectoryExpectation("ANSWERED", List.of("get_weather"))),
             List.of("get_weather"),
-            true);
+            true,
+            null);
 
     private static ScenarioResult result(String answer, List<CheckResult> checks) {
         return new ScenarioResult(
@@ -85,6 +86,25 @@ class EvalReportRendererTest {
                 .contains("&lt;script&gt;alert(&#39;x&#39;)&lt;/script&gt; &amp; &lt;img src=x onerror=alert(1)&gt;")
                 .doesNotContain("<script")
                 .doesNotContain("<img");
+    }
+
+    @Test
+    @DisplayName("an upstream-failure run names the upstream that was faked and how; a real run says none was")
+    void namesTheFakedUpstream() {
+        var faked = new Scenario("weather-upstream-timeout", List.of("weather"), "upstream-failure", "synthetic",
+                List.of("Qual a previsão para amanhã em Recife?"),
+                new Scenario.Expectation(new Scenario.TrajectoryExpectation("ANSWERED", List.of("get_weather"))),
+                List.of("open-meteo-forecast"), false,
+                new Scenario.UpstreamFailure("open-meteo-forecast", Scenario.FailureShape.TIMEOUT));
+        var fakedRun = new ScenarioResult(faked, new Trajectory("ANSWERED", List.of(), List.of()), "indisponível",
+                List.of(new CheckResult("outcome", true, "outcome ANSWERED")), Duration.ofMillis(10), 1, 1);
+
+        var html = EvalReportRenderer.render(List.of(fakedRun, result("ok",
+                List.of(new CheckResult("outcome", true, "outcome ANSWERED")))));
+
+        assertThat(html)
+                .contains("<th>Faked upstream</th><td>open-meteo-forecast faked: no answer within the 1 s timeout</td>")
+                .contains("<th>Faked upstream</th><td>none: every upstream was real</td>");
     }
 
     @Test
