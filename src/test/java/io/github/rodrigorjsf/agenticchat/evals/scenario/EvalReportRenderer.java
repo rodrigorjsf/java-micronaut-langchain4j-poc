@@ -3,7 +3,7 @@ package io.github.rodrigorjsf.agenticchat.evals.scenario;
 import io.github.rodrigorjsf.agenticchat.evals.scenario.ScenarioResult.CheckResult;
 import io.github.rodrigorjsf.agenticchat.evals.scenario.ScenarioResult.Cost;
 import io.github.rodrigorjsf.agenticchat.evals.scenario.ScenarioResult.ToolCall;
-import io.github.rodrigorjsf.agenticchat.evals.scenario.ScenarioRuns.Verdict;
+import io.github.rodrigorjsf.agenticchat.evals.scenario.ScenarioRuns.Status;
 
 import java.math.RoundingMode;
 import java.util.List;
@@ -64,7 +64,7 @@ public final class EvalReportRenderer {
 
     /** One line per fact, each opening with its label, so the page reads at a glance. */
     private static void summary(StringBuilder html, List<ScenarioRuns> scenarios) {
-        long passed = scenarios.stream().filter(runs -> runs.verdict() == Verdict.PASSED).count();
+        long passed = scenarios.stream().filter(runs -> runs.status() == Status.PASSED).count();
         var repetitions = scenarios.stream().flatMap(runs -> runs.repetitions().stream()).toList();
         long skipped = repetitions.stream().filter(ScenarioResult::skipped).count();
         long inputTokens = repetitions.stream().mapToLong(ScenarioResult::inputTokens).sum();
@@ -72,7 +72,7 @@ public final class EvalReportRenderer {
         var cost = repetitions.stream().map(ScenarioResult::cost).reduce(Cost.NONE, Cost::plus);
         String gateFailures = scenarios.stream().filter(ScenarioRuns::failsGate)
                 .map(runs -> escape(runs.scenario().id())).collect(Collectors.joining(", "));
-        String flaky = scenarios.stream().filter(runs -> runs.verdict() == Verdict.FLAKY)
+        String flaky = scenarios.stream().filter(runs -> runs.status() == Status.FLAKY)
                 .map(runs -> escape(runs.scenario().id()) + " (" + runs.passes() + "/" + runs.executed() + ")")
                 .collect(Collectors.joining(", "));
 
@@ -85,9 +85,9 @@ public final class EvalReportRenderer {
                 .append(flaky.isEmpty() ? "none" : flaky).append("</li>\n")
                 .append("<li><strong>Skipped repetitions</strong> (rate limited, counted neither way): ")
                 .append(skipped).append("</li>\n")
-                .append("<li><strong>Tokens</strong> ").append(inputTokens).append(" in / ")
+                .append("<li><strong>Tokens</strong> (as <code>/api/chat</code> reported them) ").append(inputTokens).append(" in / ")
                 .append(outputTokens).append(" out</li>\n")
-                .append("<li><strong>Estimated cost</strong> $")
+                .append("<li><strong>Estimated cost</strong> (every model call the tracer saw, judge and sub-agents included) $")
                 .append(cost.usd().setScale(6, RoundingMode.HALF_UP).toPlainString())
                 .append(cost.unpricedCalls() == 0 ? "" : " (" + cost.unpricedCalls()
                         + " model calls unpriced, not included)")
@@ -96,9 +96,9 @@ public final class EvalReportRenderer {
 
     private static void scenario(StringBuilder html, ScenarioRuns runs) {
         var scenario = runs.scenario();
-        var verdict = runs.verdict();
-        html.append(verdict == Verdict.PASSED ? "<details>\n" : "<details open>\n")
-                .append("<summary>").append(verdict(verdict)).append(' ')
+        var status = runs.status();
+        html.append(status == Status.PASSED ? "<details>\n" : "<details open>\n")
+                .append("<summary>").append(badge(status)).append(' ')
                 .append(escape(scenario.id()))
                 .append(" <span class=\"meta\">").append(escape(String.join(", ", scenario.domains())))
                 .append(" · ").append(escape(scenario.kind()))
@@ -122,7 +122,7 @@ public final class EvalReportRenderer {
     private static void repetition(StringBuilder html, ScenarioResult result, int number, int of) {
         var trajectory = result.trajectory();
         html.append("<h3>Repetition ").append(number).append(" of ").append(of).append(" — ")
-                .append(result.skipped() ? verdict(Verdict.SKIPPED) : verdict(result.passed()))
+                .append(result.skipped() ? badge(Status.SKIPPED) : badge(result.passed()))
                 .append("</h3>\n<table>\n");
         row(html, "Outcome", escape(trajectory.outcome()));
         row(html, "Activations", escape(String.join(", ", trajectory.activations())));
@@ -150,7 +150,7 @@ public final class EvalReportRenderer {
     private static String checks(List<CheckResult> checks) {
         var cell = new StringBuilder("<ul>");
         for (CheckResult check : checks) {
-            cell.append("<li>").append(verdict(check.passed())).append(' ')
+            cell.append("<li>").append(badge(check.passed())).append(' ')
                     .append(escape(check.name())).append(": ").append(escape(check.reason())).append("</li>");
         }
         return cell.append("</ul>").toString();
@@ -166,14 +166,14 @@ public final class EvalReportRenderer {
         html.append("<tr><th>").append(label).append("</th><td>").append(cell).append("</td></tr>\n");
     }
 
-    private static String verdict(boolean passed) {
+    private static String badge(boolean passed) {
         return passed ? "<span class=\"pass\">PASS</span>" : "<span class=\"fail\">FAIL</span>";
     }
 
-    private static String verdict(Verdict verdict) {
-        return switch (verdict) {
-            case PASSED -> verdict(true);
-            case FAILED -> verdict(false);
+    private static String badge(Status status) {
+        return switch (status) {
+            case PASSED -> badge(true);
+            case FAILED -> badge(false);
             case FLAKY -> "<span class=\"flaky\">FLAKY</span>";
             case SKIPPED -> "<span class=\"skipped\">SKIPPED</span>";
         };

@@ -3,7 +3,7 @@ package io.github.rodrigorjsf.agenticchat.evals.scenario;
 import io.github.rodrigorjsf.agenticchat.evals.scenario.ScenarioResult.CheckResult;
 import io.github.rodrigorjsf.agenticchat.evals.scenario.ScenarioResult.Cost;
 import io.github.rodrigorjsf.agenticchat.evals.scenario.ScenarioResult.Trajectory;
-import io.github.rodrigorjsf.agenticchat.evals.scenario.ScenarioRuns.Verdict;
+import io.github.rodrigorjsf.agenticchat.evals.scenario.ScenarioRuns.Status;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -57,7 +57,7 @@ class ScenarioRunsTest {
         var reported = scenario(false);
         var runs = new ScenarioRuns(reported, List.of(pass(reported), fail(reported), pass(reported)));
 
-        assertThat(runs.verdict()).isEqualTo(Verdict.FLAKY);
+        assertThat(runs.status()).isEqualTo(Status.FLAKY);
         assertThat(runs.failsGate()).isFalse();
     }
 
@@ -67,7 +67,7 @@ class ScenarioRunsTest {
         var reported = scenario(false);
         var runs = new ScenarioRuns(reported, List.of(fail(reported), fail(reported), fail(reported)));
 
-        assertThat(runs.verdict()).isEqualTo(Verdict.FAILED);
+        assertThat(runs.status()).isEqualTo(Status.FAILED);
         assertThat(runs.failsGate()).isFalse();
     }
 
@@ -77,7 +77,7 @@ class ScenarioRunsTest {
         var critical = scenario(true);
         var runs = new ScenarioRuns(critical, List.of(pass(critical), pass(critical), pass(critical)));
 
-        assertThat(runs.verdict()).isEqualTo(Verdict.PASSED);
+        assertThat(runs.status()).isEqualTo(Status.PASSED);
         assertThat(runs.failsGate()).isFalse();
     }
 
@@ -89,7 +89,7 @@ class ScenarioRunsTest {
 
         assertThat(runs.skipped()).isEqualTo(1);
         assertThat(runs.executed()).isEqualTo(2);
-        assertThat(runs.verdict()).isEqualTo(Verdict.PASSED);
+        assertThat(runs.status()).isEqualTo(Status.PASSED);
         assertThat(runs.failsGate()).isFalse();
     }
 
@@ -99,20 +99,20 @@ class ScenarioRunsTest {
         var critical = scenario(true);
         var runs = new ScenarioRuns(critical, List.of(skipped(critical), skipped(critical), skipped(critical)));
 
-        assertThat(runs.verdict()).isEqualTo(Verdict.SKIPPED);
+        assertThat(runs.status()).isEqualTo(Status.SKIPPED);
         assertThat(runs.failsGate()).isFalse();
     }
 
     @Test
     @DisplayName("the number of repetitions defaults to 3 and is configurable")
     void repetitionsDefaultToThreeAndAreConfigurable() {
-        assertThat(ScenarioRuns.repetitions(null)).isEqualTo(3);
-        assertThat(ScenarioRuns.repetitions(" ")).isEqualTo(3);
-        assertThat(ScenarioRuns.repetitions("5")).isEqualTo(5);
-        assertThatThrownBy(() -> ScenarioRuns.repetitions("0"))
+        assertThat(ScenarioRuns.parseRepetitions(null)).isEqualTo(3);
+        assertThat(ScenarioRuns.parseRepetitions(" ")).isEqualTo(3);
+        assertThat(ScenarioRuns.parseRepetitions("5")).isEqualTo(5);
+        assertThatThrownBy(() -> ScenarioRuns.parseRepetitions("0"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("scenarios.repetitions");
-        assertThatThrownBy(() -> ScenarioRuns.repetitions("three"))
+        assertThatThrownBy(() -> ScenarioRuns.parseRepetitions("three"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("scenarios.repetitions");
     }

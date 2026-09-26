@@ -52,7 +52,7 @@ class ScenarioSuiteEval {
 
     private EmbeddedServer app;
     private ScenarioRunner runner;
-    private final List<ScenarioRuns> results = new ArrayList<>();
+    private final List<ScenarioRuns> scenarioRuns = new ArrayList<>();
 
     @BeforeAll
     void startApp() {
@@ -70,7 +70,7 @@ class ScenarioSuiteEval {
     @AfterAll
     void writeReportAndStop() throws IOException {
         try {
-            Files.writeString(REPORT, EvalReportRenderer.render(results), StandardCharsets.UTF_8);
+            Files.writeString(REPORT, EvalReportRenderer.render(scenarioRuns), StandardCharsets.UTF_8);
             System.out.printf("%nscenario suite: report written to %s%n", REPORT);
         } finally {
             if (app != null) {
@@ -84,21 +84,21 @@ class ScenarioSuiteEval {
     void everyCriticalScenarioPasses() {
         var scenarios = ScenarioDataset.loadCommitted();
         assertThat(scenarios).isNotEmpty();
-        int repetitions = ScenarioRuns.repetitions(System.getProperty(ScenarioRuns.REPETITIONS_PROPERTY));
+        int repetitions = ScenarioRuns.parseRepetitions(System.getProperty(ScenarioRuns.REPETITIONS_PROPERTY));
 
         for (int i = 0; i < scenarios.size(); i++) {
             if (i > 0) {
                 pace();
             }
             var runs = runner.repeat(scenarios.get(i), repetitions, ScenarioSuiteEval::pace);
-            results.add(runs);
-            System.out.printf("  %s %s (%d/%d passed, %d skipped)%n", runs.verdict(), runs.scenario().id(),
+            scenarioRuns.add(runs);
+            System.out.printf("  %s %s (%d/%d passed, %d skipped)%n", runs.status(), runs.scenario().id(),
                     runs.passes(), runs.executed(), runs.skipped());
         }
 
-        assumeTrue(results.stream().anyMatch(runs -> runs.executed() > 0),
+        assumeTrue(scenarioRuns.stream().anyMatch(runs -> runs.executed() > 0),
                 "every repetition was rate limited: nothing was measured");
-        assertThat(results)
+        assertThat(scenarioRuns)
                 .filteredOn(ScenarioRuns::failsGate)
                 .as("critical scenarios that failed a repetition")
                 .isEmpty();

@@ -165,6 +165,9 @@ class ScenarioRunnerTest {
         assertThat(result.passed()).isFalse();
         assertThat(result.checks()).singleElement()
                 .satisfies(check -> assertThat(check.reason()).contains("RESOURCE_EXHAUSTED"));
+        assertThat(result.cost().unpricedCalls())
+                .as("the calls made before the quota error still count toward the estimate")
+                .isPositive();
     }
 
     @Test
@@ -200,7 +203,7 @@ class ScenarioRunnerTest {
         assertThat(runs.repetitions()).hasSize(2);
         assertThat(runs.repetitions().get(0).passed()).isTrue();
         assertThat(runs.repetitions().get(1).passed()).isFalse();
-        assertThat(runs.verdict()).isEqualTo(ScenarioRuns.Verdict.FLAKY);
+        assertThat(runs.status()).isEqualTo(ScenarioRuns.Status.FLAKY);
         assertThat(pauses).as("paced between repetitions, not after the last").hasValue(1);
     }
 

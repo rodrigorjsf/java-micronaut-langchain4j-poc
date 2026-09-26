@@ -99,12 +99,13 @@ public final class ScenarioRunner {
     private ScenarioResult failedRequest(Scenario scenario, HttpResponse<String> response, long elapsedNanos) {
         var latency = Duration.ofNanos(elapsedNanos);
         var lastError = tracer.recorded().stream()
+                .filter(recorded -> recorded.type() == ObservationType.GENERATION)
                 .map(RecordingAgentTracer.Recorded::error)
                 .filter(Objects::nonNull)
                 .reduce((first, second) -> second);
         if (lastError.isPresent() && FailoverTriageJudge.isRateLimit(lastError.get())) {
             return ScenarioResult.skipped(scenario, "SKIPPED: the provider rate-limited the turn ("
-                    + lastError.get().getMessage() + ")", latency);
+                    + lastError.get().getMessage() + ")", latency, Cost.of(tracer.recorded()));
         }
         var check = new CheckResult("request", false,
                 "POST /api/chat answered HTTP " + response.statusCode() + ": " + response.body());

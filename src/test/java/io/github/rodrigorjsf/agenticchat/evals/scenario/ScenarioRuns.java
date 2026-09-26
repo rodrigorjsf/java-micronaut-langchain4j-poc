@@ -16,7 +16,7 @@ public record ScenarioRuns(Scenario scenario, List<ScenarioResult> repetitions) 
 
     public static final int DEFAULT_REPETITIONS = 3;
 
-    public enum Verdict {
+    public enum Status {
         /** Every repetition that ran passed. */
         PASSED,
         /** Some repetitions passed and some failed. */
@@ -43,16 +43,16 @@ public record ScenarioRuns(Scenario scenario, List<ScenarioResult> repetitions) 
         return repetitions.size() - skipped();
     }
 
-    public Verdict verdict() {
+    public Status status() {
         long executed = executed();
         long passes = passes();
         if (executed == 0) {
-            return Verdict.SKIPPED;
+            return Status.SKIPPED;
         }
         if (passes == executed) {
-            return Verdict.PASSED;
+            return Status.PASSED;
         }
-        return passes == 0 ? Verdict.FAILED : Verdict.FLAKY;
+        return passes == 0 ? Status.FAILED : Status.FLAKY;
     }
 
     /** A critical scenario fails the eval on any failed repetition; any other scenario never does. */
@@ -63,7 +63,7 @@ public record ScenarioRuns(Scenario scenario, List<ScenarioResult> repetitions) 
     /**
      * @param raw the value of {@value #REPETITIONS_PROPERTY}, or {@code null} when unset
      */
-    public static int repetitions(String raw) {
+    public static int parseRepetitions(String raw) {
         if (raw == null || raw.isBlank()) {
             return DEFAULT_REPETITIONS;
         }
