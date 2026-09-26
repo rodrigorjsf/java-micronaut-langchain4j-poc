@@ -28,6 +28,7 @@ import java.util.regex.PatternSyntaxException;
  * {@code 12.4} a JSON body carries, and {@code "2"} is not grounded by the {@code 2} inside
  * {@code 12.4}. A value is also grounded by a tool number that rounds to it at the precision the
  * answer wrote, so "20 °C" is grounded by {@code 19.8} — rounding is something a good answer does.
+ * The tolerance applies against every captured number, and thousands separators are not read (see #49).
  */
 final class AnswerCheck {
 
@@ -37,8 +38,13 @@ final class AnswerCheck {
      */
     private static final Set<String> NOT_DATA = Set.of("activate_skill", "read_skill_resource");
 
-    /** A number standing alone, so the {@code 2} in {@code temperature_2m_max} is not one. */
-    private static final Pattern NUMBER = Pattern.compile("(?<![\\w.])-?\\d+(?:\\.\\d+)?(?!\\w)");
+    /**
+     * A number standing alone: not the {@code 2} in {@code temperature_2m_max}, not the
+     * {@code 27} in {@code 2026-09-27}, not the {@code 1} in {@code 1.2e-5}. A sentence's full
+     * stop after a number is allowed; a decimal point is not.
+     */
+    private static final Pattern NUMBER = Pattern.compile(
+            "(?<![\\w.\\-])-?\\d+(?:\\.\\d+)?(?![\\w\\-]|\\.\\d)");
 
     /**
      * The host of an absolute {@code http(s)} address, or of a scheme-relative one inside a
@@ -67,16 +73,24 @@ final class AnswerCheck {
                 checks.add(language(expected.language(), text));
             }
             for (String phrase : orEmpty(expected.contains())) {
-                boolean present = text.toLowerCase(Locale.ROOT).contains(phrase.toLowerCase(Locale.ROOT));
-                checks.add(new CheckResult("contains: " + phrase, present, present
-                        ? "the answer contains \"" + phrase + "\""
-                        : "the answer does not contain \"" + phrase + "\""));
+                checks.add(contains(phrase, text));
             }
             for (String pattern : orEmpty(expected.grounded())) {
                 checks.add(grounded(pattern, text, toolCalls));
             }
         }
         return checks;
+    }
+
+    private static CheckResult contains(String phrase, String answer) {
+        boolean present = containsIgnoringCase(answer, phrase);
+        return new CheckResult("contains: " + phrase, present, present
+                ? "the answer contains \"" + phrase + "\""
+                : "the answer does not contain \"" + phrase + "\"");
+    }
+
+    private static boolean containsIgnoringCase(String text, String part) {
+        return text.toLowerCase(Locale.ROOT).contains(part.toLowerCase(Locale.ROOT));
     }
 
     private static CheckResult language(String expected, String answer) {
@@ -114,7 +128,8 @@ final class AnswerCheck {
         String name = "grounded: " + pattern;
         Matcher matcher;
         try {
-            matcher = Pattern.compile(pattern).matcher(answer);
+            // Unicode classes, so a row's \\s also matches the no-break space models write before units.
+            matcher = Pattern.compile(pattern, Pattern.UNICODE_CHARACTER_CLASS).matcher(answer);
         } catch (PatternSyntaxException e) {
             return new CheckResult(name, false, "the row's pattern does not compile: " + e.getDescription());
         }
@@ -152,7 +167,7 @@ final class AnswerCheck {
         }
         BigDecimal number = asNumber(value);
         if (number == null) {
-            return result.toLowerCase(Locale.ROOT).contains(value.toLowerCase(Locale.ROOT));
+            return containsIgnoringCase(result, value);
         }
         Matcher numbers = NUMBER.matcher(result);
         while (numbers.find()) {

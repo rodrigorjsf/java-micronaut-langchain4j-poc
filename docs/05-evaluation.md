@@ -142,7 +142,7 @@ reason in the report:
 | 1 | trajectory | `outcome` | the last turn's `outcome` is the expected one |
 | 1 | trajectory | `tool called: <name>` | that tool ran at least once |
 | 2 | answer | `no link outside the catalogue` | every link in the answer is to a tool-catalogue host — on **every** answer, whether the row asks or not. The allow-list is the application's own `LinkPolicy`, so "outside" means what the output guardrail means |
-| 2 | answer | `language` | the answer reads as the expected tag, measured by the same stopword ratio triage uses (`pt-BR` or `en` only) |
+| 2 | answer | `language` | the answer reads as the expected tag, measured by the same stopword ratio triage uses (`pt-BR` or `en` only; a non-English answer reads as `pt-BR`, see #48) |
 | 2 | answer | `contains: <text>` | the answer contains the text, case-insensitively |
 | 2 | answer | `grounded: <regex>` | the regex finds at least one value in the answer, and **every** value it finds appears in a tool result captured during the same run |
 | 3 | rubric | — | not built yet; it will run after these and never gate |
@@ -154,8 +154,9 @@ for that value in what the tools actually returned:
 | Answer says | Tool returned | Verdict | Why |
 |---|---|---|---|
 | `12,4 mm` | `"precipitation_sum":[0.0,12.4]` | pass | numbers compare as numbers; the decimal comma is read |
-| `20 °C` | `"temperature_2m_max":[24.1,19.8]` | pass | 19.8 rounds to 20 at the precision the answer wrote |
+| `20 °C` | `"temperature_2m_max":[24.1,19.8]` | pass | 19.8 rounds to 20 at the precision the answer wrote (the tolerance applies against any captured number, see #49) |
 | `2 °C` | `"temperature_2m_max":[24.1,19.8]` | fail | the `2` inside `temperature_2m_max` or `12.4` is not a number standing alone |
+| `dia 27` | `"time":["2026-09-27"]` | fail | a date's parts are not numbers standing alone |
 | `31,7 mm` | `"precipitation_sum":[0.0,12.4]` | fail | a number no tool returned is a number the model made up |
 | `não sei` | anything | fail | the row asked for a value and the answer holds none |
 

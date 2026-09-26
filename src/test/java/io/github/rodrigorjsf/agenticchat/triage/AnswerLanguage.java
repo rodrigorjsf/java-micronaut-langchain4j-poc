@@ -8,7 +8,7 @@ import java.util.Set;
  * without making {@link MessageLanguage} public for one test consumer.
  *
  * <p>The detector knows two tags and treats Portuguese as the default, so it can prove English
- * but only fail to disprove Portuguese: a Spanish answer reads as {@code pt-BR}.
+ * but only fail to disprove Portuguese: a Spanish answer reads as {@code pt-BR} (see #48).
  */
 public final class AnswerLanguage {
 

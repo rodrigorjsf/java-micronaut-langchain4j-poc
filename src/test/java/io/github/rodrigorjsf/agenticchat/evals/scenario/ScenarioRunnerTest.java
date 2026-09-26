@@ -101,6 +101,9 @@ class ScenarioRunnerTest {
         assertThat(result.checks()).allSatisfy(check -> assertThat(check.passed())
                 .as("%s: %s", check.name(), check.reason()).isTrue());
         assertThat(result.passed()).isTrue();
+        assertThat(result.checks())
+                .as("the value is grounded in what the stub returned, through the recorded tool result")
+                .anySatisfy(check -> assertThat(check.name()).startsWith("grounded: "));
         assertThat(result.trajectory().outcome()).isEqualTo("ANSWERED");
         assertThat(result.trajectory().activations()).containsExactly("geo-and-weather");
 

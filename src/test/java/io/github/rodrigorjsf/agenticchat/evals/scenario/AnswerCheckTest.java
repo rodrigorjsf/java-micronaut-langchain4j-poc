@@ -131,4 +131,29 @@ class AnswerCheckTest {
         assertThat(missing.passed()).isFalse();
         assertThat(missing.reason()).contains("guarda-chuva");
     }
+
+    @Test
+    @DisplayName("a date or an exponent in a tool result is not a number standing alone, so it grounds nothing")
+    void datesAndExponentsDoNotGround() {
+        var run = List.of(new ToolCall("get_weather", "{}",
+                "{\"daily\":{\"time\":[\"2026-09-27\"],\"uv\":[1.2e-5]}}"));
+        String day = "dia (\\d+)";
+
+        var fromDate = AnswerCheck.evaluate(grounded(day), "Chove no dia 27.", run, CATALOGUE);
+        var fromExponent = AnswerCheck.evaluate(grounded(day), "Chove no dia 1.", run, CATALOGUE);
+
+        assertThat(only("grounded: " + day, fromDate).passed()).as("27 only appears inside a date").isFalse();
+        assertThat(only("grounded: " + day, fromExponent).passed()).as("1 only appears inside 1.2e-5").isFalse();
+    }
+
+    @Test
+    @DisplayName("a row pattern's \\s also matches a no-break space, so a value written with one is still checked")
+    void noBreakSpaceIsWhitespace() {
+        var checks = AnswerCheck.evaluate(grounded(PRECIPITATION),
+                "Amanhã: 31,7\u00a0mm previstos.", WEATHER_RUN, CATALOGUE);
+
+        var check = only("grounded: " + PRECIPITATION, checks);
+        assertThat(check.passed()).isFalse();
+        assertThat(check.reason()).contains("31,7");
+    }
 }
