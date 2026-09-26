@@ -19,7 +19,7 @@ class ScenarioRunsTest {
         return new Scenario("weather-happy-forecast-tomorrow", List.of("weather"), "happy", "synthetic",
                 List.of("Vai chover amanhã em São Paulo?"),
                 new Scenario.Expectation(new Scenario.TrajectoryExpectation("ANSWERED", List.of("get_weather")), null),
-                List.of("get_weather"), critical);
+                List.of("get_weather"), critical, null);
     }
 
     private static ScenarioResult pass(Scenario scenario) {

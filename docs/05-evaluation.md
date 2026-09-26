@@ -120,7 +120,8 @@ assertions, but they run against a real model, so it runs where level 2 does:
 before a release, not on every commit.
 
 Each scenario is one row in a JSON file per scenario domain under
-`src/test/resources/evals/scenarios/` — today one happy path for the weather domain.
+`src/test/resources/evals/scenarios/` — today, for the weather domain, one happy path
+and one upstream failure of each shape.
 A row says what the user types (`turns`) and what must be true afterwards:
 `expect.trajectory` (the final `outcome`, and the tools that must have run) and,
 optionally, `expect.answer` (what the answer itself must satisfy):
@@ -197,6 +198,25 @@ flowchart LR
   returned fails grounding. `ScenarioSuiteEval` runs the same row
   against the real model and real upstream APIs, tagged `evals`, with
   `./mvnw test -Pevals`.
+- **Upstream failures are declared by the row.** A row of kind `upstream-failure`
+  carries `"upstream": {"catalogueKey": "open-meteo-forecast", "failure": "timeout"}`.
+  The runner starts a context of its own for that row, with that one catalogue key's
+  `base-url` pointed at a failure route of the test `StubApiController`; the model and
+  every other upstream stay real, and no other row sees the override.
+
+  | `failure` | What the stub does | What the model is handed |
+  |---|---|---|
+  | `server-error` | answers HTTP 500 | "The service is unavailable: …" |
+  | `timeout` | answers after 3 s; the faked key's timeout drops to 1 s | "The service is unavailable: …" |
+  | `oversized` | answers 1 MiB of JSON, above every ceiling in the catalogue | the body cut at the key's `max-response-bytes`, marked `[truncated: …]` |
+
+  `UpstreamFailureScenarioTest` runs each committed failure row with a scripted model
+  and checks the text the tool door hands the model. The report names the faked
+  upstream on every row ("none: every upstream was real" otherwise). An override
+  naming a key that is not in the catalogue is refused rather than silently faking
+  nothing. What the real model then tells the user is shown in the report; the
+  failure rows assert only the trajectory (answered, `get_weather` called) until
+  answer checks land.
 - **The report.** After the eval, `eval-report.html` is written at the repository
   root: one self-contained page (inline CSS, no script, nothing fetched) with each
   scenario's turns, expectation, activations, tool calls, answer, checks, latency and

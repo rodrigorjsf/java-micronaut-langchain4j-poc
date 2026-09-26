@@ -175,4 +175,32 @@ public class StubApiController {
         Thread.sleep(3_000);
         return "{\"late\":true}";
     }
+
+    // ------------------------------------------------------------------
+    // Failure routes for upstream-failure scenarios.
+    //
+    // A scenario points a whole catalogue key's base-url here, and the tool then
+    // appends its own path ("/v1/forecast?..."), so each route swallows whatever
+    // path and query follow it and fails the same way for every one.
+    // ------------------------------------------------------------------
+
+    @Get("/fail/server-error/{+path}")
+    public HttpResponse<String> failWithServerError(String path) {
+        return HttpResponse.serverError("upstream failure injected by the scenario suite");
+    }
+
+    /** Longer than the one-second timeout the timeout shape gives its catalogue key. */
+    @Get("/fail/timeout/{+path}")
+    public String failWithTimeout(String path) throws InterruptedException {
+        return slow();
+    }
+
+    /**
+     * One MiB of valid JSON: above the largest {@code max-response-bytes} in the catalogue
+     * (512 KiB), so any key pointed here is truncated at its own ceiling.
+     */
+    @Get("/fail/oversized/{+path}")
+    public String failWithOversizedBody(String path) {
+        return "{\"padding\":\"" + "x".repeat(1 << 20) + "\"}";
+    }
 }

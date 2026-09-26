@@ -26,7 +26,8 @@ class EvalReportRendererTest {
                 List.of("Vai chover amanhã em São Paulo?"),
                 new Scenario.Expectation(new Scenario.TrajectoryExpectation("ANSWERED", List.of("get_weather")), null),
                 List.of("get_weather"),
-                critical);
+                critical,
+                null);
     }
 
     private static ScenarioResult result(String answer, List<CheckResult> checks) {
@@ -155,6 +156,25 @@ class EvalReportRendererTest {
     }
 
     @Test
+    @DisplayName("an upstream-failure run names the upstream that was faked and how; a real run says none was")
+    void namesTheFakedUpstream() {
+        var faked = new Scenario("weather-upstream-timeout", List.of("weather"), "upstream-failure", "synthetic",
+                List.of("Qual a previsão para amanhã em Recife?"),
+                new Scenario.Expectation(new Scenario.TrajectoryExpectation("ANSWERED", List.of("get_weather")), null),
+                List.of("open-meteo-forecast"), false,
+                new Scenario.UpstreamFailure("open-meteo-forecast", Scenario.FailureShape.TIMEOUT));
+        var fakedRun = new ScenarioResult(faked, new Trajectory("ANSWERED", List.of(), List.of()), "indisponível",
+                List.of(new CheckResult("outcome", true, "outcome ANSWERED")), Duration.ofMillis(10), 1, 1, ScenarioResult.Cost.NONE);
+
+        var html = EvalReportRenderer.render(List.of(once(fakedRun), once(result("ok",
+                List.of(new CheckResult("outcome", true, "outcome ANSWERED"))))));
+
+        assertThat(html)
+                .contains("<th>Faked upstream</th><td>open-meteo-forecast faked: no answer within the 1 s timeout</td>")
+                .contains("<th>Faked upstream</th><td>none: every upstream was real</td>");
+    }
+
+    @Test
     @DisplayName("the report is self-contained: it makes no request when opened")
     void makesNoExternalRequest() {
         var html = EvalReportRenderer.render(List.of(once(result("ok",
@@ -176,7 +196,7 @@ class EvalReportRendererTest {
         var scenario = new Scenario(WEATHER.id(), WEATHER.domains(), WEATHER.kind(), WEATHER.source(), WEATHER.turns(),
                 new Scenario.Expectation(WEATHER.expect().trajectory(), new Scenario.AnswerExpectation(
                         "pt-BR", List.of("São Paulo"), List.of("(\\d+)\\s*mm<"))),
-                WEATHER.dependsOn(), WEATHER.critical());
+                WEATHER.dependsOn(), WEATHER.critical(), null);
         var run = result("Vai chover 31,7 mm.", List.of(
                 new CheckResult("no link outside the catalogue", true, "the answer carries no link"),
                 new CheckResult("grounded: (\\d+)\\s*mm<", false, "[31,7] appear in no captured tool result")));
