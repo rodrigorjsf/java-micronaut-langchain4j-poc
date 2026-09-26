@@ -120,6 +120,20 @@ class KnowledgeBaseTest {
         results.forEach(result -> assertThat(html).contains(result.query().id()));
     }
 
+    @Test
+    @DisplayName("every corpus document is some positive row's expected source, and every expected source exists")
+    void queriesCoverTheCorpusBothWays() throws Exception {
+        var expected = results.stream().map(r -> r.query().expectedSource())
+                .filter(java.util.Objects::nonNull).distinct().toList();
+
+        assertThat(expected)
+                .as("a document no positive row names ships untested; see Uncovered documents in the report")
+                .containsAll(corpusDocuments());
+        assertThat(corpusDocuments())
+                .as("an expected_source naming a document that no longer exists can never pass")
+                .containsAll(expected);
+    }
+
     Stream<Arguments> positiveRows() {
         return results.stream().filter(r -> r.query().positive()).map(r -> Arguments.of(r.query().id(), r));
     }
@@ -154,8 +168,10 @@ class KnowledgeBaseTest {
             var queries = new ArrayList<Query>();
             for (JsonNode row : new ObjectMapper().readTree(in).get("queries")) {
                 JsonNode expected = row.get("expected_source");
+                String label = row.get("label").asText();
+                assertThat(label).as("row %s label", row.get("id").asText()).isIn("positive", "negative");
                 queries.add(new Query(row.get("id").asText(), row.get("question").asText(),
-                        row.get("label").asText(),
+                        label,
                         expected == null || expected.isNull() ? null : expected.asText(),
                         row.get("provenance").asText()));
             }

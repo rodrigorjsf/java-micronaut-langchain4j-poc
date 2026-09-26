@@ -1,5 +1,7 @@
 package io.github.rodrigorjsf.agenticchat.rag;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 
@@ -101,7 +103,7 @@ final class RetrievalReport {
         // positive row names, and the unit a knowledge author adds or edits.
         html.append("<h2>Coverage per document</h2>\n<table><tr><th>document</th>"
                 + "<th>positive queries</th><th>passing</th></tr>\n");
-        var uncovered = new java.util.ArrayList<String>();
+        var uncovered = new ArrayList<String>();
         for (String document : run.corpusDocuments()) {
             var rows = run.results().stream()
                     .filter(result -> document.equals(result.query().expectedSource()))
@@ -132,7 +134,7 @@ final class RetrievalReport {
             html.append("<p>No corpus document changed.</p>\n");
             return;
         }
-        var byId = new java.util.HashMap<String, Result>();
+        var byId = new HashMap<String, Result>();
         run.results().forEach(result -> byId.put(result.query().id(), result));
         var queries = run.results().stream().map(Result::query).toList();
         html.append("<table><tr><th>changed document</th><th>dependent queries</th></tr>\n");
