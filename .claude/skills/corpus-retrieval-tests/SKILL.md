@@ -25,6 +25,7 @@ the questions that must retrieve **nothing**.
 | a question that ought to work does not | [`DIAGNOSIS.md`](DIAGNOSIS.md) — do not edit a document first |
 | a question retrieves and should not | *A question that retrieves and should not* |
 | a new document landed in the corpus | *Re-running as the corpus grows* |
+| you edited a document and need the rows it puts at risk, or want to read a run | [`REPORT.md`](REPORT.md) — the report, its coverage table and the diff mode |
 | you need row counts, gating, or the deterministic/live split | `agentic-evals` — that skill owns all three |
 | the document itself is what needs rewriting | `writing-retrievable-knowledge` |
 | the question is whether to retrieve at all, or where the threshold sits | `retrieval-that-earns-its-place` |
@@ -122,8 +123,8 @@ different universe proves the floor — that the store is not returning literall
 everything — and nothing about the boundary you actually ship.
 
 This repository's own suite is the illustration, and it is an illustration of the
-gap: the two committed negatives in `rag/KnowledgeBaseTest.java` are a cake recipe
-and a request to write a Python script, both plainly out of domain. What such rows
+gap: the two committed negatives in `src/test/resources/evals/retrieval-queries.json`
+(`neg-receita-bolo`, `neg-script-python`) are a cake recipe and a request to write a Python script, both plainly out of domain. What such rows
 are worth is in the measurement recorded in `rag/SkillAwareQueryRouter.java`'s
 javadoc — a third out-of-domain question, a football result, scored **0.7342**
 against a relevant question's **0.7299**. Even the far negatives sat inside the
@@ -131,7 +132,7 @@ relevant band. Those two rows are the floor; that suite has no near-miss half ye
 
 **That football question is in the suite. It is a pinned probe, not a negative
 row** — and the distinction is the point, not a technicality. It sits at
-`KnowledgeBaseTest.java:109` inside `theScoreDistributionsOverlap`, which is
+`KnowledgeBaseTest.java:190` inside `theScoreDistributionsOverlap`, which is
 assertion 3 below: a second retriever at `minScore` 0.0 and k of 1, asserting the
 irrelevant score stays **above** the relevant one. It could not have been made a
 negative row instead. The shipped gate is `agentic.rag.min-score: 0.72`
@@ -397,12 +398,32 @@ script:
 - **document → row.** A document that is no positive row's `expected_source` is
   either dead weight or a missing row, and you cannot tell which without asking.
   In this checkout that direction holds: the six positive rows in
-  `KnowledgeBaseTest` name all three files under `src/main/resources/knowledge/`,
-  two rows each.
+  `src/test/resources/evals/retrieval-queries.json` name all three files under
+  `src/main/resources/knowledge/`, two rows each — and the report's *Uncovered
+  documents* section is where it stops holding, the run it happens.
 - **row → document.** An `expected_source` naming a file that no longer exists.
   After a rename the row can never pass, and the repair somebody reaches for under
   time pressure is relaxing the assertion — which is the previous section's failure
   arriving through a door nobody was watching.
+
+## Every run writes a report; a diff names the rows at risk
+
+A green suite says nothing about *how close* each row came, and a red one names one
+row per failure. Have the test write a self-contained HTML report on every run —
+per query the expected document (or *nothing* for a negative), every retrieved chunk
+with its score, the threshold applied, pass or fail; per document the rows that name
+it; and the documents no row names. Retrieve **once per query** and feed the same
+results to the assertions and to the report: with a deterministic local embedding
+model a second retrieval repeats the first, and two retrieval paths are two answers
+that can disagree.
+
+**The diff mode turns an edit into a list.** Given a git ref, the report names, per
+corpus document changed since it, the positive rows whose `expected_source` it is
+**and every negative row** — top-k is a competition, so an edit anywhere can lift a
+question that used to retrieve nothing over the threshold.
+
+→ [`REPORT.md`](REPORT.md) — open it to read a run or to add the report to another
+stack: the sections, the pass rule, the diff rule, and this repository's commands.
 
 ## Not this skill's ground
 
@@ -430,7 +451,8 @@ Run in order; done is the right-hand column.
 | 8 | Run it through the shipped path | the router and threshold the application ships; the only open-gate call in the file is the distribution probe, and a comment says why |
 | 9 | Diagnose every failure before editing anything | `DIAGNOSIS.md` ran, the verdict names which of the four layers failed, and the fix went to the skill that owns that layer — no document was edited on a hunch. Where the verdict is *never migrated*, the owner is `prompt-to-corpus-migration` and a model cannot hand off to it: ask the user to run it, which they invoke by name |
 | 10 | Check both directions | every corpus document is some positive row's `expected_source`, and every `expected_source` names a document that exists |
-| 11 | Commit the set beside the corpus | rows in a stable order, each with its provenance; any edited row in its own commit with its reason |
+| 11 | Read the report after the run | every document appears in the coverage table with at least one passing row, *Uncovered documents* is empty, and after a corpus edit the diff mode ran against the base ref and every row it named was read |
+| 12 | Commit the set beside the corpus | rows in a stable order, each with its provenance; any edited row in its own commit with its reason |
 
 A green run of positives alone closes none of this. The row that certifies a
 corpus is the negative one — the question in the product's own words that the
