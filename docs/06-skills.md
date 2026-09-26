@@ -488,8 +488,8 @@ neighbours are by-name; it is not.
 passes — which a corpus that returns its nearest chunk for *every* input also does.
 
 - The suite's negative rows are all **far** negatives and the near-miss half does
-  not exist. This repository is the illustration: the two committed rows in
-  [`KnowledgeBaseTest.java`](../src/test/java/io/github/rodrigorjsf/agenticchat/rag/KnowledgeBaseTest.java)
+  not exist. This repository is the illustration: the two committed negative rows in
+  [`retrieval-queries.json`](../src/test/resources/evals/retrieval-queries.json)
   — a cake recipe and *"escreva um script em python para ler um csv"* — are plainly
   out of domain, score **0.7058** and **0.6826** under the shipped
   `agentic.rag.min-score: 0.72`, and prove only the floor. A third out-of-domain

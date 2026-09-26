@@ -61,7 +61,7 @@ to be evals in disguise:
 | What is asserted | Where |
 |---|---|
 | every refusal offers an alternative, stays under 220 chars, never lectures or asks the user to rephrase | `RefusalTemplatesTest` — 59 cases across every intent and both languages |
-| retrieval finds the right document for six real questions, and nothing for unrelated ones | `KnowledgeBaseTest` |
+| retrieval finds the right document for six real questions, and nothing for unrelated ones — rows in `src/test/resources/evals/retrieval-queries.json`, each retrieved once, results written to the gitignored `retrieval-report.html` at the root | `KnowledgeBaseTest` |
 | the score distributions overlap, so the router cannot be deleted | `KnowledgeBaseTest` |
 | every tool description follows the house style; no parameter is named like a credential; names are unique | `SkillCatalogTest` |
 | the standing skills-index cost stays under budget | `SkillCatalogTest` |
