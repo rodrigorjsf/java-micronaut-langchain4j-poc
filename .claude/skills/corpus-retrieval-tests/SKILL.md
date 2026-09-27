@@ -244,10 +244,11 @@ owes the set one positive row naming it, one negative in its neighbourhood and a
 full re-run; then check both directions, document → row and row → document →
 [`CORPUS-GROWTH.md`](CORPUS-GROWTH.md).
 
-## Every run writes a report; a diff names the rows at risk
+## An evals run writes a report; a diff names the rows at risk
 
-Have the test write a self-contained HTML report on every run, retrieving **once
-per query** and feeding the same results to the assertions and the report. Given a
+Keep the assertions in the default build and have an evals-profile run write a
+self-contained HTML report, both retrieving **once per query** through one shared
+loader, so the report shows exactly what the assertions judged. Given a
 git ref, the diff mode names, per changed document, the positive rows whose
 `expected_source` it is **and every negative row**, since an edit anywhere can lift
 a question over the threshold → [`REPORT.md`](REPORT.md): the sections, the pass

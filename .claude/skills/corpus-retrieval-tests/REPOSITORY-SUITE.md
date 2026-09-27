@@ -15,7 +15,7 @@ relevant band. Those two rows are the floor; that suite has no near-miss half ye
 
 **That football question is in the suite. It is a pinned probe, not a negative
 row** — and the distinction is the point, not a technicality. It sits at
-`KnowledgeBaseTest.java:190` inside `theScoreDistributionsOverlap`, which is
+`KnowledgeBaseTest.java:113` inside `theScoreDistributionsOverlap`, which is
 assertion 3 of `SKILL.md`, *What to assert*: a second retriever at `minScore` 0.0 and k of 1, asserting the
 irrelevant score stays **above** the relevant one. It could not have been made a
 negative row instead. The shipped gate is `agentic.rag.min-score: 0.72`

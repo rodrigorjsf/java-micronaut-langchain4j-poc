@@ -79,15 +79,17 @@ a row the edit's author would have picked.
 | What | Where |
 |---|---|
 | the query set | `src/test/resources/evals/retrieval-queries.json` — beside the other eval datasets, not beside the corpus: a test-resources `knowledge/` directory would shadow the corpus on the classpath and ingestion would read it instead |
-| the test that retrieves once and writes the page | `src/test/java/.../rag/KnowledgeBaseTest.java` |
+| the test that retrieves once and asserts, in the default build | `src/test/java/.../rag/KnowledgeBaseTest.java` |
+| the evals-profile run that retrieves once and writes the page | `src/test/java/.../rag/RetrievalReportEval.java`, both reading the rows through `RetrievalRun` |
 | the pure renderer and the pass rule | `src/test/java/.../rag/RetrievalReport.java`, unit tested in `RetrievalReportTest` |
 | the diff rule | `src/test/java/.../rag/CorpusDiff.java`, unit tested in `CorpusDiffTest` |
 | the page | `retrieval-report.html` at the repository root, gitignored |
 
-The suite runs in the default build — the embedding model is in-process — so every
-`./mvnw test` or `./mvnw verify` rewrites the page. The diff mode is one property:
+The assertions run in the default build — the embedding model is in-process — but the
+page does not: it is written only in the evals profile, so `./mvnw verify` leaves the
+working tree alone. The diff mode is one property:
 
 ```bash
-./mvnw test -Dtest=KnowledgeBaseTest                        # the report alone
-./mvnw test -Dtest=KnowledgeBaseTest -Dretrieval.diff=main  # plus the rows each document changed since main puts at risk
+./mvnw test -Pevals -Dtest=RetrievalReportEval                        # the report alone
+./mvnw test -Pevals -Dtest=RetrievalReportEval -Dretrieval.diff=main  # plus the rows each document changed since main puts at risk
 ```

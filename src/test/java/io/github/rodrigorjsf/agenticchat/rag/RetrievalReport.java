@@ -11,7 +11,7 @@ import java.util.Locale;
  * Renders one retrieval run as a self-contained HTML page: inline CSS, no script,
  * nothing fetched from the network, so the file opens from disk anywhere.
  *
- * <p>A pure function on purpose. {@code KnowledgeBaseTest} does the retrieving and
+ * <p>A pure function on purpose. {@code RetrievalReportEval} does the retrieving and
  * writes the file; everything a reader sees here is unit tested without loading the
  * embedding model.
  */

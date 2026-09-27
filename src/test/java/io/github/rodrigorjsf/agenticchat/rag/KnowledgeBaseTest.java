@@ -1,13 +1,8 @@
 package io.github.rodrigorjsf.agenticchat.rag;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import dev.langchain4j.rag.content.ContentMetadata;
 import dev.langchain4j.rag.content.retriever.ContentRetriever;
 import io.github.rodrigorjsf.agenticchat.rag.RetrievalReport.Chunk;
-import io.github.rodrigorjsf.agenticchat.rag.RetrievalReport.Query;
 import io.github.rodrigorjsf.agenticchat.rag.RetrievalReport.Result;
-import io.github.rodrigorjsf.agenticchat.rag.RetrievalReport.Run;
 import io.micronaut.context.ApplicationContext;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -18,12 +13,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -35,17 +24,12 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * <p>The embedding model runs in-process and costs nothing per call, so these are
  * ordinary unit tests with no network and no fixtures — which is the point of
- * choosing an in-process model in the first place.
+ * choosing an in-process model in the first place. They assert only; the report a person
+ * reads is written by {@code RetrievalReportEval} in the evals profile, so the default build
+ * leaves the working tree alone.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class KnowledgeBaseTest {
-
-    private static final String QUERY_SET = "/evals/retrieval-queries.json";
-    /** {@code -Dretrieval.diff=<git ref>} adds the changed-documents section to the report. */
-    static final String DIFF_PROPERTY = "retrieval.diff";
-    /** Surefire runs with the module directory as the working directory. */
-    private static final Path REPOSITORY_ROOT = Path.of(System.getProperty("user.dir"));
-    private static final Path REPORT = REPOSITORY_ROOT.resolve("retrieval-report.html");
 
     private ApplicationContext ctx;
     private KnowledgeBase knowledge;
@@ -60,15 +44,7 @@ class KnowledgeBaseTest {
         knowledge = ctx.getBean(KnowledgeBase.class);
         retriever = ctx.getBean(ContentRetriever.class);
 
-        results = retrieveEveryRow();
-        String diffRef = System.getProperty(DIFF_PROPERTY, "").strip();
-        var run = new Run(
-                ctx.getRequiredProperty("agentic.rag.min-score", Double.class),
-                ctx.getRequiredProperty("agentic.rag.max-results", Integer.class),
-                corpusDocuments(),
-                results,
-                diffRef.isEmpty() ? null : CorpusDiff.since(diffRef, REPOSITORY_ROOT));
-        Files.writeString(REPORT, RetrievalReport.render(run), StandardCharsets.UTF_8);
+        results = RetrievalRun.retrieveEveryRow(retriever);
     }
 
     @AfterAll
@@ -111,25 +87,15 @@ class KnowledgeBaseTest {
     }
 
     @Test
-    @DisplayName("every run writes retrieval-report.html at the repository root, one row per query")
-    void writesTheReport() throws IOException {
-        String html = Files.readString(REPORT, StandardCharsets.UTF_8);
-
-        assertThat(results).isNotEmpty();
-        assertThat(html).contains("<h1>Retrieval report</h1>");
-        results.forEach(result -> assertThat(html).contains(result.query().id()));
-    }
-
-    @Test
     @DisplayName("every corpus document is some positive row's expected source, and every expected source exists")
     void queriesCoverTheCorpusBothWays() throws Exception {
         var expected = results.stream().map(r -> r.query().expectedSource())
                 .filter(java.util.Objects::nonNull).distinct().toList();
 
         assertThat(expected)
-                .as("a document no positive row names ships untested; see Uncovered documents in the report")
-                .containsAll(corpusDocuments());
-        assertThat(corpusDocuments())
+                .as("a document no positive row names ships untested; see Uncovered documents in RetrievalReportEval's report")
+                .containsAll(RetrievalRun.corpusDocuments());
+        assertThat(RetrievalRun.corpusDocuments())
                 .as("an expected_source naming a document that no longer exists can never pass")
                 .containsAll(expected);
     }
@@ -140,53 +106,6 @@ class KnowledgeBaseTest {
 
     Stream<Arguments> negativeRows() {
         return results.stream().filter(r -> !r.query().positive()).map(r -> Arguments.of(r.query().id(), r));
-    }
-
-    /**
-     * Each committed row goes through the shipped retriever exactly once. The local
-     * embedding model is deterministic, so a second retrieval would only repeat the
-     * first; the assertions and the report both read these results.
-     */
-    private List<Result> retrieveEveryRow() throws IOException {
-        var rows = new ArrayList<Result>();
-        for (Query query : loadQuerySet()) {
-            var chunks = retriever.retrieve(dev.langchain4j.rag.query.Query.from(query.question())).stream()
-                    .map(content -> new Chunk(
-                            content.textSegment().metadata().getString("source"),
-                            content.textSegment().metadata().getString("title"),
-                            ((Number) content.metadata().get(ContentMetadata.SCORE)).doubleValue(),
-                            content.textSegment().text()))
-                    .toList();
-            rows.add(new Result(query, chunks));
-        }
-        return List.copyOf(rows);
-    }
-
-    private static List<Query> loadQuerySet() throws IOException {
-        try (InputStream in = KnowledgeBaseTest.class.getResourceAsStream(QUERY_SET)) {
-            assertThat(in).as("query set %s on the test classpath", QUERY_SET).isNotNull();
-            var queries = new ArrayList<Query>();
-            for (JsonNode row : new ObjectMapper().readTree(in).get("queries")) {
-                JsonNode expected = row.get("expected_source");
-                String label = row.get("label").asText();
-                assertThat(label).as("row %s label", row.get("id").asText()).isIn("positive", "negative");
-                queries.add(new Query(row.get("id").asText(), row.get("question").asText(),
-                        label,
-                        expected == null || expected.isNull() ? null : expected.asText(),
-                        row.get("provenance").asText()));
-            }
-            return queries;
-        }
-    }
-
-    /** Every document the corpus holds, read from the same classpath directory ingestion reads. */
-    private static List<String> corpusDocuments() throws Exception {
-        var url = KnowledgeBaseTest.class.getClassLoader().getResource("knowledge");
-        assertThat(url).isNotNull();
-        try (Stream<Path> files = Files.list(Path.of(url.toURI()))) {
-            return files.map(path -> path.getFileName().toString()).filter(name -> name.endsWith(".md"))
-                    .sorted().toList();
-        }
     }
 
     @Test
