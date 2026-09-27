@@ -638,8 +638,8 @@ a child receives is being written.
   round trip in front of it.
 - A fan-out has no call budget, and one of the children can spawn children.
 - The steps are known in advance, yet a child agent was given the job of choosing
-  them — a predefined code path would do it for fewer calls, at a measured ~4×
-  (agent) to ~15× (multi-agent) the tokens of a chat turn, cited in the skill.
+  them — a predefined code path in the application would do it without the
+  agent's token overhead, which the skill cites from published measurements.
 
 | Neighbour | Way | The discriminator |
 |---|---|---|

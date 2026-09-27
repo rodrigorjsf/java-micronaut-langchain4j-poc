@@ -37,8 +37,8 @@ increasing complexity when needed" [sourced — Anthropic, *Building effective
 agents*, 2024-12-19, https://www.anthropic.com/engineering/building-effective-agents,
 read 2026-09-27]. So before the discard test, ask whether the steps are known in
 advance. "Look up the CNPJ, then the weather at its address" is two calls in a
-fixed order: a method that makes them costs two model calls at most and fails
-where you can see it; a child agent asked to "find out about this company" spends
+fixed order: a method that makes them costs two HTTP calls, no model call to
+decide the order, and fails where you can see it; a child agent asked to "find out about this company" spends
 its own loop deciding what the method already knew. Spawn only where the model
 has to choose the path.
 
@@ -57,10 +57,10 @@ brief carries five parts:
 | the budget, in round trips and seconds | the child spends until something else stops it, and the stop looks like a finding |
 | what to do when the material is not there, and when the question has two readings | it answers from pretraining, fluently, and the parent cannot tell |
 
-**Size the return, in the brief: about 1,000–2,000 tokens.** Anthropic's
-sub-agents "might explore extensively, using tens of thousands of tokens or more,
-but return only a condensed, distilled summary of its work (often 1,000-2,000
-tokens)" [sourced — Anthropic, *Effective context engineering for AI agents*,
+**Size the return, in the brief: about 1,000–2,000 tokens.** Describing
+sub-agent architectures, Anthropic writes: "Each subagent might explore
+extensively, using tens of thousands of tokens or more, but returns only a
+condensed, distilled summary of its work (often 1,000-2,000 tokens)" [sourced — Anthropic, *Effective context engineering for AI agents*,
 2025-09-29,
 https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents,
 read 2026-09-27]. Treat the range as a target to state, not a law: a return that
@@ -88,14 +88,15 @@ calls for one message. **Parallelism buys wall-clock, not calls — 17 stays
 
 The measured multipliers point the same way. In Anthropic's own data "agents
 typically use about 4× more tokens than chat interactions, and multi-agent systems
-use about 15× more tokens as chats" [sourced — Anthropic, *How we built our
+use about 15× more tokens than chats" [sourced — Anthropic, *How we built our
 multi-agent research system*, 2025-06-13,
 https://www.anthropic.com/engineering/multi-agent-research-system, read
 2026-09-27]. Those are one vendor's figures on research tasks, not a constant for
 your workload — but they set the order of magnitude a fan-out has to earn back,
 and the same post names the tasks that do: heavy parallelism, information larger
-than one context window, many complex tools. Work where "all agents … share the
-same context" is, in its words, "not a good fit".
+than one context window, many complex tools. Domains that "require all agents to
+share the same context or involve many dependencies between agents" are, in its
+words, "not a good fit".
 
 **Isolation has a fixed floor**: a child replays its own system prompt and tool
 schemas on *every one of its own model calls* — illustratively, a 1200-token
@@ -184,8 +185,10 @@ in [`RETURN-SEAMS.md`](RETURN-SEAMS.md).
 three categories, built from expert-annotated traces and applied to a dataset of
 1600+ traces across seven multi-agent frameworks [sourced — Cemri et al., *Why Do
 Multi-Agent LLM Systems Fail?*, arXiv 2503.13657 v3, 2025-10-26,
-https://arxiv.org/abs/2503.13657, read 2026-09-27]. Most modes are ones a
-control in this skill already names:
+https://arxiv.org/abs/2503.13657, read 2026-09-27]. Each category lines up with
+controls this skill already names — tightly for the first and third, loosely for
+conversation reset and reasoning-action mismatch, which no brief or return schema
+prevents on its own:
 
 | MAST category | Modes, as the paper names them | The control here (this skill's mapping, not the paper's) |
 |---|---|---|
@@ -193,7 +196,7 @@ control in this skill already names:
 | **Inter-agent misalignment** | conversation reset, fail to ask for clarification, task derailment, information withholding, ignored other agent's input, reasoning-action mismatch | the discard test and no org-chart splits (§1), `ambiguous` as an outcome (§6) |
 | **Task verification** | premature termination, no or incomplete verification, incorrect verification | `budget_exhausted` and `not_found` as outcomes, citations resolved by a tool (§6) |
 
-The paper's own conclusion is the reason to reach for structure rather than a
+The authors' conjecture is the reason to reach for structure rather than a
 bigger model: "improvements in the base model capabilities will be insufficient
 to address the full MAST". Use the mode names when you label a failed run — "fail
 to ask for clarification" says which control was missing; "the agent got
