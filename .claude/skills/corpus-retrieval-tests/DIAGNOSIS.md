@@ -14,8 +14,8 @@ Probe 3 is the one people skip, because it needs a second retriever built by han
 — and it is the only probe that separates a vocabulary failure from a gate
 failure, which are the two verdicts most often confused.
 
-The worked question below is the one from `writing-retrievable-knowledge`'s
-`WORKED-EXAMPLE.md`, in the same invented domain — a public library's assistant, whose corpus is the
+The worked question below is the one `writing-retrievable-knowledge` works
+through, in the same invented domain — a public library's assistant, whose corpus is the
 library's own rules. The user typed: *"can I keep this book longer or do I have to
 bring it back"*, and the row expects `renewals.md`.
 

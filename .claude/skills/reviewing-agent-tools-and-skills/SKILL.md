@@ -105,8 +105,8 @@ activating it changes nothing, both read perfectly in source. **One dump shows t
 show the second** — the visible tool set is rebuilt on every round trip from the marker the
 activation left (`progressive-tool-disclosure`), so a dump taken with nothing activated never held
 those tools at all. Proving attachment costs one activation per skill plus the request captured on
-the turn after it, read against that skill's declared list — `authoring-agent-skills`'s
-`PROVING-ACTIVATION.md` runs that comparison and tells its three failures apart. Then write each
+the turn after it, read against that skill's declared list — `authoring-agent-skills` owns
+that comparison and tells its three failures apart; load it by name. Then write each
 primary subject down. All pairs in a forty-item layer is 780 comparisons, and the index is the only
 thing cutting passes 3 and 4 to a handful — which it does only when its groups are neither one
 group nor forty:

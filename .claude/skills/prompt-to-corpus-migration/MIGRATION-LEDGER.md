@@ -6,9 +6,9 @@ four. They are filled in against **one invented codebase**, so a row in one bloc
 can be traced into the next. Copy the shapes, not the contents; every number below
 is illustrative and none of it was measured on anything.
 
-The shapes come from `agentic-codebase-audit`'s `OUTPUT-SHAPES.md` and are reused
-deliberately, so a reader who has seen one file can read the other: the two stamp
-lines at the head, an **Evidence** column carrying captured output rather than
+The shapes are the ones `agentic-codebase-audit` writes, reused deliberately and
+carried in full here, so a reader who has seen one audit can read this ledger: the
+two stamp lines at the head, an **Evidence** column carrying captured output rather than
 judgement, a **Previous** field with `first run` as its honest empty value — reused
 here as a whole column of the settings block — a **Smallest change** sized in
 files, and a **Proved by** field naming the test that closes the entry. Four shapes

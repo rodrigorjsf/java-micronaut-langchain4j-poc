@@ -227,8 +227,8 @@ Three are deterministic and sit beside the code.
 **Routing is the fourth, and not a unit test** — it runs the model, so the pass
 threshold and the flaky-case rule are `agentic-evals` territory, which you can
 invoke. Sourcing, sizing and scoring the set are `reviewing-agent-tools-and-skills`,
-which is human-invoked only: read its `ROUTING-SET.md` directly, or ask the user to
-run it. This pass owes it four kinds of case, in that file's names: **Own**, sourced from
+which is human-invoked only: ask the user to run it, which they invoke by name.
+This pass owes it four kinds of case, in that skill's names: **Own**, sourced from
 the sealed third the description was never written from; **Boundary**, a sentence
 belonging to the nearest sibling by name and labelled with that sibling, which
 fails the day someone edits its description into your territory; **Orphan**, a

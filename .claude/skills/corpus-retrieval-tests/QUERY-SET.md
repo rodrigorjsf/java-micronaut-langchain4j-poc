@@ -3,7 +3,7 @@
 Open this when writing the first rows, or when a field in
 [`SKILL.md`](SKILL.md)'s row table needs a shape. The domain is invented and
 neutral — a public library's assistant, the same one
-`writing-retrievable-knowledge`'s `WORKED-EXAMPLE.md` uses — with a corpus of four documents: `renewals.md`, `fines.md`, `holds.md`,
+`writing-retrievable-knowledge` works through — with a corpus of four documents: `renewals.md`, `fines.md`, `holds.md`,
 `hours-and-branches.md`. Two facts about it decide several rows below: the library
 serves an English- and Spanish-speaking membership, so the corpus carries both
 languages and so must the query set; and the assistant has a tool that looks up a
@@ -143,7 +143,7 @@ then the suite is green about a system nobody runs.
 
 Nothing about the rows changes. What changes is where the suite runs: tagged out of
 the default build, run before a release, and paced under a measured rate limit —
-`agentic-evals` owns that split, and its `RUNNING-A-SUITE.md` owns the pacing,
-the `ran / total` block and what a skipped row means. A quota error on
+`agentic-evals` owns that split, the pacing, the `ran / total` block and what a
+skipped row means. A quota error on
 `neg-neighbour-001` is not a passing negative row; it is a skipped one, and
 counting it as a pass is the most expensive arithmetic error in the file.

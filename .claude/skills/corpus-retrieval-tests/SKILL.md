@@ -173,8 +173,8 @@ catalogue is a negative row generator.** Anything a tool answers is, by
 `retrieval-that-earns-its-place`'s rule, not corpus material — so the question that
 reaches that tool is a question the corpus must decline.
 
-**Write the gate as a count, not a rate.** `agentic-evals`'s `SIZING.md` settles
-this: below roughly twenty negative rows a `<= 0.05` rate permits zero misses, so
+**Write the gate as a count, not a rate.** `agentic-evals` settles this, in its
+sizing arithmetic: below roughly twenty negative rows a `<= 0.05` rate permits zero misses, so
 a percentage disguises a zero tolerance as an allowance. A three-document corpus cannot reach twenty
 negatives without padding, and padding is the one thing that makes the number
 worse. That is also the honest answer to *"generate a large set"*: **what scales a
@@ -224,8 +224,7 @@ once, not for fewer rows.
 
 **A hosted embedding API means a key, a bill and somebody else's rate limit**, so
 it is a live suite: tagged out of the default build, run before a release, paced.
-`agentic-evals` owns that split and the gating that follows from it, and its
-`RUNNING-A-SUITE.md` owns the pacing.
+`agentic-evals` owns that split, the gating that follows from it, and the pacing.
 
 **Find out which you have by reading the ingest path**, where the embedding model
 is constructed: a model id string plus credentials is hosted; weights loaded from
@@ -239,7 +238,7 @@ cache, put the model id and version in the cache key and fail the run on a
 mismatch rather than silently reusing yesterday's vectors.
 
 Row counts, the band around a score, and how small a regression a suite can see at
-all are `agentic-evals`'s `SIZING.md`. Cite it; do not invent a competing floor.
+all are `agentic-evals`'s ground. Hand off to it; do not invent a competing floor.
 
 ## Where the sentences come from
 
@@ -450,7 +449,7 @@ Run in order; done is the right-hand column.
 | 4 | Write the negative half | every row is in the product's own vocabulary, names which emptiness it asserts, and every tool in the catalogue has been walked for the question it serves; no absurdity stands in for a near-miss |
 | 5 | Vary each base question | every variant could fail while its base passes and you can name the layer; misspelling and synonym rows carry the `evasion` family; base questions came from outside the document |
 | 6 | Pin the distribution | the lowest relevant top score and the highest irrelevant one are asserted, measured with the gate open, and the assertion says what a flip means |
-| 7 | Decide where the suite runs and what it gates | decided by the embedding model, sized off `agentic-evals`'s `SIZING.md`, and the gate written as a count wherever the negative half is under about twenty rows |
+| 7 | Decide where the suite runs and what it gates | decided by the embedding model, sized off `agentic-evals`'s sizing arithmetic, and the gate written as a count wherever the negative half is under about twenty rows |
 | 8 | Run it through the shipped path | the router and threshold the application ships; the only open-gate call in the file is the distribution probe, and a comment says why |
 | 9 | Diagnose every failure before editing anything | `DIAGNOSIS.md` ran, the verdict names which of the four layers failed, and the fix went to the skill that owns that layer — no document was edited on a hunch. Where the verdict is *never migrated*, the owner is `prompt-to-corpus-migration` and a model cannot hand off to it: ask the user to run it, which they invoke by name |
 | 10 | Check both directions | every corpus document is some positive row's `expected_source`, and every `expected_source` names a document that exists |

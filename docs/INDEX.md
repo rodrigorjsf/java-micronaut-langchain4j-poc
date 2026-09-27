@@ -60,7 +60,8 @@ they travel to any agentic backend.
 that send you to it, whether the model fires it or a person invokes it by name, and
 which skill hands off to which. It is checked against the directory in both
 directions by [`check-skill-docs.py`](../scripts/check-skill-docs.py), so no count
-is restated here to go stale.
+is restated here to go stale; the same script fails on a skill that points into
+another skill's files instead of handing off by name.
 
 [`.claude/rules/micronaut-langchain4j.md`](../.claude/rules/micronaut-langchain4j.md)
 holds what does not travel: the framework traps that compiled, or ran, or passed a

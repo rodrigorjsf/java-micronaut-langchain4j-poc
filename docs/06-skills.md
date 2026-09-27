@@ -822,7 +822,7 @@ reader — or a row outlives the directory it names and sends someone to a path 
 is not there. Neither breaks a build.
 
 ```bash
-./scripts/check-skill-docs.py    # skill directories vs the rows here, both ways
+./scripts/check-skill-docs.py    # skill directories vs the rows here, both ways; no skill points into another
 ```
 
 Set equality in both directions, and exit 1 on either failure. It is the same
@@ -836,6 +836,14 @@ their skills as bare backticked text rather than as links: a hand-off cell that
 could satisfy the check would let a skill mentioned by its neighbour and never given
 a row of its own pass, which is precisely the case the check exists to catch. Two
 rows for one skill fails the same way one row for none does.
+
+**A skill never points into another skill's files.** A pointer to a sibling's
+reference file dangles the day its owner renames or splits it, and when the sibling
+is invoked by name the model reading the pointer can never load it at all. So a skill
+hands off to a sibling by the sibling's name, and the sibling routes to its own
+files. The same script fails on a link climbing out of a skill (`](../`), a
+`.claude/skills/<other>/` path, or a backticked file name that exists only in
+another skill's directory.
 
 ---
 

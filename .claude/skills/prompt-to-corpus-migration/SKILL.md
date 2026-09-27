@@ -323,8 +323,8 @@ and does not go looking, so a path recorded only in a commit message is a pointe
 with no reader.
 
 → [`MIGRATION-LEDGER.md`](MIGRATION-LEDGER.md) — the four blocks worked against an
-invented codebase, and the note on which shapes come from `agentic-codebase-audit`'s
-`OUTPUT-SHAPES.md`. Open it before writing the first row.
+invented codebase, and the note on which shapes are shared with `agentic-codebase-audit`.
+Open it before writing the first row.
 
 ## Running it again
 

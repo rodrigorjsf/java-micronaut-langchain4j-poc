@@ -62,7 +62,7 @@ in-process and starting a real Valkey container for the cache.
 ./mvnw test -Pit                  # + floci via Testcontainers
 ./mvnw test -Pevals               # + the triage golden set, the scenario suite (writes eval-report.html) and the grader calibration, against live models
 ./scripts/check-tool-catalogue.py # tool code vs configured endpoints, both ways, https only
-./scripts/check-skill-docs.py     # skill directories vs docs/06-skills.md, both ways
+./scripts/check-skill-docs.py     # skill directories vs docs/06-skills.md, both ways; no skill points into another
 ```
 
 Traces are optional and off by default. Two profiles, one at a time — the two stacks
