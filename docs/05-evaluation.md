@@ -175,11 +175,100 @@ Two rules keep that honest:
   registry like any other role. (The registry is built on first use, not when the
   server starts — see #51.)
 - **Uncalibrated means report-only.** Nobody has measured this Grader against human
-  labels yet, so its verdict is an opinion, not a measurement. Until a calibration set
-  exists (TPR and TNR per criterion, see the `agentic-evals` skill; tracked in #33), a failing rubric
-  can never fail the eval. `ScenarioRunnerTest` proves it in the ordinary build: a
-  scripted grader fails the committed critical row's rubric, and the row still passes
-  and the gate stays green.
+  labels yet, so its verdict is an opinion, not a measurement. The machinery to measure
+  it exists (see *Calibrating the Grader* below), but the labelled set is still empty,
+  so a failing rubric can never fail the eval. `ScenarioRunnerTest` proves it in the
+  ordinary build: a scripted grader fails the committed critical row's rubric, and the
+  row still passes and the gate stays green.
+
+**Calibrating the Grader.** A Grader is itself a classifier, so it is measured like
+one: against answers a person has already labelled. The labels live in
+`src/test/resources/evals/grader-calibration.json`, one entry per rubric criterion
+(worded exactly as the scenario rows word it), each with labelled answers:
+
+```json
+{"criteria": [{"criterion": "The answer tells the user directly whether rain is expected ...",
+  "examples": [{"id": "rain-017", "split": "test", "turns": ["Vai chover amanhã em São Paulo?"],
+                "answer": "Amanhã: 12,4 mm.", "pass": false,
+                "critique": "Only a figure; never says whether it will rain.",
+                "labelledBy": "rodrigo"}]}]}
+```
+
+Every row sits in one **split**, and the split decides what the row may be used for:
+
+| Split | Used for | Why it is kept apart |
+|---|---|---|
+| `train` | the Grader's **few-shot examples** — shown to it, with the human's verdict and critique, before the answer it grades | the only rows the Grader ever sees |
+| `dev` | tuning the Grader's instructions and choosing train rows | measured, but you look at it while iterating |
+| `test` | the number that is reported and committed | never looked at while tuning, so it stays an honest estimate |
+
+A Grader measured on the rows it was shown as examples scores itself against the
+answer key, so `GraderCalibration.measure` refuses the train split outright, and
+`RubricGrader.withFewShot` takes a criterion's examples from its train rows and from
+nothing else. The scenario suite prompts the Grader the same way, so the prompt
+measured is the prompt used.
+
+**Two rates, never one accuracy.** Per criterion, the Grader's verdicts are compared
+with the labels:
+
+| Rate | Of the answers a person marked… | …the share the Grader… | A low value means |
+|---|---|---|---|
+| **TPR** (true-positive rate) | PASS | also marked PASS | it fails good answers |
+| **TNR** (true-negative rate) | FAIL | also marked FAIL | it lets bad answers through |
+
+A set with 90 PASS rows and 10 FAIL rows gives a Grader that always says PASS 90%
+accuracy — and a TNR of 0, which is the number that exposes it. A row the Grader gave
+no verdict on (UNGRADED) counts toward neither rate and is printed apart. The rates
+mean something only once a criterion has at least **60 labelled rows** (one criterion
+is one failure mode) **and both labels in the dev and in the test split**; with no
+FAIL row, TNR is undefined however good the Grader is. `GraderCalibrationEval` prints
+every shortfall.
+
+**Recalibration.** A TPR and TNR describe one grader model, prompted one way, grading
+one agent's answers. `GraderCalibrationEval` (`./mvnw test -Pevals
+-Dtest=GraderCalibrationEval`, needs `OPENAI_API_KEY`) writes the test-split counts,
+with a fingerprint of what they were measured under, to
+`src/test/resources/evals/grader-calibration-record.json`; commit it. From then on
+`GraderCalibrationFreshnessTest`, in the ordinary build, compares that fingerprint
+with the current one and fails, naming the change, when any of three things moved:
+
+| Changed | Why the old numbers no longer hold |
+|---|---|
+| the `grader` role's provider or model | a different model disagrees with people differently |
+| the Grader's prompt: its instructions, its question template or any train row | a new prompt is a new grader |
+| the `agent` role's provider or model | the answers it grades are no longer like the ones that were labelled |
+
+Dev and test rows are not part of the prompt, so adding them does not trigger it.
+Until the record exists there is nothing to go stale, and the test passes.
+
+```mermaid
+flowchart LR
+    labels[human-labelled rows] --> train[train split]
+    labels --> dev[dev split]
+    labels --> test[test split]
+    train -- "few-shot examples" --> grader[RubricGrader]
+    dev --> measure[GraderCalibration.measure]
+    test --> measure
+    grader --> measure
+    measure -- "TPR + TNR per criterion" --> record[grader-calibration-record.json]
+    config[grader + agent models, grader prompt] --> fresh{GraderCalibrationFreshnessTest}
+    record --> fresh
+    fresh -- "fingerprint moved" --> recal[recalibrate]
+    classDef input fill:#2d6cdf,stroke:#9ec1ff,color:#ffffff
+    classDef step fill:#5a6275,stroke:#aab3c5,color:#ffffff
+    classDef soft fill:#7a4fa3,stroke:#d2b3f0,color:#ffffff
+    classDef out fill:#1f7a3f,stroke:#8fd9a8,color:#ffffff
+    class labels,config input
+    class train,dev,test,measure,fresh step
+    class grader soft
+    class record,recal out
+    linkStyle default stroke:#8892b0
+```
+
+The set is still empty: labelling is human work, and a row a model labelled would
+measure the Grader against another model. Filling it is tracked in #55.
+Even once every criterion is sized, the rubric stays report-only until someone
+decides, from measured rates, that it may gate.
 
 **Grounding, by example.** The row cannot say "12.4 mm" — tomorrow's rainfall
 changes daily. So it says *where* a value sits in the answer, and the check looks
@@ -428,9 +517,12 @@ consumes them yet.
    for every scenario's trajectory and the reason behind each failed check;
    a critical scenario failing any of its 3 repetitions fails the eval, and
    the summary names the flaky ones.
-3. Read the intent-drift table the golden set prints. A decision that stayed
+3. If you changed the `grader` or `agent` model or the Grader's prompt and
+   `GraderCalibrationFreshnessTest` goes red, re-run `GraderCalibrationEval` and
+   commit its record.
+4. Read the intent-drift table the golden set prints. A decision that stayed
    right while the labels moved is still a regression, because the metrics and
    the refusal templates key on those labels.
-4. If a case now fails and the *case* was wrong, change the case — and say so in
+5. If a case now fails and the *case* was wrong, change the case — and say so in
    the commit. A golden set edited quietly to make a build green is worse than no
    golden set.
