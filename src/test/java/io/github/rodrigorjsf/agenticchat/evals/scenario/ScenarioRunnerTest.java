@@ -66,7 +66,8 @@ class ScenarioRunnerTest {
         models = (StubChatModelRegistry) app.getApplicationContext().getBean(ChatModelRegistry.class);
         runner = new ScenarioRunner(URI.create("http://localhost:" + app.getPort()),
                 app.getApplicationContext().getBean(RecordingAgentTracer.class),
-                app.getApplicationContext().getBean(LinkPolicy.class));
+                app.getApplicationContext().getBean(LinkPolicy.class),
+                new RubricGrader(models.forRole("grader")));
     }
 
     @AfterEach
@@ -120,6 +121,61 @@ class ScenarioRunnerTest {
         assertThat(result.latency()).isPositive();
         assertThat(result.inputTokens()).isPositive();
         assertThat(result.outputTokens()).isPositive();
+    }
+
+    @Test
+    @DisplayName("a failing rubric is reported with its critique and never fails the scenario or the gate")
+    void aFailingRubricNeverFailsTheEval() {
+        assertThat(weather.critical()).as("the gate this test must not trip").isTrue();
+        assertThat(weather.expect().rubric()).as("the committed row carries a rubric").isNotEmpty();
+        models.model("judge").fallbackTo(IN_SCOPE);
+        scriptTheRightTrajectory();
+        var grader = models.model("grader").fallbackTo("""
+                {"pass":false,"critique":"Lists millimetres but never says whether it will rain."}""");
+
+        var runs = runner.repeat(weather, 1, () -> { });
+        var result = runs.repetitions().getFirst();
+
+        assertThat(result.rubric()).hasSameSizeAs(weather.expect().rubric())
+                .allSatisfy(verdict -> {
+                    assertThat(verdict.verdict()).isEqualTo(RubricVerdict.Verdict.FAIL);
+                    assertThat(verdict.critique()).contains("never says whether it will rain");
+                });
+        assertThat(result.passed()).as("the rubric is not one of the checks").isTrue();
+        assertThat(runs.status()).isEqualTo(ScenarioRuns.Status.PASSED);
+        assertThat(runs.failsGate()).isFalse();
+        assertThat(grader.lastRequest().messages().toString())
+                .as("the grader sees the criterion, the user's turn and the answer it grades")
+                .contains(weather.expect().rubric().getLast())
+                .contains("Vai chover amanhã em São Paulo?")
+                .contains("12,4 mm");
+    }
+
+    @Test
+    @DisplayName("a grader that answers something other than a verdict leaves the criterion ungraded, not failed")
+    void anUnreadableVerdictIsUngraded() {
+        models.model("judge").fallbackTo(IN_SCOPE);
+        scriptTheRightTrajectory();
+        models.model("grader").fallbackTo("I think it is fine.");
+
+        var result = runner.run(weather);
+
+        assertThat(result.rubric()).allSatisfy(verdict -> {
+            assertThat(verdict.verdict()).isEqualTo(RubricVerdict.Verdict.UNGRADED);
+            assertThat(verdict.critique()).contains("I think it is fine.");
+        });
+        assertThat(result.passed()).isTrue();
+    }
+
+    private void scriptTheRightTrajectory() {
+        var agent = models.model("agent");
+        agent.reply(request -> AiMessage.from(ToolExecutionRequest.builder()
+                .id("call-1").name("activate_skill")
+                .arguments("{\"skill_name\":\"geo-and-weather\"}").build()));
+        agent.reply(request -> AiMessage.from(ToolExecutionRequest.builder()
+                .id("call-2").name("get_weather")
+                .arguments("{\"latitude\":\"-23.55\",\"longitude\":\"-46.63\",\"forecastDays\":\"2\"}").build()));
+        agent.replyWith("Sim, amanhã deve chover em São Paulo: 12,4 mm previstos.");
     }
 
     @Test

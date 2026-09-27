@@ -26,7 +26,7 @@ import java.util.Objects;
 /**
  * Runs one scenario end to end: every turn through {@code POST /api/chat}, the trajectory read
  * back from the recording tracer, then the checks: trajectory first, then the deterministic
- * answer checks — before any rubric a model would have to grade.
+ * answer checks, and only then the rubric, which a model grades and which never gates.
  *
  * <p>Plain {@code java.net.http} rather than Micronaut's client, so the request is exactly the
  * JSON a caller outside this JVM would send.
@@ -43,6 +43,7 @@ public final class ScenarioRunner {
     private final URI chatEndpoint;
     private final RecordingAgentTracer tracer;
     private final LinkPolicy links;
+    private final RubricGrader grader;
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
 
     /**
@@ -50,9 +51,18 @@ public final class ScenarioRunner {
      *              what the output guardrail means by it
      */
     public ScenarioRunner(URI serverUrl, RecordingAgentTracer tracer, LinkPolicy links) {
+        this(serverUrl, tracer, links, RubricGrader.NONE);
+    }
+
+    /**
+     * @param grader scores each row's rubric after the deterministic checks; its verdicts are
+     *               reported and never decide whether the scenario passed
+     */
+    public ScenarioRunner(URI serverUrl, RecordingAgentTracer tracer, LinkPolicy links, RubricGrader grader) {
         this.chatEndpoint = serverUrl.resolve("/api/chat");
         this.tracer = tracer;
         this.links = links;
+        this.grader = grader;
     }
 
     /**
@@ -96,8 +106,15 @@ public final class ScenarioRunner {
         var trajectory = trajectory(outcome);
         var checks = new ArrayList<>(TrajectoryCheck.evaluate(scenario.expect().trajectory(), trajectory));
         checks.addAll(AnswerCheck.evaluate(scenario.expect().answer(), answer, trajectory.toolCalls(), links::allows));
-        return new ScenarioResult(scenario, trajectory, answer, checks, latency, inputTokens, outputTokens,
+        var result = new ScenarioResult(scenario, trajectory, answer, checks, latency, inputTokens, outputTokens,
                 Cost.of(tracer.recorded()));
+        if (scenario.expect().rubric().isEmpty()) {
+            return result;
+        }
+        // Graded last and outside the latency: the grader's calls are the eval's, not the turn's.
+        // Its generations reach the same tracer, so the cost re-read here includes them.
+        var verdicts = grader.grade(scenario.expect().rubric(), scenario.turns(), answer);
+        return result.withRubric(verdicts, Cost.of(tracer.recorded()));
     }
 
     /**

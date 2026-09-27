@@ -213,6 +213,28 @@ class EvalReportRendererTest {
                 .contains("<span class=\"fail\">FAIL</span> grounded: (\\d+)\\s*mm&lt;: [31,7] appear in no captured tool result");
     }
 
+    @Test
+    @DisplayName("rubric verdicts appear labelled uncalibrated with their critique, and a failing one leaves the scenario passed")
+    void rendersTheRubricAsReportOnly() {
+        var criterion = "Says whether it will rain <tomorrow>";
+        var scenario = new Scenario(WEATHER.id(), WEATHER.domains(), WEATHER.kind(), WEATHER.source(), WEATHER.turns(),
+                new Scenario.Expectation(WEATHER.expect().trajectory(), null, List.of(criterion)),
+                WEATHER.dependsOn(), WEATHER.critical(), null);
+        var graded = passing(scenario).withRubric(List.of(new RubricVerdict(criterion, RubricVerdict.Verdict.FAIL,
+                "Only lists <b>millimetres</b>.")), new Cost(new BigDecimal("0.0016"), 0));
+
+        var html = EvalReportRenderer.render(List.of(once(graded)));
+
+        assertThat(html)
+                .contains("uncalibrated")
+                .contains("Says whether it will rain &lt;tomorrow&gt;")
+                .contains("<span class=\"fail\">FAIL</span> Says whether it will rain &lt;tomorrow&gt;: "
+                        + "Only lists &lt;b&gt;millimetres&lt;/b&gt;.")
+                .doesNotContain("<b>millimetres");
+        assertThat(summaryLine(html, "1 of 1 scenarios passed")).isNotBlank();
+        assertThat(summaryLine(html, "Rubric")).contains("uncalibrated").contains("0 of 1");
+    }
+
     /** The one summary row that starts with {@code label}, so an assertion cannot match elsewhere. */
     private static String summaryLine(String html, String label) {
         return html.lines()

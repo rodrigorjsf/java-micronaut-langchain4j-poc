@@ -35,8 +35,18 @@ public record Scenario(String id,
     /**
      * @param trajectory how the agent must have reached its answer
      * @param answer     what the answer itself must satisfy; absent when the row asserts nothing on it
+     * @param rubric     criteria the Grader scores, each pass or fail with a critique; reported only,
+     *                   never a check, because the Grader is uncalibrated. Empty when the row has none
      */
-    public record Expectation(TrajectoryExpectation trajectory, AnswerExpectation answer) {
+    public record Expectation(TrajectoryExpectation trajectory, AnswerExpectation answer, List<String> rubric) {
+
+        public Expectation {
+            rubric = rubric == null ? List.of() : List.copyOf(rubric);
+        }
+
+        public Expectation(TrajectoryExpectation trajectory, AnswerExpectation answer) {
+            this(trajectory, answer, List.of());
+        }
     }
 
     /**

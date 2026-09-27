@@ -18,6 +18,9 @@ import java.util.List;
  * @param cost         what the model calls of this repetition cost, as the application priced them
  * @param skipped      the repetition hit a provider rate limit or quota, so it measured nothing:
  *                     it is neither a pass nor a failure
+ * @param rubric       the Grader's verdict on each rubric criterion. Deliberately not among
+ *                     {@code checks}: the Grader is uncalibrated, so its verdicts are reported and
+ *                     never decide {@link #passed()}
  */
 public record ScenarioResult(Scenario scenario,
                              Trajectory trajectory,
@@ -27,15 +30,23 @@ public record ScenarioResult(Scenario scenario,
                              long inputTokens,
                              long outputTokens,
                              Cost cost,
-                             boolean skipped) {
+                             boolean skipped,
+                             List<RubricVerdict> rubric) {
 
     public ScenarioResult {
         checks = List.copyOf(checks);
+        rubric = List.copyOf(rubric);
     }
 
     public ScenarioResult(Scenario scenario, Trajectory trajectory, String answer, List<CheckResult> checks,
                           Duration latency, long inputTokens, long outputTokens, Cost cost) {
-        this(scenario, trajectory, answer, checks, latency, inputTokens, outputTokens, cost, false);
+        this(scenario, trajectory, answer, checks, latency, inputTokens, outputTokens, cost, false, List.of());
+    }
+
+    /** The same repetition with the Grader's verdicts attached, and the cost of grading added. */
+    public ScenarioResult withRubric(List<RubricVerdict> verdicts, Cost cost) {
+        return new ScenarioResult(scenario, trajectory, answer, checks, latency, inputTokens, outputTokens,
+                cost, skipped, verdicts);
     }
 
     /**
@@ -49,7 +60,7 @@ public record ScenarioResult(Scenario scenario,
     /** @param cost what the calls made before the quota error cost — they are billed all the same */
     public static ScenarioResult skipped(Scenario scenario, String reason, Duration latency, Cost cost) {
         return new ScenarioResult(scenario, new Trajectory(null, List.of(), List.of()), null,
-                List.of(new CheckResult("rate limit", false, reason)), latency, 0, 0, cost, true);
+                List.of(new CheckResult("rate limit", false, reason)), latency, 0, 0, cost, true, List.of());
     }
 
     public boolean passed() {

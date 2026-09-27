@@ -1,5 +1,6 @@
 package io.github.rodrigorjsf.agenticchat.llm.config;
 
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -62,6 +63,28 @@ public final class ModelRoleValidator {
                         """).formatted(role.name(), role.modelName(), role.thinkingLevel()));
             }
         });
+    }
+
+    /**
+     * Rules that span roles rather than one role: the {@code grader} must not be the
+     * {@code agent}'s model. A model grading its own answers favours them, and the rubric
+     * would then measure that preference instead of the answer. Only checked when both roles
+     * are configured; an absent grader is the eval's error, not the application's.
+     */
+    public static void validateAcrossRoles(Map<String, ModelRoleProperties> rolesByName) {
+        var grader = rolesByName.get("grader");
+        var agent = rolesByName.get("agent");
+        if (grader == null || agent == null) {
+            return;
+        }
+        if (grader.provider() == agent.provider()
+                && grader.modelName().strip().equalsIgnoreCase(agent.modelName().strip())) {
+            throw new InvalidModelConfigurationException(("""
+                    agentic.llm.models.grader uses %s %s, the same model as the agent role. \
+                    The grader scores the agent's answers, and a model grading its own answers \
+                    favours them; configure the grader to a different model.\
+                    """).formatted(grader.provider(), grader.modelName()));
+        }
     }
 
     private static void rejectThinkingOn(ModelRoleProperties role) {

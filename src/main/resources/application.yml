@@ -164,6 +164,20 @@ agentic:
         timeout: PT60S
         max-retries: 2
 
+      # Scores the optional rubric of an end-to-end scenario (ScenarioSuiteEval). The
+      # application itself never calls it; it is built here so the eval resolves it
+      # through the same registry, listeners and cost accounting as every other role.
+      # It must be a model other than `agent`: a model grading its own answers favours
+      # them, so ChatModelRegistry refuses to start when the two are the same. Its
+      # verdicts are uncalibrated and never gate the eval.
+      grader:
+        provider: OPENAI
+        model-name: gpt-4o-mini
+        temperature: 0.0
+        max-output-tokens: 256
+        timeout: PT30S
+        max-retries: 1
+
     # -------------------------------------------------------------------------
     # USD per million tokens. In configuration, not in code: prices change without
     # asking, and a stale constant produces a cost report that is confidently

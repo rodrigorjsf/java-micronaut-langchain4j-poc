@@ -1,5 +1,6 @@
 package io.github.rodrigorjsf.agenticchat.evals.scenario;
 
+import io.github.rodrigorjsf.agenticchat.llm.ChatModelRegistry;
 import io.github.rodrigorjsf.agenticchat.testsupport.RecordingAgentTracer;
 import io.github.rodrigorjsf.agenticchat.tools.http.LinkPolicy;
 import io.github.rodrigorjsf.agenticchat.tools.http.ToolHttpClient;
@@ -38,6 +39,10 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * ran; any other scenario reports its pass rate and never fails the eval. A repetition the
  * provider rate-limited is SKIPPED, and when no repetition ran at all the eval is aborted
  * (reported as skipped) rather than passed or failed.
+ *
+ * <p>A row's optional {@code rubric} is scored by the {@code grader} model role after every
+ * deterministic check. Its verdicts are uncalibrated: they appear in the report and never fail
+ * the eval.
  *
  * <p>A row that declares an {@code upstream} failure runs in a context of its own, with that
  * one catalogue key pointed at the local {@code StubApiController}; the model and every other
@@ -82,10 +87,16 @@ class ScenarioSuiteEval {
         return ApplicationContext.run(EmbeddedServer.class, config);
     }
 
+    /**
+     * The rubric is scored by the registry's {@code grader} role, which the registry refuses to
+     * start with when it is the agent's model.
+     */
     private static ScenarioRunner runnerFor(EmbeddedServer server) {
+        var context = server.getApplicationContext();
         return new ScenarioRunner(URI.create("http://localhost:" + server.getPort()),
-                server.getApplicationContext().getBean(RecordingAgentTracer.class),
-                server.getApplicationContext().getBean(LinkPolicy.class));
+                context.getBean(RecordingAgentTracer.class),
+                context.getBean(LinkPolicy.class),
+                new RubricGrader(context.getBean(ChatModelRegistry.class).forRole("grader")));
     }
 
     /**
