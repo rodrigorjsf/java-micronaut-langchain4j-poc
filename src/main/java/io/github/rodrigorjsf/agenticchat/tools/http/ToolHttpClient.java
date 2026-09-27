@@ -6,6 +6,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.client.HttpClient;
+import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.uri.UriBuilder;
 import jakarta.inject.Singleton;
@@ -41,8 +42,8 @@ import java.util.stream.Collectors;
  *   <li><b>No redirect leaves the catalogue.</b> The catalogue stops a tool from
  *       naming a host, but a catalogued host can still answer {@code 302} to
  *       {@code 169.254.169.254}, and an HTTP client that follows redirects by default
- *       re-opens the door the catalogue closed. The shared client does not follow
- *       ({@code micronaut.http.client.follow-redirects: false}); this class follows
+ *       re-opens the door the catalogue closed. This class's own client does not follow
+ *       ({@code micronaut.http.services.tool-apis.follow-redirects: false}); this class follows
  *       each hop itself, and only to a host some catalogue entry already names —
  *       see {@link #MAX_REDIRECTS}.</li>
  *   <li><b>Bounded output.</b> Every response is capped at the endpoint's byte
@@ -109,15 +110,23 @@ public class ToolHttpClient {
      */
     private static final int MAX_REDIRECTS = 3;
 
+    /**
+     * The client this class uses, configured under {@code micronaut.http.services.tool-apis}.
+     * Its own client, not the default bean: turning redirects off is a decision about
+     * the tool door, and on the shared bean it would also change every other consumer
+     * — a Langfuse score POST answered with a 3xx would then "succeed" unwritten.
+     */
+    static final String CLIENT_ID = "tool-apis";
+
     private final HttpClient httpClient;
     private final Map<String, ApiEndpointProperties> catalogue;
-    /** Exact hosts of every catalogue base URL: the only places a redirect may land. */
-    private final Set<String> catalogueHosts;
+    /** {@code host:port} of every catalogue base URL: the only places a redirect may land. */
+    private final Set<String> catalogueOrigins;
     private final String defaultUserAgent;
     private final LinkPolicy links;
     private final Semaphore inFlight = new Semaphore(IN_FLIGHT_LIMIT);
 
-    public ToolHttpClient(HttpClient httpClient,
+    public ToolHttpClient(@Client(id = CLIENT_ID) HttpClient httpClient,
                           List<ApiEndpointProperties> endpoints,
                           LinkPolicy links,
                           @io.micronaut.context.annotation.Value(
@@ -127,10 +136,9 @@ public class ToolHttpClient {
         this.links = links;
         this.catalogue = endpoints.stream().collect(Collectors.toUnmodifiableMap(
                 ApiEndpointProperties::name, e -> e));
-        this.catalogueHosts = endpoints.stream()
-                .map(e -> URI.create(e.baseUrl()).getHost())
-                .filter(host -> host != null)
-                .map(host -> host.toLowerCase(Locale.ROOT))
+        this.catalogueOrigins = endpoints.stream()
+                .map(e -> origin(URI.create(e.baseUrl())))
+                .filter(origin -> origin != null)
                 .collect(Collectors.toUnmodifiableSet());
         LOG.info("Tool API catalogue: {}", new java.util.TreeSet<>(catalogue.keySet()));
     }
@@ -242,16 +250,19 @@ public class ToolHttpClient {
                 var truncated = truncate(body == null ? "" : body, endpoint.maxResponseBytes());
                 return new ToolResponse(links.scrub(truncated.body()), truncated.outcome(), truncated.truncated());
             }
+            // Every refusal below is a value, not an exception: the attempt loop retries
+            // exceptions, and a refused hop is deterministic — asking again gets the same
+            // Location. The target goes to operators only; an address in the prompt is an
+            // address the model can repeat.
             URI next = redirectTarget(current, response);
-            if (hop == MAX_REDIRECTS || next == null || !mayFollow(current, next)) {
-                // A value, not an exception: the attempt loop retries exceptions, and a
-                // refused hop is deterministic — asking again gets the same Location.
-                // The target goes to operators only; an address in the prompt is an
-                // address the model can repeat.
-                LOG.warn("Tool API {} redirect refused after {} hop(s): {} -> {}",
-                        endpoint.name(), hop, current, next);
-                return ToolResponse.failure(ToolResponse.Outcome.UPSTREAM_ERROR,
-                        "the service redirected outside the tool catalogue, which is refused.");
+            String refusal = next == null ? "the service answered with a redirect that has no usable target."
+                    : hop == MAX_REDIRECTS ? "the service redirected too many times."
+                    : !mayFollow(current, next) ? "the service redirected outside the tool catalogue, which is refused."
+                    : null;
+            if (refusal != null) {
+                LOG.warn("Tool API {} redirect refused after {} hop(s): {} -> {} ({})",
+                        endpoint.name(), hop, current, next, refusal);
+                return ToolResponse.failure(ToolResponse.Outcome.UPSTREAM_ERROR, refusal);
             }
             current = next;
         }
@@ -270,7 +281,7 @@ public class ToolHttpClient {
     }
 
     /**
-     * A hop may land only on a host a catalogue entry names exactly, and never
+     * A hop may land only on a host and port a catalogue entry names exactly, and never
      * downgrades https to http. Exact host, not registrable domain: the link policy
      * widens to subdomains because a link is read by a person, while a request is
      * made by this process, and a sibling subdomain of a catalogued API is a host
@@ -281,8 +292,18 @@ public class ToolHttpClient {
         if (!scheme.equals("https") && !(scheme.equals("http") && "http".equalsIgnoreCase(from.getScheme()))) {
             return false;
         }
-        String host = to.getHost();
-        return host != null && catalogueHosts.contains(host.toLowerCase(Locale.ROOT));
+        String origin = origin(to);
+        return origin != null && catalogueOrigins.contains(origin);
+    }
+
+    /** {@code host:port}, with the scheme's default port filled in; null without a host. */
+    private static String origin(URI uri) {
+        if (uri.getHost() == null) {
+            return null;
+        }
+        int port = uri.getPort() != -1 ? uri.getPort()
+                : "https".equalsIgnoreCase(uri.getScheme()) ? 443 : 80;
+        return uri.getHost().toLowerCase(Locale.ROOT) + ":" + port;
     }
 
     private static ToolResponse truncate(String body, int maxBytes) {

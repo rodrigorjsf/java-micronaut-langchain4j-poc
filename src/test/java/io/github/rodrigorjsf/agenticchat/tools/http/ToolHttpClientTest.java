@@ -296,6 +296,17 @@ class ToolHttpClientTest {
     }
 
     @Test
+    @DisplayName("a redirect to another port on a catalogued host is refused")
+    void aRedirectToAnotherPortIsRefused() {
+        // The catalogue names an origin, not a hostname: "localhost" with the stub's port
+        // is reviewed, localhost:6379 is somebody's Redis. The port is unbound here, so a
+        // client that followed would fail as a connection error, not as a refusal.
+        var response = tools.get("stub", "/redirect", Map.of("to", "http://localhost:1/stub/landed"));
+
+        assertThat(response.toModelText()).contains("redirected outside the tool catalogue");
+    }
+
+    @Test
     @DisplayName("a redirect that stays on the catalogued host is still followed")
     void aRedirectWithinTheCatalogueIsFollowed() {
         // Refusing every 3xx would be the easy fix and a silent regression: an upstream
