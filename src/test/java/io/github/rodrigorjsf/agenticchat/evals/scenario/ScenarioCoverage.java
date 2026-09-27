@@ -16,7 +16,7 @@ import java.util.TreeSet;
  * <p>Computed over the whole dataset, not over the rows a filter selected: a run narrowed to one
  * domain still reports what the dataset as a whole is missing. Reported, never gated — the floor
  * is what the scenario-suite skill aims for when it drafts rows, and a gap is work to do rather
- * than a regression.
+ * than a regression. Whether it should gate is open in #65.
  *
  * @param domains             one entry per domain, by name
  * @param uncovered           artifacts no row's {@code dependsOn} names, by kind then id
