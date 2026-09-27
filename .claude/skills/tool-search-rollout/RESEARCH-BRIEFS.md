@@ -458,5 +458,5 @@ gaps have been erased rather than answered.
   and exempting it from search altogether is a trade between maintenance burden
   and permanent standing-prompt cost, and the last of those four is a decision
   the user is entitled to see at the gate.
-- Running the verification in Step 5, or reporting its result. The pass's
+- Running the verification in Step 5 (`EXECUTE-AND-VERIFY.md`), or reporting its result. The pass's
   measurements are made where their output can be read by whoever signs the pass.

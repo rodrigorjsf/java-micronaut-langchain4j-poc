@@ -308,14 +308,14 @@ names and descriptions; leave `maxResults` set by the floor below rather than by
 the rank distribution.
 
 Its **floor** comes from somewhere else entirely: the disclosure-lifetime
-observation in `SKILL.md`, Step 2. Where a search's results survive to the model
+observation in `DECIDE.md`. Where a search's results survive to the model
 calls after it, a task can search twice and accumulate, and `maxResults` only has
 to cover one step. Where they do not, every tool a step needs must return from a
 *single* search, and the floor is the largest number of tools any one step of a
 real task uses — a number you take from the query set's multi-step rows, not from
 the framework's `5`. **Where the lifetime could not be measured at all**, that
 same largest-single-step count *is* the answer rather than a floor under one: it
-is `SKILL.md`, Step 2's default, and it goes to the gate labelled as one.
+is `DECIDE.md`'s default, and it goes to the gate labelled as one.
 
 **Say in the description that the tool may be called again.** A model that
 searches once, receives `maxResults` specifications and proceeds has done
@@ -667,7 +667,7 @@ check asks **the providers the application actually assembles** what they answer
 row by row, and fails when a tool the census recorded as `static` or `provider`
 now arrives through one answering dynamic. A test double cannot catch this: it
 answers whatever it was constructed to answer, which is the census's opinion
-wearing a green tick. This is the same assertion `SKILL.md`, Step 5 makes once
+wearing a green tick. This is the same assertion `EXECUTE-AND-VERIFY.md`, Step 5 makes once
 at the end of the pass; here it becomes the thing that keeps making it.
 
 Then the new-tool experience is the point of the whole thing: **adding a tool
@@ -713,7 +713,7 @@ in the repository that goes red when retrieval quietly moved.
 
 ## What the record shows once it ships
 
-The query set is a sample of one team's vocabulary, and `SKILL.md`, Step 5 says
+The query set is a sample of one team's vocabulary, and `EXECUTE-AND-VERIFY.md`, Step 5 says
 what a green verification therefore leaves unproven. The mechanism that corrects
 it after launch is a record of what search was actually asked for and what it
 actually returned, it costs a handful of fields, and it ships in the same change
