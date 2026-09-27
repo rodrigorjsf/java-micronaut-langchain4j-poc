@@ -45,8 +45,8 @@ record CorpusDiff(String ref, List<String> changedDocuments) {
      */
     static CorpusDiff since(String ref, Path repositoryRoot) {
         var names = new TreeSet<String>();
-        names.addAll(Git.lines(Git.runOrThrow(repositoryRoot, "diff", "--name-only", "--no-renames", ref, "--", CORPUS_DIRECTORY)));
-        names.addAll(Git.lines(Git.runOrThrow(repositoryRoot, "ls-files", "--others", "--exclude-standard", "--", CORPUS_DIRECTORY)));
+        names.addAll(Git.lines(repositoryRoot, "diff", "--name-only", "--no-renames", ref, "--", CORPUS_DIRECTORY));
+        names.addAll(Git.lines(repositoryRoot, "ls-files", "--others", "--exclude-standard", "--", CORPUS_DIRECTORY));
         var documents = names.stream()
                 .filter(name -> name.endsWith(".md"))
                 .map(name -> Path.of(name).getFileName().toString())

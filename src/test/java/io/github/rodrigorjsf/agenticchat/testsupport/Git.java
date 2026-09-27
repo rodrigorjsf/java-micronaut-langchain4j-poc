@@ -52,9 +52,9 @@ public final class Git {
         return result.stdout();
     }
 
-    /** Non-blank output lines, stripped. */
-    public static List<String> lines(String output) {
-        return output.lines().map(String::strip).filter(line -> !line.isEmpty()).toList();
+    /** Non-blank stdout lines, stripped, of a command that must succeed. */
+    public static List<String> lines(Path directory, String... arguments) {
+        return runOrThrow(directory, arguments).lines().map(String::strip).filter(line -> !line.isEmpty()).toList();
     }
 
     private static String read(InputStream stream) {

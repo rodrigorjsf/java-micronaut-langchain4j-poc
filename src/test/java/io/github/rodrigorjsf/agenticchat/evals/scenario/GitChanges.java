@@ -30,8 +30,8 @@ public final class GitChanges {
                     + "', which git cannot resolve to a commit in " + repositoryRoot);
         }
         var changedPaths = new TreeSet<String>();
-        changedPaths.addAll(Git.lines(Git.runOrThrow(repositoryRoot, "diff", "--name-only", "--relative", "--no-renames", ref, "--", "src/main")));
-        changedPaths.addAll(Git.lines(Git.runOrThrow(repositoryRoot, "ls-files", "--others", "--exclude-standard", "--", "src/main")));
+        changedPaths.addAll(Git.lines(repositoryRoot, "diff", "--name-only", "--relative", "--no-renames", ref, "--", "src/main"));
+        changedPaths.addAll(Git.lines(repositoryRoot, "ls-files", "--others", "--exclude-standard", "--", "src/main"));
         changedPaths.removeIf(path -> !ArtifactInventory.isInventoried(path));
 
         var after = ArtifactInventory.readWorkingTree(repositoryRoot);
