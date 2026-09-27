@@ -286,6 +286,9 @@ public class ToolHttpClient {
      * widens to subdomains because a link is read by a person, while a request is
      * made by this process, and a sibling subdomain of a catalogued API is a host
      * nobody reviewed.
+     *
+     * <p>Names only: a catalogued hostname that resolves to a private or link-local
+     * address is still dialled — see #58.
      */
     private boolean mayFollow(URI from, URI to) {
         String scheme = to.getScheme() == null ? "" : to.getScheme().toLowerCase(Locale.ROOT);
