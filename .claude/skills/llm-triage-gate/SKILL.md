@@ -1,6 +1,6 @@
 ---
 name: llm-triage-gate
-description: Put a cheap, fast classifier in front of an expensive agent. Use when every request pays for a full agent turn regardless of whether it needed one, when designing an in-scope/out-of-scope boundary, when choosing a model for a latency-critical classifier, or when structured classifier output feeds later prompts.
+description: Use when putting a cheap, fast classifier in front of an expensive agent, when every request pays for a full agent turn regardless of whether it needed one, when designing an in-scope/out-of-scope boundary, when choosing a model for a latency-critical classifier, or when structured classifier output feeds later prompts.
 ---
 
 # The triage gate

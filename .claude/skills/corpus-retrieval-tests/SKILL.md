@@ -1,6 +1,6 @@
 ---
 name: corpus-retrieval-tests
-description: Build the committed query set that proves a corpus answers the questions it was written for, and diagnose which layer failed when one of them stops working.
+description: Run when a corpus needs the committed query set that proves it answers the questions it was written for, when a question that ought to retrieve does not and the failed layer must be named, or when a corpus document changed and you need the queries it puts at risk.
 disable-model-invocation: true
 ---
 

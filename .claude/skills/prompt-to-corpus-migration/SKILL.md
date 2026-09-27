@@ -1,6 +1,6 @@
 ---
 name: prompt-to-corpus-migration
-description: Find the domain content shipping in every prompt whether or not the turn needs it, and produce a ranked plan for moving what may move into a retrievable corpus and deleting it from the prompt. No block may be deleted until its proof runs, and that proof is a skill a model cannot load — ask the user to run corpus-retrieval-tests, which they invoke by name.
+description: Run when domain content ships in every prompt whether or not the turn needs it, and you need a ranked plan for moving what may move into a retrievable corpus and deleting it from the prompt. No block may be deleted until its proof runs, and that proof is a skill a model cannot load — ask the user to run corpus-retrieval-tests, which they invoke by name.
 disable-model-invocation: true
 ---
 

@@ -8,7 +8,7 @@ is a normal size for four tools, not a stripped-down illustration.
 ```
 ---
 name: billing
-description: Invoices, charges, refunds, payment methods. Use when the user asks what they were
+description: Use when the user asks about an invoice or a payment method, asks what they were
   charged, disputes an amount, or wants money back. For what shipped, use order-history.
 ---
 Start from what the user gave you: an `INV-` number → `read_invoice`; an email address or company

@@ -1,6 +1,6 @@
 ---
 name: authoring-agent-tools
-description: Decide whether "we need a tool for X" needs a tool at all, and turn the ones that do into a contract before any of it is built. Use when someone asks for a tool that does not exist yet, when deciding what parameters a proposed tool takes, when a tool request arrives as an implementation rather than a requirement, or when working out whether one proposed tool is really two. For a tool that already exists, use agentic-tool-boundary; for grouping several behind one activation, authoring-agent-skills.
+description: Use when someone asks for a tool that does not exist yet ("we need a tool for X"), when deciding what parameters a proposed tool takes, when a tool request arrives as an implementation rather than a requirement, or when working out whether one proposed tool is really two. For a tool that already exists, use agentic-tool-boundary; for grouping several behind one activation, authoring-agent-skills.
 ---
 
 # Authoring an agent tool

@@ -1,6 +1,6 @@
 ---
 name: retrieval-that-earns-its-place
-description: Decide whether and when an agent should retrieve, and prove the threshold works. Use when adding RAG to an agent that already has tools, when choosing a corpus, when tuning a similarity threshold, or when retrieved context is polluting answers.
+description: Use when deciding whether and when an agent should retrieve, when adding RAG to an agent that already has tools, when choosing a corpus, when tuning a similarity threshold or proving it works, or when retrieved context is polluting answers.
 ---
 
 # Retrieval that earns its place

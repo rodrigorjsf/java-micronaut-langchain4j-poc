@@ -1,6 +1,6 @@
 ---
 name: prompt-injection-layers
-description: Build a prompt-injection defence that survives production. Use when adding input or output guardrails, when a regex blocklist is the only defence, when a detector is producing false positives, when an agent reads tool results, fetched pages or retrieved documents, when text a tool returned could become an argument of a tool that writes, sends or pays, or when deciding what a rejected request should be told. For where a guardrail attaches in the runtime so that it actually runs, use agentic-service-composition; for enforcing a destination rule or a human approval at the tool door, agentic-tool-boundary.
+description: Use when defending an agent against prompt injection, when adding input or output guardrails, when a regex blocklist is the only defence, when a detector is producing false positives, when an agent reads tool results, fetched pages or retrieved documents, when text a tool returned could become an argument of a tool that writes, sends or pays, or when deciding what a rejected request should be told. For where a guardrail attaches in the runtime so that it actually runs, use agentic-service-composition; for enforcing a destination rule or a human approval at the tool door, agentic-tool-boundary.
 ---
 
 # Layered injection defence

@@ -1,6 +1,6 @@
 ---
 name: agentic-codebase-audit
-description: Inventory a codebase's agentic seams, score what each one actually enforces, and produce a ranked, capped improvement plan.
+description: Run when you inherit, harden or are asked to assess an agentic backend and need its seams inventoried, what each one actually enforces scored, and a ranked, capped improvement plan.
 disable-model-invocation: true
 ---
 

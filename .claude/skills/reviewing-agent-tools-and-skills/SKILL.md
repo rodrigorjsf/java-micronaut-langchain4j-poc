@@ -1,6 +1,6 @@
 ---
 name: reviewing-agent-tools-and-skills
-description: Sweep an existing tool and skill layer for routing, contract and skill-body defects, and fix them without moving traffic you did not mean to move.
+description: Run when an existing tool and skill layer needs sweeping for routing, contract and skill-body defects, when the model keeps picking the wrong tool or skill, or before a description or name change ships — fixing each defect without moving traffic you did not mean to move.
 disable-model-invocation: true
 ---
 

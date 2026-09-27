@@ -1,6 +1,6 @@
 ---
 name: writing-retrievable-knowledge
-description: Write a document so that one retrieved chunk of it answers the user alone. Use when adding a file to a retrieval corpus, when writing or rewriting a knowledge document, when a question that should match a document does not, when deciding how to break a document into headings and sections for a splitter, when a retrieved passage arrives meaning nothing on its own, or when the corpus is in the team's vocabulary and the users are not. For whether the content belongs in a corpus at all, its threshold and its router, use retrieval-that-earns-its-place; for content sitting in a prompt that should move, ask the user to run prompt-to-corpus-migration, and for proving the finished document actually retrieves, corpus-retrieval-tests — both of which they invoke by name.
+description: Use when adding a file to a retrieval corpus, when writing or rewriting a knowledge document, when a question that should match a document does not, when deciding how to break a document into headings and sections for a splitter, when a retrieved passage arrives meaning nothing on its own, or when the corpus is in the team's vocabulary and the users are not. For whether the content belongs in a corpus at all, its threshold and its router, use retrieval-that-earns-its-place; for content sitting in a prompt that should move, ask the user to run prompt-to-corpus-migration, and for proving the finished document actually retrieves, corpus-retrieval-tests — both of which they invoke by name.
 ---
 
 # Writing a document that retrieves
