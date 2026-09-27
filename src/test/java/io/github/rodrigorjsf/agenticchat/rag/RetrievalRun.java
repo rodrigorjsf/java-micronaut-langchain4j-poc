@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.langchain4j.rag.content.ContentMetadata;
 import dev.langchain4j.rag.content.retriever.ContentRetriever;
+import io.micronaut.context.ApplicationContext;
 import io.github.rodrigorjsf.agenticchat.rag.RetrievalReport.Chunk;
 import io.github.rodrigorjsf.agenticchat.rag.RetrievalReport.Query;
 import io.github.rodrigorjsf.agenticchat.rag.RetrievalReport.Result;
@@ -14,6 +15,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -28,6 +30,17 @@ final class RetrievalRun {
     static final String QUERY_SET = "/evals/retrieval-queries.json";
 
     private RetrievalRun() {
+    }
+
+    /**
+     * The context both callers retrieve through. One definition, so the default-build assertions
+     * and the evals-profile report cannot drift onto different configurations. The credentials are
+     * fakes: retrieval is local and never reaches a provider.
+     */
+    static ApplicationContext startContext() {
+        return ApplicationContext.run(Map.of(
+                "agentic.llm.credentials.google-api-key", "fake",
+                "agentic.llm.credentials.openai-api-key", "fake"));
     }
 
     /**

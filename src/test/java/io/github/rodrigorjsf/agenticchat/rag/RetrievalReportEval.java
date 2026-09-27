@@ -3,7 +3,6 @@ package io.github.rodrigorjsf.agenticchat.rag;
 import dev.langchain4j.rag.content.retriever.ContentRetriever;
 import io.github.rodrigorjsf.agenticchat.rag.RetrievalReport.Result;
 import io.github.rodrigorjsf.agenticchat.rag.RetrievalReport.Run;
-import io.micronaut.context.ApplicationContext;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -12,7 +11,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -40,9 +38,7 @@ class RetrievalReportEval {
     void writesTheReport() throws Exception {
         List<Result> results;
         String html;
-        try (var ctx = ApplicationContext.run(Map.of(
-                "agentic.llm.credentials.google-api-key", "fake",
-                "agentic.llm.credentials.openai-api-key", "fake"))) {
+        try (var ctx = RetrievalRun.startContext()) {
             results = RetrievalRun.retrieveEveryRow(ctx.getBean(ContentRetriever.class));
             String diffRef = System.getProperty(DIFF_PROPERTY, "").strip();
             var run = new Run(

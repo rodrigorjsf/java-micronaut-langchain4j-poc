@@ -14,7 +14,6 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -38,9 +37,7 @@ class KnowledgeBaseTest {
 
     @BeforeAll
     void setUp() throws Exception {
-        ctx = ApplicationContext.run(Map.of(
-                "agentic.llm.credentials.google-api-key", "fake",
-                "agentic.llm.credentials.openai-api-key", "fake"));
+        ctx = RetrievalRun.startContext();
         knowledge = ctx.getBean(KnowledgeBase.class);
         retriever = ctx.getBean(ContentRetriever.class);
 
