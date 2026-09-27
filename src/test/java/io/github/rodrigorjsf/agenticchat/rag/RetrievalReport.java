@@ -1,5 +1,7 @@
 package io.github.rodrigorjsf.agenticchat.rag;
 
+import static io.github.rodrigorjsf.agenticchat.testsupport.Html.escape;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -155,23 +157,5 @@ final class RetrievalReport {
 
     private static String score(double value) {
         return String.format(Locale.ROOT, "%.4f", value).replaceAll("0+$", "").replaceAll("\\.$", "");
-    }
-
-    static String escape(String text) {
-        if (text == null) {
-            return "";
-        }
-        var out = new StringBuilder(text.length());
-        for (char c : text.toCharArray()) {
-            switch (c) {
-                case '&' -> out.append("&amp;");
-                case '<' -> out.append("&lt;");
-                case '>' -> out.append("&gt;");
-                case '"' -> out.append("&quot;");
-                case '\'' -> out.append("&#39;");
-                default -> out.append(c);
-            }
-        }
-        return out.toString();
     }
 }

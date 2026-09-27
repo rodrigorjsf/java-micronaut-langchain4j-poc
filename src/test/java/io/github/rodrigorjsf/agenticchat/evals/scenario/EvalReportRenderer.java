@@ -1,5 +1,7 @@
 package io.github.rodrigorjsf.agenticchat.evals.scenario;
 
+import static io.github.rodrigorjsf.agenticchat.testsupport.Html.escape;
+
 import io.github.rodrigorjsf.agenticchat.evals.scenario.ScenarioResult.CheckResult;
 import io.github.rodrigorjsf.agenticchat.evals.scenario.ScenarioResult.Cost;
 import io.github.rodrigorjsf.agenticchat.evals.scenario.ScenarioResult.ToolCall;
@@ -331,24 +333,5 @@ public final class EvalReportRenderer {
             case FLAKY -> "<span class=\"flaky\">FLAKY</span>";
             case SKIPPED -> "<span class=\"skipped\">SKIPPED</span>";
         };
-    }
-
-    static String escape(String text) {
-        if (text == null) {
-            return "";
-        }
-        var escaped = new StringBuilder(text.length() + 16);
-        for (int i = 0; i < text.length(); i++) {
-            char c = text.charAt(i);
-            switch (c) {
-                case '&' -> escaped.append("&amp;");
-                case '<' -> escaped.append("&lt;");
-                case '>' -> escaped.append("&gt;");
-                case '"' -> escaped.append("&quot;");
-                case '\'' -> escaped.append("&#39;");
-                default -> escaped.append(c);
-            }
-        }
-        return escaped.toString();
     }
 }
