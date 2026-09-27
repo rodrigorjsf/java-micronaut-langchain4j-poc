@@ -90,7 +90,18 @@ is the whole point of the lever.
 ```
 before activation:  activate_skill, read_skill_resource
 after  activation:  + that skill's 4–10 tools, and its full instructions
+on demand:          read_skill_resource(skill, path) → one scoped reference
 ```
+
+The third tier exists only because a skill ships a resource: LangChain4j
+registers `read_skill_resource` when at least one skill directory holds a file
+besides `SKILL.md`. `health-and-food` is that skill — its body keeps the routing
+and the medical-advice boundary, and the field-by-field reading rules live in
+`references/packaged-food.md` and `references/recipes-and-drinks.md`, named in an
+entry table the model reads after activation. `SkillResourceTest` drives a turn
+that reads one, and fails if a body names a path the loader did not produce, or a
+resource no body names. It is the only skill split so far; the larger ones and
+the round-trip cost of the extra read are tracked in #60.
 
 The mechanism and its two silent failure modes are in
 [ADR 0005](adr/0005-progressive-tool-disclosure-through-skills.md); the general
