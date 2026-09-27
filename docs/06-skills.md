@@ -346,6 +346,10 @@ or when a skill fires on the wrong turns.
   other by name, so which one fires is effectively random.
 - A skill is model-invoked but no turn anyone types matches its description: paid
   on every turn, activated on none.
+- One body carries paths that only some turns take. The page teaches resources as
+  the third tier: references cut by scope, each linked from the body's entry table,
+  loaded through `read_skill_resource` or a file read. It also holds the draft to
+  `writing-great-skills` before it ships.
 
 | Neighbour | Way | The discriminator |
 |---|---|---|

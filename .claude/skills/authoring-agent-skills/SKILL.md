@@ -16,7 +16,9 @@ page too, so it is entered from here:
 | it fires on the wrong turns, or never on the right ones | *A description bounds a territory*, then *Routing fails in two shapes* |
 | two descriptions cover the same ground | *A description bounds a territory* — first the one-skill-or-two fork, then the hand-off clause |
 | a rule belongs to the whole tool set, not one call | *Boundaries only the body can carry* |
+| the body serves paths that only some turns take | *Resources are the third tier, cut by scope* |
 | activation appears to change nothing | *Prove that activation changed something* |
+| a draft is finished and about to ship | *Hold the draft to writing-great-skills*, then the review table |
 
 **The description routes; the body teaches.** The description is loaded every turn and is all the
 model sees before choosing. The body arrives only after that choice, then stays in the window and is
@@ -30,8 +32,8 @@ A body that fires on one work turn and is acted on there is paid once. That is a
 no clock: the cost argument stops binding, the steering one does not — its ceiling is what one turn
 can act on before the instruction at the top stops steering the call at the bottom, illustratively
 **~4.5k tokens, about 250 lines**. The sibling-file rule is what holds it there: this page is of that
-second kind, and stays near that ceiling only because its worked example and its activation
-checks are in the two files it names rather than in it.
+second kind, and stays near that ceiling only because its worked examples and its activation
+checks are in the three files it names rather than in it.
 
 **Make a skill model-invoked only when the model has to recognise the turn itself.** A skill a person
 invokes by name (a sweep, a release procedure) routes on nothing, and its cost stops scaling with the
@@ -133,6 +135,36 @@ often the same backend — the cascading-failure item (**ASI08**), written into 
 → [`ASSEMBLED-EXAMPLE.md`](ASSEMBLED-EXAMPLE.md) — open when drafting a body's first version: those
 five parts as one finished twenty-two-line document, and which paragraph carries which.
 
+## Resources are the third tier, cut by scope
+
+The description is paid every turn, the body once activated, and a **resource** only on the turn the
+body's pointer fires. Cut resources by the **path a turn takes**, not by document type: the refund
+turn and the dispute turn share the entry table, then part ways. Keep in the body what every path
+needs; move behind a pointer what only one path reaches. Link each resource **directly from the
+body's entry table** — one level deep, since a reference named only inside another reference is a
+path the model reaches late, partially or never.
+
+It loads two ways, and one body serves both. Under LangChain4j's `Skills`, every file in the skill
+directory except `SKILL.md` and anything under `scripts/` is loaded up front as a `SkillResource`
+keyed by its path relative to the skill root, joined with `/`; the model fetches one with
+`read_skill_resource(skill_name, relative_path)`, which is registered only when some skill has a
+resource. Under the Agent Skills standard's file-based agents, the model reads the same path from
+disk. So write every pointer as the relative path from the skill root, forward slashes.
+
+**The resource path is model-visible text.** The pointer is the argument the model copies, and
+`relative_path` is matched by exact string equality — `./references/refunds.md` misses, and the miss
+costs a round trip listing what exists. The default parameter description also publishes the first
+resource path of *any* loaded skill in every turn's tool schema. Name each file for what it holds
+(`references/disputes.md`, never `ref2.md`), put nothing in a path you would not put in the prompt,
+and treat a rename as a body edit that the grep below must cover. Under `Skills`, files under
+`scripts/`, blank files and non-UTF-8 files are never resources: a pointer to one points at nothing.
+[sourced, read 2026-09-27 — docs.langchain4j.dev/tutorials/skills; `FileSystemSkillLoader` and
+`ReadResource*` at langchain4j tag 1.20.1; agentskills.io/specification, *File references*;
+platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices, *one level deep*]
+
+→ [`SCOPED-REFERENCES.md`](SCOPED-REFERENCES.md) — open when a body starts carrying a path only
+some turns take: the billing body grown to two scoped references, reached from its entry table.
+
 ## Boundaries only the body can carry
 
 **An instruction in the body is a default, not a control.** The model follows it until a persuasive
@@ -172,6 +204,8 @@ body, or is named on a single `no-guidance:` line at the foot of the body — an
 list the lint subtracts before asserting equality: leaving a tool out becomes a written decision, and
 without the mark the check cannot separate that from an omission and gets relaxed until it catches
 nothing. A tool the body never mentions is callable and absent from every plan the model makes.
+Resource paths get the same two-way grep: every path the body names is a file in the skill directory
+outside `scripts/`, and every such file is named in the body — an unnamed one is loaded and unreached.
 
 **Then check ownership across the whole catalogue, not inside this skill.** Concatenate every skill's
 declared tool list and assert no name appears in two of them. A tool disclosed by two bodies is owned
@@ -182,6 +216,16 @@ own declared list cannot see that — the two are equal whether or not a neighbo
 → [`PROVING-ACTIVATION.md`](PROVING-ACTIVATION.md) — open before a skill ships, and whenever activating
 one appears to change nothing: the routing run, the visible-tool-set comparison, the captured-request
 test, and the one metric that only arrives after ship.
+
+## Hold the draft to writing-great-skills
+
+This page decides what the document says; `writing-great-skills`, read by name, is the structure it
+is held to. Four of its checks catch what the table below does not:
+
+- **The description carries triggers, not identity** — one trigger per branch, plus any hand-off.
+- **A leading word** the model already holds, like *lesson* here, replaces a rule restated thrice.
+- **Pruning, sentence by sentence**: one home per meaning; a sentence the model obeys untold goes whole.
+- **Every step ends on a checkable completion criterion** — the model can tell done from not-done.
 
 ## Reviewing a skill document, and what done means
 
@@ -203,3 +247,5 @@ tell you anything yet. Done is every row's right-hand column.
 | 11 | Look for the labelled set | the repo | it is committed beside the skill and gated in CI |
 | 12 | Capture one post-activation request | one turn you send | a distinctive sentence of the body is in it — if it is absent the mount dropped the body, and rows 3-8 graded text the model never received; fix that before reading them. Rows 1-2 and 9-11 hold regardless |
 | 13 | Run the vocabulary count | turns written by someone who has not read your descriptions | the description's content words are the ones those turns used, at the rate above — turns you write yourself reuse its vocabulary and pass by construction, which is a rigged green |
+| 14 | Walk each row of the entry table to the resource it names | the skill directory | every reference is linked from the body's entry table, one level deep, by the exact relative path from the skill root; no path sits under `scripts/`; each file holds only what its path needs, and what every path needs stays in the body |
+| 15 | Run the draft through `writing-great-skills` | that skill, read by name | the description has no identity sentence, a leading word replaces each restated rule, every sentence survives the no-op test, and every step ends on a checkable criterion |
