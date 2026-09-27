@@ -29,6 +29,19 @@ researcher found, the critic what the writer meant — the same material retold 
 every hop, and what the researcher hedged returning through the writer as flat
 assertion. Two roles that need the same material are one agent.
 
+**A path you can write down is code, not an agent.** Anthropic separates
+*workflows* — "systems where LLMs and tools are orchestrated through predefined
+code paths" — from *agents*, which "dynamically direct their own processes and
+tool usage", and recommends "finding the simplest solution possible, and only
+increasing complexity when needed" [sourced — Anthropic, *Building effective
+agents*, 2024-12-19, https://www.anthropic.com/engineering/building-effective-agents,
+read 2026-09-27]. So before the discard test, ask whether the steps are known in
+advance. "Look up the CNPJ, then the weather at its address" is two calls in a
+fixed order: a method that makes them costs two HTTP calls, no model call to
+decide the order, and fails where you can see it; a child agent asked to "find out about this company" spends
+its own loop deciding what the method already knew. Spawn only where the model
+has to choose the path.
+
 ## 2. The briefing is a contract, like the return
 
 A child has no user, no history and one shot: **it cannot come back for
@@ -43,6 +56,16 @@ brief carries five parts:
 | the return schema — an `outcome` value, the `finding`, the `cites` behind it | the parent parses prose again, and every control on the way back rests on that schema |
 | the budget, in round trips and seconds | the child spends until something else stops it, and the stop looks like a finding |
 | what to do when the material is not there, and when the question has two readings | it answers from pretraining, fluently, and the parent cannot tell |
+
+**Size the return, in the brief: about 1,000–2,000 tokens.** Describing
+sub-agent architectures, Anthropic writes: "Each subagent might explore
+extensively, using tens of thousands of tokens or more, but returns only a
+condensed, distilled summary of its work (often 1,000-2,000 tokens)" [sourced — Anthropic, *Effective context engineering for AI agents*,
+2025-09-29,
+https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents,
+read 2026-09-27]. Treat the range as a target to state, not a law: a return that
+approaches what the child read has discarded nothing, and one far below it has
+usually dropped the `cites`.
 
 **Give the child what it needs and nothing that anchors it on the parent's
 conclusion.** A critic handed the reasoning behind the mistake agrees with it.
@@ -62,6 +85,18 @@ calls, and the parent pays two of its own, choosing the fan-out tool and consumi
 what comes back. Three children of four round trips each is `2 + (3 × 5) = 17`
 calls for one message. **Parallelism buys wall-clock, not calls — 17 stays
 17.**
+
+The measured multipliers point the same way. In Anthropic's own data "agents
+typically use about 4× more tokens than chat interactions, and multi-agent systems
+use about 15× more tokens than chats" [sourced — Anthropic, *How we built our
+multi-agent research system*, 2025-06-13,
+https://www.anthropic.com/engineering/multi-agent-research-system, read
+2026-09-27]. Those are one vendor's figures on research tasks, not a constant for
+your workload — but they set the order of magnitude a fan-out has to earn back,
+and the same post names the tasks that do: heavy parallelism, information larger
+than one context window, many complex tools. Domains that "require all agents to
+share the same context or involve many dependencies between agents" are, in its
+words, "not a good fit".
 
 **Isolation has a fixed floor**: a child replays its own system prompt and tool
 schemas on *every one of its own model calls* — illustratively, a 1200-token
@@ -144,17 +179,41 @@ child's tool set, the return entering the parent's prompt, the return written to
 memory, and a hop that leaves the process. One control each, one OWASP item each,
 in [`RETURN-SEAMS.md`](RETURN-SEAMS.md).
 
+## 7. What multi-agent systems actually fail on
+
+**MAST** (Multi-Agent System failure Taxonomy) classifies 14 failure modes in
+three categories, built from expert-annotated traces and applied to a dataset of
+1600+ traces across seven multi-agent frameworks [sourced — Cemri et al., *Why Do
+Multi-Agent LLM Systems Fail?*, arXiv 2503.13657 v3, 2025-10-26,
+https://arxiv.org/abs/2503.13657, read 2026-09-27]. Each category lines up with
+controls this skill already names — tightly for the first and third, loosely for
+conversation reset and reasoning-action mismatch, which no brief or return schema
+prevents on its own:
+
+| MAST category | Modes, as the paper names them | The control here (this skill's mapping, not the paper's) |
+|---|---|---|
+| **System design issues** | disobey task specification, disobey role specification, step repetition, loss of conversation history, unaware of termination conditions | the brief's five parts (§2), the parent-owned counter and the deadline (§3) |
+| **Inter-agent misalignment** | conversation reset, fail to ask for clarification, task derailment, information withholding, ignored other agent's input, reasoning-action mismatch | the discard test and no org-chart splits (§1), `ambiguous` as an outcome (§6) |
+| **Task verification** | premature termination, no or incomplete verification, incorrect verification | `budget_exhausted` and `not_found` as outcomes, citations resolved by a tool (§6) |
+
+The authors' conjecture is the reason to reach for structure rather than a
+bigger model: "improvements in the base model capabilities will be insufficient
+to address the full MAST". Use the mode names when you label a failed run — "fail
+to ask for clarification" says which control was missing; "the agent got
+confused" does not.
+
 ## Reviewing an existing sub-agent
 
-1. Name the discard point — would a plausible next turn need what the child read?
-2. Which of the brief's five parts is missing?
-3. Plant an instruction in the brief's quoted material — returned, or obeyed?
-4. Model calls at full width and depth: does one parent-owned counter bound them?
-5. Is there a per-child deadline, and does a miss return `budget_exhausted`?
-6. Default path, or a tool the model chose — what does an unneeded turn pay?
-7. Can the parent resolve one citation without re-running the child?
-8. What comes back when nothing was found, and when the brief had two readings?
-9. Is the join done in code, and does a failed branch arrive as a missing field?
-10. Which of the parent's tools does the child hold that its subtask never needs?
-11. Where does the return land — prompt, memory store, wire — what guards each?
-12. From the parent's turn id alone, can you retrieve the child's message list?
+1. Are the steps known in advance? Then it is a workflow in code, not a child agent.
+2. Name the discard point — would a plausible next turn need what the child read?
+3. Which of the brief's five parts is missing?
+4. Plant an instruction in the brief's quoted material — returned, or obeyed?
+5. Model calls at full width and depth: does one parent-owned counter bound them?
+6. Is there a per-child deadline, and does a miss return `budget_exhausted`?
+7. Default path, or a tool the model chose — what does an unneeded turn pay?
+8. Can the parent resolve one citation without re-running the child?
+9. What comes back when nothing was found, and when the brief had two readings?
+10. Is the join done in code, and does a failed branch arrive as a missing field?
+11. Which of the parent's tools does the child hold that its subtask never needs?
+12. Where does the return land — prompt, memory store, wire — what guards each?
+13. From the parent's turn id alone, can you retrieve the child's message list?
