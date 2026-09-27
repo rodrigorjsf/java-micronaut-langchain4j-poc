@@ -96,14 +96,16 @@ Doctrine belongs to `agentic-tool-boundary`. These are inventory queries.
 3. **List every parameter whose value could name a destination** — URL, host,
    file path, connection string, query text, shell command. The list should be
    empty; whatever is on it is the first thing in the plan. (**ASI02 Tool Misuse
-   & Exploitation**; anything that evaluates, templates, renders or shells out is
-   also **ASI05 Unexpected Code Execution**.) For each survivor, record
+   and Exploitation**; anything that evaluates, templates, renders or shells out is
+   also **ASI05 Unexpected Code Execution (RCE)**.) For each survivor, record
    **where it executes and what ends its blast radius** — the process the request
    is served from, the identity it holds, what it can reach on the network. "In
    the application process, as the application user" is the finding, and it is the
    half of ASI05 that an allowlist of parameters does not answer.
 4. **Read the framework's *default* tool-error handler**, not yours, and record
-   verbatim what the model would see. Assume nothing here.
+   verbatim what the model would see. Assume nothing here. In LangChain4j it is
+   whatever runs where `toolExecutionErrorHandler` and `hallucinatedToolNameStrategy`
+   are unset on the AI Service builder — the second one's default throws.
 5. **Trigger the largest response each tool can produce and record the bytes.**
    Compare against the per-source budget; having no budget is itself the finding.
    Illustrative bands for the report: over ~10 KB is a plan entry, over ~100 KB
@@ -112,7 +114,7 @@ Doctrine belongs to `agentic-tool-boundary`. These are inventory queries.
    credential it runs under, whether it can write. Ask of the credential column
    whether it is the **caller's** authority or **one shared service identity**:
    the second means a tool can read what the person who asked for it could not,
-   and the audit trail names the service (**ASI03 Identity & Privilege Abuse**).
+   and the audit trail names the service (**ASI03 Identity and Privilege Abuse**).
    No scope column anywhere is itself the finding.
 7. **Count tools with no test at all.** A tool is a public API with a stochastic
    caller.

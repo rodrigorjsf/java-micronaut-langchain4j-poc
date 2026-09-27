@@ -173,7 +173,7 @@ tool with an id belonging to somebody else, and that read has already happened b
 the time you switch branches back. Point it at a scratch tenant whose data is
 yours, or at a stubbed downstream — never a real caller's id — the way 6.1 names
 its scratch conversation. Its other two arguments are harmless: the hazard is that
-one value, not the probe. Dropping 3.8 does not strip ASI02: `OWASP-COVERAGE.md`
+one value, not the probe. Dropping 3.8 does not strip ASI02, because `OWASP-COVERAGE.md`
 keys that item on three probes, and 3.3 and 3.6 still stand — you lose the one
 clause about rejection at the boundary, and say so.
 

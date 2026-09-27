@@ -34,7 +34,8 @@ Writing without the splitter's numbers is writing to an imaginary page size.
 
 **Find it in the ingestion path, not in the config file.** Search where the corpus
 is loaded and written to the store for `split`, `chunk_size`, `chunk_overlap`,
-`chunkSize`, `SEGMENT`, `TextSplitter`, `node_parser`. Three places it hides:
+`chunkSize`, `SEGMENT`, `TextSplitter`, `node_parser`, LangChain4j's
+`DocumentSplitters`. Three places it hides:
 
 - **passed at the call site**, as literals or constants next to the ingest loop;
 - **not passed at all** — the framework's default applies. Read the default *for the
@@ -55,7 +56,10 @@ characters. English prose is commonly quoted at roughly four characters per toke
 a rule of thumb, not a measurement — so a writer who assumes the wrong unit is
 mis-sized by about that factor in one direction or the other. Settle it by reading
 the parameter's documentation for that version, or by ingesting one document and
-printing the length of a produced chunk in both units.
+printing the length of a produced chunk in both units. In LangChain4j 1.20.x,
+`DocumentSplitters.recursive(size, overlap)` counts characters and the overload that
+takes a `TokenCountEstimator` counts tokens [sourced — `DocumentSplitters` javadoc
+at tag 1.20.1, read 2026-09-27].
 
 Then read what each number changes about the writing:
 

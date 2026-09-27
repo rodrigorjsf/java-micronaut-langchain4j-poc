@@ -86,7 +86,7 @@ a *second identical call* costs: `get_order_status` served from cache after its
 `as_of` window has passed hands back a stamp that is no longer true, so it caches
 for that window and not past it.
 
-Choosing the tier deliberately closes **Tool Misuse & Exploitation (ASI02)** of
+Choosing the tier deliberately closes **Tool Misuse and Exploitation (ASI02)** of
 the OWASP Top 10 for Agentic Applications 2026: the ranked risk is not that a
 model calls a tool, it is that a tool exists which can do more than the question
 needed. The two-call contract closes **Human-Agent Trust Exploitation (ASI09)**.
@@ -111,7 +111,7 @@ set; a parameter absent from the schema can never be handed a hostile value, and
 so can never be tested for refusing one.
 
 The answer belongs to one customer, so `customerId` is not a parameter and no
-argument exists to smuggle an account number through, which removes **Identity & Privilege Abuse (ASI03)** rather than filtering for it.
+argument exists to smuggle an account number through, which removes **Identity and Privilege Abuse (ASI03)** rather than filtering for it.
 **Invented**: nothing in the conversation or session supplies it, so the model
 guesses — a fabrication with a function call around it. Either the user is asked,
 or it is not a parameter.

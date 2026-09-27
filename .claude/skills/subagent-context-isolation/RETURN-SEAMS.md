@@ -19,7 +19,7 @@ then carries every write, send and purchase tool the parent has, while reading
 text an attacker controls.
 
 **Give each child the narrowest set that does its subtask, and keep every
-irreversible call with the parent.** Per-child allowlists remove **Identity &
+irreversible call with the parent.** Per-child allowlists remove **Identity and
 Privilege Abuse (ASI03)** from the delegation path by construction, rather than
 detecting it after a send has already gone out.
 

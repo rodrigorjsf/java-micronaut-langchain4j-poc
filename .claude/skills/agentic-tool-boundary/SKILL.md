@@ -122,6 +122,8 @@ land in the prompt, then in the conversation history, then in the provider's
 logs, then in your observability pipeline.
 
 Return a shaped result instead. Log the real cause where operators can see it.
+In LangChain4j that means setting `toolExecutionErrorHandler` on the AI Service
+builder — the async table below is why the default is not even one behaviour.
 
 **And shape the text for recovery.** A result that only says "error" makes the
 model retry the same call or invent an answer. Each outcome states what happened
