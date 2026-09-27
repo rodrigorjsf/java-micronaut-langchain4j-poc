@@ -18,6 +18,7 @@ import org.junit.jupiter.api.TestInstance;
 
 import java.net.URI;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -244,6 +245,126 @@ class ScenarioRunnerTest {
         assertThat(runs.repetitions().get(1).passed()).isFalse();
         assertThat(runs.status()).isEqualTo(ScenarioRuns.Status.FLAKY);
         assertThat(pauses).as("paced between repetitions, not after the last").hasValue(1);
+    }
+
+    @Test
+    @DisplayName("a two-turn scenario runs on one conversation: the second turn carries the first as memory")
+    void everyTurnSharesOneConversation() {
+        models.model("judge").fallbackTo(IN_SCOPE);
+        var agent = models.model("agent");
+        agent.reply(request -> AiMessage.from(ToolExecutionRequest.builder()
+                .id("call-1").name("get_weather")
+                .arguments("{\"latitude\":\"-23.55\",\"longitude\":\"-46.63\",\"forecastDays\":\"2\"}").build()));
+        agent.replyWith("Sim, amanhã deve chover em São Paulo: 12,4 mm previstos.");
+        agent.replyWith("Você perguntou sobre São Paulo.");
+
+        var result = runner.run(twoTurns(null));
+
+        assertThat(result.turns()).hasSize(2);
+        var first = result.turns().get(0);
+        var second = result.turns().get(1);
+        assertThat(first.message()).isEqualTo("Vai chover amanhã em São Paulo?");
+        assertThat(second.message()).isEqualTo("De qual cidade eu perguntei?");
+        assertThat(first.conversationId()).isNotBlank();
+        assertThat(second.conversationId())
+                .as("the second turn reused the conversation the first one opened")
+                .isEqualTo(first.conversationId());
+        assertThat(agent.lastRequest().messages().toString())
+                .as("the model saw the first turn when answering the second")
+                .contains("Vai chover amanhã em São Paulo?");
+        assertThat(first.trajectory().toolCalls()).extracting(ScenarioResult.ToolCall::name)
+                .containsExactly("get_weather");
+        assertThat(first.answer()).contains("12,4 mm");
+        assertThat(second.trajectory().toolCalls()).as("each turn keeps only its own tool calls").isEmpty();
+        assertThat(second.answer()).isEqualTo("Você perguntou sobre São Paulo.");
+        assertThat(result.answer()).as("the scenario's answer is the last turn's").isEqualTo(second.answer());
+    }
+
+    @Test
+    @DisplayName("a check aimed at one turn sees only that turn, while grounding reaches back to earlier turns")
+    void checksCanTargetOneTurn() {
+        models.model("judge").fallbackTo(IN_SCOPE);
+        var agent = models.model("agent");
+        agent.reply(request -> AiMessage.from(ToolExecutionRequest.builder()
+                .id("call-0").name("activate_skill")
+                .arguments("{\"skill_name\":\"geo-and-weather\"}").build()));
+        agent.reply(request -> AiMessage.from(ToolExecutionRequest.builder()
+                .id("call-1").name("get_weather")
+                .arguments("{\"latitude\":\"-23.55\",\"longitude\":\"-46.63\",\"forecastDays\":\"2\"}").build()));
+        agent.replyWith("Sim, amanhã deve chover em São Paulo: 12,4 mm previstos.");
+        agent.replyWith("Você perguntou sobre São Paulo, onde estão previstos 12,4 mm.");
+        var grounded = List.of("(-?\\d+(?:[.,]\\d+)?)\\s*mm");
+
+        var result = runner.run(twoTurns(List.of(
+                new Scenario.TurnExpectation(1,
+                        new Scenario.TrajectoryExpectation("ANSWERED", List.of("get_weather")), null),
+                new Scenario.TurnExpectation(2,
+                        new Scenario.TrajectoryExpectation(null, List.of("get_weather")),
+                        new Scenario.AnswerExpectation(null, List.of("São Paulo"), grounded)),
+                new Scenario.TurnExpectation(3, null, null))));
+
+        assertThat(result.checks()).filteredOn(check -> check.name().equals("turn 1: tool called: get_weather"))
+                .singleElement().satisfies(check -> assertThat(check.passed()).isTrue());
+        assertThat(result.checks()).filteredOn(check -> check.name().equals("turn 1: outcome"))
+                .singleElement().satisfies(check -> assertThat(check.passed()).isTrue());
+        assertThat(result.checks()).filteredOn(check -> check.name().equals("turn 2: tool called: get_weather"))
+                .as("the scenario called get_weather, but turn 2 did not")
+                .singleElement().satisfies(check -> assertThat(check.passed()).isFalse());
+        assertThat(result.checks()).filteredOn(check -> check.name().equals("turn 2: contains: São Paulo"))
+                .singleElement().satisfies(check -> assertThat(check.passed()).isTrue());
+        assertThat(result.checks()).filteredOn(check -> check.name().startsWith("turn 2: grounded: "))
+                .as("12,4 was fetched in turn 1 and repeated from memory in turn 2")
+                .singleElement().satisfies(check -> assertThat(check.passed()).as(check.reason()).isTrue());
+        assertThat(result.checks()).filteredOn(check -> check.name().equals("turn 3"))
+                .singleElement().satisfies(check -> {
+                    assertThat(check.passed()).isFalse();
+                    assertThat(check.reason()).contains("2 turns");
+                });
+        assertThat(result.passed()).isFalse();
+    }
+
+    @Test
+    @DisplayName("a rate limit on turn 2 is SKIPPED and keeps turn 1 for the report")
+    void aRateLimitMidConversationKeepsTheCompletedTurns() {
+        models.model("judge").fallbackTo(IN_SCOPE);
+        var agent = models.model("agent");
+        agent.replyWith("Sim, amanhã deve chover em São Paulo.");
+        agent.reply(request -> {
+            throw new IllegalStateException("429 RESOURCE_EXHAUSTED: quota exceeded for this model");
+        });
+
+        var result = runner.run(twoTurns(null));
+
+        assertThat(result.skipped()).isTrue();
+        assertThat(result.turns()).singleElement()
+                .satisfies(turn -> assertThat(turn.answer()).isEqualTo("Sim, amanhã deve chover em São Paulo."));
+    }
+
+    @Test
+    @DisplayName("a server error on turn 2 fails the run and keeps turn 1 for the report")
+    void aFailureMidConversationKeepsTheCompletedTurns() {
+        models.model("judge").fallbackTo(IN_SCOPE);
+        var agent = models.model("agent");
+        agent.replyWith("Sim, amanhã deve chover em São Paulo.");
+        agent.reply(request -> {
+            throw new IllegalStateException("missing thought_signature");
+        });
+
+        var result = runner.run(twoTurns(null));
+
+        assertThat(result.passed()).isFalse();
+        assertThat(result.checks()).singleElement()
+                .satisfies(check -> assertThat(check.reason()).contains("turn 2").contains("HTTP 500"));
+        assertThat(result.turns()).singleElement()
+                .satisfies(turn -> assertThat(turn.answer()).isEqualTo("Sim, amanhã deve chover em São Paulo."));
+    }
+
+    private Scenario twoTurns(List<Scenario.TurnExpectation> perTurn) {
+        return new Scenario("weather-multi-turn-memory", List.of("weather"), "multi-turn", "synthetic",
+                List.of("Vai chover amanhã em São Paulo?", "De qual cidade eu perguntei?"),
+                new Scenario.Expectation(new Scenario.TrajectoryExpectation("ANSWERED", List.of("get_weather")),
+                        null, perTurn),
+                List.of("get_weather"), false, null);
     }
 
     @Test

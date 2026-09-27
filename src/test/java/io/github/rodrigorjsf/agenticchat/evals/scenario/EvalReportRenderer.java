@@ -3,10 +3,13 @@ package io.github.rodrigorjsf.agenticchat.evals.scenario;
 import io.github.rodrigorjsf.agenticchat.evals.scenario.ScenarioResult.CheckResult;
 import io.github.rodrigorjsf.agenticchat.evals.scenario.ScenarioResult.Cost;
 import io.github.rodrigorjsf.agenticchat.evals.scenario.ScenarioResult.ToolCall;
+import io.github.rodrigorjsf.agenticchat.evals.scenario.ScenarioResult.Trajectory;
 import io.github.rodrigorjsf.agenticchat.evals.scenario.ScenarioRuns.Status;
 
 import java.math.RoundingMode;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 /**
@@ -79,6 +82,8 @@ public final class EvalReportRenderer {
         html.append("<ul class=\"summary\">\n")
                 .append("<li><strong>").append(passed).append(" of ").append(scenarios.size())
                 .append(" scenarios passed</strong> every repetition that ran</li>\n")
+                .append("<li><strong>Coverage per domain</strong> (a scenario counts toward every domain it names): ")
+                .append(coverage(scenarios)).append("</li>\n")
                 .append("<li><strong>Gate failures</strong> (critical, any repetition failed): ")
                 .append(gateFailures.isEmpty() ? "none" : gateFailures).append("</li>\n")
                 .append("<li><strong>Flaky</strong> (passed some repetitions, failed others): ")
@@ -92,6 +97,19 @@ public final class EvalReportRenderer {
                 .append(cost.unpricedCalls() == 0 ? "" : " (" + cost.unpricedCalls()
                         + " model calls unpriced, not included)")
                 .append("</li>\n</ul>\n");
+    }
+
+    private static String coverage(List<ScenarioRuns> scenarios) {
+        var perDomain = scenarios.stream()
+                .flatMap(runs -> runs.scenario().domains().stream())
+                .collect(Collectors.groupingBy(domain -> domain, TreeMap::new, Collectors.counting()));
+        if (perDomain.isEmpty()) {
+            return "none";
+        }
+        return perDomain.entrySet().stream()
+                .map(entry -> escape(entry.getKey()) + ": " + entry.getValue()
+                        + (entry.getValue() == 1 ? " scenario" : " scenarios"))
+                .collect(Collectors.joining(", "));
     }
 
     private static void scenario(StringBuilder html, ScenarioRuns runs) {
@@ -112,13 +130,20 @@ public final class EvalReportRenderer {
                 : escape(scenario.upstream().describe()));
         row(html, "Turns", list(scenario.turns()));
         var expected = scenario.expect().trajectory();
-        row(html, "Expected", "outcome " + escape(expected.outcome()) + "; tools "
-                + escape(String.valueOf(expected.toolsCalled())));
+        row(html, "Expected", describe(expected));
         var answer = scenario.expect().answer();
         if (answer != null) {
-            row(html, "Expected answer", "language " + escape(answer.language())
-                    + "; contains " + escape(String.valueOf(answer.contains()))
-                    + "; grounded " + escape(String.valueOf(answer.grounded())));
+            row(html, "Expected answer", describe(answer));
+        }
+        for (var turn : scenario.expect().turns()) {
+            var parts = new ArrayList<String>();
+            if (turn.trajectory() != null) {
+                parts.add(describe(turn.trajectory()));
+            }
+            if (turn.answer() != null) {
+                parts.add(describe(turn.answer()));
+            }
+            row(html, "Expected at turn " + turn.turn(), parts.isEmpty() ? "nothing" : String.join("; ", parts));
         }
         html.append("</table>\n");
         var repetitions = runs.repetitions();
@@ -133,14 +158,39 @@ public final class EvalReportRenderer {
         html.append("<h3>Repetition ").append(number).append(" of ").append(of).append(" — ")
                 .append(result.skipped() ? badge(Status.SKIPPED) : badge(result.passed()))
                 .append("</h3>\n<table>\n");
-        row(html, "Outcome", escape(trajectory.outcome()));
-        row(html, "Activations", escape(String.join(", ", trajectory.activations())));
-        row(html, "Tool calls", toolCalls(trajectory.toolCalls()));
-        row(html, "Answer", "<pre>" + escape(result.answer()) + "</pre>");
+        var turns = result.turns();
+        if (result.scenario().turns().size() > 1) {
+            for (var turn : turns) {
+                html.append("<tr><th colspan=\"2\">Turn ").append(turn.number()).append(" of ")
+                        .append(result.scenario().turns().size()).append("</th></tr>\n");
+                row(html, "Message", escape(turn.message()));
+                row(html, "Conversation", escape(turn.conversationId()));
+                renderTurn(html, turn.trajectory(), turn.answer());
+            }
+        } else {
+            renderTurn(html, trajectory, result.answer());
+        }
         row(html, "Checks", checks(result.checks()));
         row(html, "Latency", result.latency().toMillis() + " ms");
         row(html, "Tokens", result.inputTokens() + " in / " + result.outputTokens() + " out");
         html.append("</table>\n");
+    }
+
+    private static void renderTurn(StringBuilder html, Trajectory trajectory, String answer) {
+        row(html, "Outcome", escape(trajectory.outcome()));
+        row(html, "Activations", escape(String.join(", ", trajectory.activations())));
+        row(html, "Tool calls", toolCalls(trajectory.toolCalls()));
+        row(html, "Answer", "<pre>" + escape(answer) + "</pre>");
+    }
+
+    private static String describe(Scenario.TrajectoryExpectation expected) {
+        return "outcome " + escape(expected.outcome()) + "; tools " + escape(String.valueOf(expected.toolsCalled()));
+    }
+
+    private static String describe(Scenario.AnswerExpectation answer) {
+        return "language " + escape(answer.language())
+                + "; contains " + escape(String.valueOf(answer.contains()))
+                + "; grounded " + escape(String.valueOf(answer.grounded()));
     }
 
     private static String toolCalls(List<ToolCall> calls) {

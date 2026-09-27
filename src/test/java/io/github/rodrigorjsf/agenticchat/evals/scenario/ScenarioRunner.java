@@ -6,6 +6,7 @@ import io.github.rodrigorjsf.agenticchat.evals.scenario.ScenarioResult.CheckResu
 import io.github.rodrigorjsf.agenticchat.evals.scenario.ScenarioResult.Cost;
 import io.github.rodrigorjsf.agenticchat.evals.scenario.ScenarioResult.ToolCall;
 import io.github.rodrigorjsf.agenticchat.evals.scenario.ScenarioResult.Trajectory;
+import io.github.rodrigorjsf.agenticchat.evals.scenario.ScenarioResult.TurnResult;
 import io.github.rodrigorjsf.agenticchat.observability.trace.ObservationType;
 import io.github.rodrigorjsf.agenticchat.testsupport.RecordingAgentTracer;
 import io.github.rodrigorjsf.agenticchat.tools.http.LinkPolicy;
@@ -75,29 +76,63 @@ public final class ScenarioRunner {
     public ScenarioResult run(Scenario scenario) {
         tracer.reset();
         String conversationId = null;
-        String outcome = null;
-        String answer = null;
         long inputTokens = 0;
         long outputTokens = 0;
+        var turns = new ArrayList<TurnResult>(scenario.turns().size());
         long started = System.nanoTime();
         for (String turn : scenario.turns()) {
+            int observedBefore = tracer.recorded().size();
             HttpResponse<String> response = post(conversationId, turn);
             if (response.statusCode() != 200) {
-                return failedRequest(scenario, response, System.nanoTime() - started);
+                return failedRequest(scenario, response, System.nanoTime() - started, turns);
             }
             JsonNode body = read(response.body());
             conversationId = body.path("conversationId").asText(null);
-            outcome = body.path("outcome").asText(null);
-            answer = body.path("reply").asText(null);
+            var recorded = tracer.recorded();
+            turns.add(new TurnResult(turns.size() + 1, turn, conversationId,
+                    trajectory(body.path("outcome").asText(null), recorded.subList(observedBefore, recorded.size())),
+                    body.path("reply").asText(null)));
             inputTokens += body.path("usage").path("inputTokens").asLong();
             outputTokens += body.path("usage").path("outputTokens").asLong();
         }
         var latency = Duration.ofNanos(System.nanoTime() - started);
-        var trajectory = trajectory(outcome);
+        var last = turns.isEmpty() ? null : turns.getLast();
+        String answer = last == null ? null : last.answer();
+        var trajectory = trajectory(last == null ? null : last.trajectory().outcome(), tracer.recorded());
         var checks = new ArrayList<>(TrajectoryCheck.evaluate(scenario.expect().trajectory(), trajectory));
         checks.addAll(AnswerCheck.evaluate(scenario.expect().answer(), answer, trajectory.toolCalls(), links::allows));
+        for (var expected : scenario.expect().turns()) {
+            checks.addAll(turnChecks(expected, turns));
+        }
         return new ScenarioResult(scenario, trajectory, answer, checks, latency, inputTokens, outputTokens,
-                Cost.of(tracer.recorded()));
+                Cost.of(tracer.recorded()), false, turns);
+    }
+
+    /**
+     * The checks a row aims at one turn, named {@code turn N: <check>}. The trajectory is that
+     * turn's alone; grounding may use any tool result up to and including it, since a value
+     * fetched earlier and repeated from memory is still one a tool returned.
+     */
+    private List<CheckResult> turnChecks(Scenario.TurnExpectation expected, List<TurnResult> turns) {
+        String prefix = "turn " + expected.turn();
+        if (expected.turn() < 1 || expected.turn() > turns.size()) {
+            return List.of(new CheckResult(prefix, false, "the row targets turn " + expected.turn()
+                    + ", but the scenario has " + turns.size() + " turns"));
+        }
+        var turn = turns.get(expected.turn() - 1);
+        var checks = new ArrayList<CheckResult>();
+        if (expected.trajectory() != null) {
+            checks.addAll(TrajectoryCheck.evaluate(expected.trajectory(), turn.trajectory()));
+        }
+        if (expected.answer() != null) {
+            var callsSoFar = turns.subList(0, expected.turn()).stream()
+                    .flatMap(t -> t.trajectory().toolCalls().stream())
+                    .toList();
+            checks.addAll(AnswerCheck.evaluate(expected.answer(), turn.answer(), callsSoFar, links::allows));
+        }
+        return checks.stream()
+                .map(check -> new CheckResult(prefix + ": " + check.name(), check.passed(), check.reason()))
+                .toList();
     }
 
     /**
@@ -106,7 +141,8 @@ public final class ScenarioRunner {
      * repetition measured the provider's quota, not the agent — SKIPPED rather than failed.
      * An upstream tool's 429 never gets here: it reaches the model as a tool result (see #50).
      */
-    private ScenarioResult failedRequest(Scenario scenario, HttpResponse<String> response, long elapsedNanos) {
+    private ScenarioResult failedRequest(Scenario scenario, HttpResponse<String> response, long elapsedNanos,
+                                         List<TurnResult> completed) {
         var latency = Duration.ofNanos(elapsedNanos);
         var lastError = tracer.recorded().stream()
                 .filter(recorded -> recorded.type() == ObservationType.GENERATION)
@@ -114,19 +150,19 @@ public final class ScenarioRunner {
                 .filter(Objects::nonNull)
                 .reduce((first, second) -> second);
         if (lastError.isPresent() && FailoverTriageJudge.isRateLimit(lastError.get())) {
-            return ScenarioResult.skipped(scenario, "SKIPPED: the provider rate-limited the turn ("
-                    + lastError.get().getMessage() + ")", latency, Cost.of(tracer.recorded()));
+            return ScenarioResult.skipped(scenario, "SKIPPED: the provider rate-limited turn " + (completed.size() + 1)
+                    + " (" + lastError.get().getMessage() + ")", latency, Cost.of(tracer.recorded()), completed);
         }
-        var check = new CheckResult("request", false,
-                "POST /api/chat answered HTTP " + response.statusCode() + ": " + response.body());
-        return new ScenarioResult(scenario, trajectory(null), null, List.of(check),
-                latency, 0, 0, Cost.of(tracer.recorded()));
+        var check = new CheckResult("request", false, "turn " + (completed.size() + 1)
+                + ": POST /api/chat answered HTTP " + response.statusCode() + ": " + response.body());
+        return new ScenarioResult(scenario, trajectory(null, tracer.recorded()), null, List.of(check),
+                latency, 0, 0, Cost.of(tracer.recorded()), false, completed);
     }
 
-    private Trajectory trajectory(String outcome) {
+    private Trajectory trajectory(String outcome, List<RecordingAgentTracer.Recorded> observations) {
         var calls = new ArrayList<ToolCall>();
         var activations = new ArrayList<String>();
-        for (var recorded : tracer.recorded()) {
+        for (var recorded : observations) {
             if (recorded.type() != ObservationType.TOOL) {
                 continue;
             }

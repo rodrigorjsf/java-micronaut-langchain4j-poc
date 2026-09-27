@@ -18,6 +18,8 @@ import java.util.List;
  * @param cost         what the model calls of this repetition cost, as the application priced them
  * @param skipped      the repetition hit a provider rate limit or quota, so it measured nothing:
  *                     it is neither a pass nor a failure
+ * @param turns        each turn that completed, in order; {@code trajectory} and {@code answer} are
+ *                     the whole scenario seen at once
  */
 public record ScenarioResult(Scenario scenario,
                              Trajectory trajectory,
@@ -27,15 +29,17 @@ public record ScenarioResult(Scenario scenario,
                              long inputTokens,
                              long outputTokens,
                              Cost cost,
-                             boolean skipped) {
+                             boolean skipped,
+                             List<TurnResult> turns) {
 
     public ScenarioResult {
         checks = List.copyOf(checks);
+        turns = turns == null ? List.of() : List.copyOf(turns);
     }
 
     public ScenarioResult(Scenario scenario, Trajectory trajectory, String answer, List<CheckResult> checks,
                           Duration latency, long inputTokens, long outputTokens, Cost cost) {
-        this(scenario, trajectory, answer, checks, latency, inputTokens, outputTokens, cost, false);
+        this(scenario, trajectory, answer, checks, latency, inputTokens, outputTokens, cost, false, List.of());
     }
 
     /**
@@ -43,13 +47,17 @@ public record ScenarioResult(Scenario scenario,
      * as a regression.
      */
     public static ScenarioResult skipped(Scenario scenario, String reason, Duration latency) {
-        return skipped(scenario, reason, latency, Cost.NONE);
+        return skipped(scenario, reason, latency, Cost.NONE, List.of());
     }
 
-    /** @param cost what the calls made before the quota error cost — they are billed all the same */
-    public static ScenarioResult skipped(Scenario scenario, String reason, Duration latency, Cost cost) {
+    /**
+     * @param cost      what the calls made before the quota error cost — they are billed all the same
+     * @param completed the turns that finished before the quota error, kept for the report
+     */
+    public static ScenarioResult skipped(Scenario scenario, String reason, Duration latency, Cost cost,
+                                         List<TurnResult> completed) {
         return new ScenarioResult(scenario, new Trajectory(null, List.of(), List.of()), null,
-                List.of(new CheckResult("rate limit", false, reason)), latency, 0, 0, cost, true);
+                List.of(new CheckResult("rate limit", false, reason)), latency, 0, 0, cost, true, completed);
     }
 
     public boolean passed() {
@@ -69,6 +77,17 @@ public record ScenarioResult(Scenario scenario,
             activations = List.copyOf(activations);
             toolCalls = List.copyOf(toolCalls);
         }
+    }
+
+    /**
+     * One turn of the conversation: what the user sent and what that turn alone produced.
+     *
+     * @param number         1-based position in the scenario's turns
+     * @param conversationId the id the endpoint answered with; the same on every turn of a run
+     * @param trajectory     the outcome, activations and tool calls of this turn only
+     */
+    public record TurnResult(int number, String message, String conversationId, Trajectory trajectory,
+                             String answer) {
     }
 
     /** One tool execution as the tool listener recorded it: the model's arguments and the tool's result. */

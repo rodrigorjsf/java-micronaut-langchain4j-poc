@@ -167,7 +167,8 @@ skill body is instructions, not data about the world.
 ```mermaid
 flowchart LR
     row[scenario row] --> runner[ScenarioRunner]
-    runner -- "POST /api/chat" --> app[embedded app]
+    runner -- "POST /api/chat, once per turn" --> app[embedded app]
+    app -- "conversationId, sent back on the next turn" --> runner
     app --> tools[tool listener]
     tools --> tracer[RecordingAgentTracer]
     tracer -- "tool calls: name, arguments, result" --> checks[trajectory checks]
@@ -221,6 +222,46 @@ flowchart LR
   root: one self-contained page (inline CSS, no script, nothing fetched) with each
   scenario's turns, expectation, activations, tool calls, answer, checks, latency and
   tokens. Model text is HTML-escaped. The file is gitignored: it is a run artifact.
+
+### Multi-turn and cross-domain rows
+
+A row with more than one entry in `turns` is **one conversation**: the runner sends
+the first turn without a `conversationId`, then sends every later turn with the id
+the endpoint answered, so turn 2 reaches the model with turn 1 in its memory. A row
+with more than one entry in `domains` crosses them ("what is the dollar rate and will
+it rain in São Paulo tomorrow") and counts toward **each** domain in the report's
+coverage line.
+
+`expect.trajectory` and `expect.answer` read the scenario as a whole: tools called in
+any turn, the last turn's outcome and answer. To aim a check at one turn, add it
+under `expect.turns`:
+
+```json
+"expect": {
+  "trajectory": {"outcome": "ANSWERED", "toolsCalled": ["get_weather"]},
+  "turns": [
+    {"turn": 1, "trajectory": {"toolsCalled": ["get_weather"]}},
+    {"turn": 2, "answer": {"contains": ["São Paulo"], "grounded": ["(-?\\d+(?:[.,]\\d+)?)\\s*mm"]}}
+  ]
+}
+```
+
+| Turn check | Sees | Example verdict |
+|---|---|---|
+| `turn N: outcome`, `turn N: tool called: <name>` | turn N's outcome and tool calls only | `get_weather` ran in turn 1, so `turn 2: tool called: get_weather` **fails** |
+| `turn N: contains`, `turn N: language`, `turn N: no link …` | turn N's answer only | — |
+| `turn N: grounded: <regex>` | turn N's answer, against tool results of turns 1…N | `12,4 mm` fetched in turn 1 and repeated from memory in turn 2 **passes** |
+| `turn N` | a row that aims at a turn the scenario does not have | always fails, naming how many turns there are |
+
+Turns are 1-based. In the report, a multi-turn repetition lists every turn in order
+— message, conversation id, outcome, activations, tool calls, answer — before the
+checks; a single-turn repetition keeps the flat layout. A run that stops partway —
+HTTP 500 or a rate limit on turn 2 — keeps the turns that finished, and its failed
+check names the turn it stopped at. Each turn's trajectory is the slice of observations
+recorded between that turn's request and its response, which holds because the tool
+listener records synchronously, inside the request. `ScenarioRunnerTest` proves
+both behaviours with a scripted model: the second request carries the first turn,
+both turns share one conversation id, and each turn keeps only its own tool calls.
 
 ### Repetitions, the gate and flakiness
 
