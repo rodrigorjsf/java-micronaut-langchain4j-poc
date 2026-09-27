@@ -132,6 +132,7 @@ optionally, `expect.answer` (what the answer itself must satisfy):
  "expect": {"trajectory": {"outcome": "ANSWERED", "toolsCalled": ["get_weather"]},
             "answer": {"language": "pt-BR",
                        "grounded": ["(-?\\d+(?:[.,]\\d+)?)\\s*(?:mm|milímetros|°C|ºC|°|graus|%)"]}},
+ "dependsOn": ["geo-and-weather", "get_weather", "open-meteo-forecast"],
  "critical": true}
 ```
 
@@ -294,6 +295,78 @@ What the repetitions add up to depends on whether the row is `critical`:
   A call to a model with no configured price is counted as unpriced and left out,
   never priced at zero.
 
+### Dependencies, coverage and narrowing a run
+
+Every row declares `dependsOn`: the **artifacts** whose change could change its
+outcome. An artifact is anything the model reads or reaches, named the way the row
+names it:
+
+| Kind | Identifier in `dependsOn` | Defined by |
+|---|---|---|
+| skill | directory name — `geo-and-weather` | every file under `src/main/resources/skills/<name>/` |
+| tool | method name — `get_weather` | its `@Tool` description and parameters, plus the code its class shares |
+| system-prompt section | `system-prompt#<heading>` — `system-prompt#role` | a `# Heading` of `SystemPromptBuilder`'s prompt, `prompt/CALCULATION.md` (`system-prompt#arithmetic`), or `voice/VOICE.md` (`system-prompt#voice`) |
+| catalogue key | the `agentic.tools.apis` key — `open-meteo-forecast` | that entry's parsed value in `application.yml` (a comment edit changes nothing) |
+| sub-agent | its `@Agent(name = …)` — `weather_reporter` | the whole source file |
+
+**A row that loads is a row the suite can trust.** The loader rejects an invalid row
+with its file, its id and the reason — an unknown `kind` or `source`, a missing or
+empty `dependsOn`, `domains` or `turns`, no expected `outcome`, a duplicate id, a
+`multi-turn` row with one turn, and a `kind: "upstream-failure"` without an `upstream`
+override (or an override on any other kind). `ScenarioDatasetTest` covers each case in
+the ordinary build.
+
+**Coverage** is computed over the whole dataset and printed at the top of the report:
+
+- **Per domain**, against the floor: at least 2 `happy` rows, at least 3 bad paths
+  from the named set (`missing-info`, `out-of-territory`, `upstream-failure`,
+  `injection`, `ambiguous`), and 1 `multi-turn` row when the domain holds state
+  (the list is `src/test/resources/evals/stateful-domains.json`). A domain below the
+  floor is named with each shortfall, e.g. "1 happy path of the 2 required". It is
+  reported, never gated: a gap is work to do, not a regression (whether it should gate once
+  every domain meets it is open in #47).
+- **Uncovered artifacts**: every artifact of the repository that no row depends on —
+  a new tool or skill with no scenario shows up here.
+- **Unknown dependencies**: a `dependsOn` entry naming no artifact. A typo there
+  would silently hide the row from diff mode, so `ScenarioCoverageTest` also asserts
+  the committed dataset has none.
+
+**Narrowing a run.** A full run pays for every row, three times. Three system
+properties narrow it, and every one that is set must select a row for it to run:
+
+| Property | Runs | Example |
+|---|---|---|
+| `-Dscenario.domain=<domain>` | the rows of one domain, cross-domain rows included | `-Dscenario.domain=weather` |
+| `-Dscenario.ids=<id,id>` | the listed rows | `-Dscenario.ids=weather-upstream-timeout` |
+| `-Dscenario.changedSince=<git ref>` | **diff mode**: the rows whose `dependsOn` names an artifact that changed since the ref, working-tree edits and untracked files included | `-Dscenario.changedSince=main` |
+
+A domain or id no row has is refused rather than running nothing. Diff mode compares
+the artifacts at the ref with the ones in the working tree, fingerprint by
+fingerprint, so editing `get_weather`'s description selects the rows that depend on
+`get_weather` and not those that depend on its neighbour `find_place`. A fingerprint
+may be coarser than the artifact, never finer: an edit to code a tool class shares
+selects every tool of that class, because over-selecting costs a run and
+under-selecting would let a change ship untested. When the selection matches nothing,
+the eval is aborted, not passed. The report's summary names the selection.
+
+```mermaid
+flowchart LR
+    ref[git ref] --> before[inventory at the ref]
+    wt[working tree] --> after[inventory now]
+    before --> diff{fingerprints differ?}
+    after --> diff
+    diff -- "changed artifacts" --> select[rows whose dependsOn intersects]
+    rows[committed rows] --> select
+    select --> run[ScenarioSuiteEval]
+    classDef input fill:#2d6cdf,stroke:#9ec1ff,color:#ffffff
+    classDef step fill:#5a6275,stroke:#aab3c5,color:#ffffff
+    classDef out fill:#1f7a3f,stroke:#8fd9a8,color:#ffffff
+    class ref,wt,rows input
+    class before,after,diff,select step
+    class run out
+    linkStyle default stroke:#8892b0
+```
+
 ## What is not built, and why
 
 **An LLM-as-judge for answer quality.** The obvious level-2 addition, and the one
@@ -314,7 +387,8 @@ consumes them yet.
 
 1. `./mvnw test` — the deterministic gates, including the injection corpus.
 2. `./mvnw test -Pevals` — the golden set, if the triage prompt or its schema
-   moved, and the scenario suite; open `eval-report.html` at the repository root
+   moved, and the scenario suite (`-Dtest=ScenarioSuiteEval -Dscenario.changedSince=main`
+   runs only the scenarios your change can affect); open `eval-report.html` at the repository root
    for every scenario's trajectory and the reason behind each failed check;
    a critical scenario failing any of its 3 repetitions fails the eval, and
    the summary names the flaky ones.

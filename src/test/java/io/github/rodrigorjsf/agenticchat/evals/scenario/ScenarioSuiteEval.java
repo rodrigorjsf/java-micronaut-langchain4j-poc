@@ -43,6 +43,12 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * one catalogue key pointed at the local {@code StubApiController}; the model and every other
  * upstream stay real, and the shared context never sees the override.
  *
+ * <p>Narrow a run with {@code -Dscenario.domain=<domain>}, {@code -Dscenario.ids=<id,id>} or
+ * {@code -Dscenario.changedSince=<git ref>} (diff mode: the rows whose {@code dependsOn} names an
+ * artifact changed since the ref, working-tree edits included) — see {@link ScenarioSelection}.
+ * A selection that matches nothing aborts the eval rather than passing it. The report's coverage
+ * section is computed over the whole dataset either way.
+ *
  * <p>{@code eval-report.html} is written at the repository root after the run — in
  * {@link AfterAll}, so a failing gate still leaves the page that explains it. The file is
  * gitignored.
@@ -52,7 +58,8 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 class ScenarioSuiteEval {
 
     /** Surefire runs with the project base directory as the working directory: the repository root. */
-    private static final Path REPORT = Path.of(System.getProperty("user.dir"), "eval-report.html");
+    private static final Path REPOSITORY = Path.of(System.getProperty("user.dir"));
+    private static final Path REPORT = REPOSITORY.resolve("eval-report.html");
 
     /** Below ~6 requests/minute, inside the measured free-tier limit (see TriageGoldenSetEval). */
     private static final long PACING_MILLIS = 10_000;
@@ -61,6 +68,8 @@ class ScenarioSuiteEval {
     private EmbeddedServer stub;
     private ScenarioRunner runner;
     private final List<ScenarioRuns> scenarioRuns = new ArrayList<>();
+    private ScenarioCoverage coverage = ScenarioCoverage.empty();
+    private ScenarioSelection selection = ScenarioSelection.everything();
 
     @BeforeAll
     void startApp() {
@@ -106,7 +115,7 @@ class ScenarioSuiteEval {
     @AfterAll
     void writeReportAndStop() throws IOException {
         try {
-            Files.writeString(REPORT, EvalReportRenderer.render(scenarioRuns), StandardCharsets.UTF_8);
+            Files.writeString(REPORT, EvalReportRenderer.render(scenarioRuns, coverage, selection), StandardCharsets.UTF_8);
             System.out.printf("%nscenario suite: report written to %s%n", REPORT);
         } finally {
             if (app != null) {
@@ -121,8 +130,14 @@ class ScenarioSuiteEval {
     @Test
     @DisplayName("scenario suite: every critical scenario passes every repetition against the real model")
     void everyCriticalScenarioPasses() {
-        var scenarios = ScenarioDataset.loadCommitted();
-        assertThat(scenarios).isNotEmpty();
+        var dataset = ScenarioDataset.loadCommitted();
+        assertThat(dataset).isNotEmpty();
+        coverage = ScenarioCoverage.of(dataset, ScenarioDataset.loadStatefulDomains(),
+                ArtifactInventory.ofWorkingTree(REPOSITORY));
+        selection = ScenarioSelection.fromProperties(System::getProperty,
+                ref -> GitChanges.changedArtifactsSince(REPOSITORY, ref));
+        var scenarios = selection.apply(dataset);
+        assumeTrue(!scenarios.isEmpty(), "the selection (" + selection.describe() + ") matches no scenario");
         int repetitions = ScenarioRuns.parseRepetitions(System.getProperty(ScenarioRuns.REPETITIONS_PROPERTY));
 
         for (int i = 0; i < scenarios.size(); i++) {

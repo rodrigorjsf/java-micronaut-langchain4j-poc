@@ -3,11 +3,15 @@ package io.github.rodrigorjsf.agenticchat.evals.scenario;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -111,10 +115,55 @@ class ScenarioDatasetTest {
         assertThat(ScenarioDataset.load(dir).getFirst().expect().turns()).isEmpty();
     }
 
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("invalidRows")
+    @DisplayName("an invalid row fails loading, naming the row and the reason")
+    void anInvalidRowFailsLoadingWithItsIdAndReason(String reason, String row, String expectedMessage,
+                                                    @TempDir Path dir) throws Exception {
+        Files.writeString(dir.resolve("d.json"), "[" + row("fine") + "," + row + "]");
+
+        assertThatThrownBy(() -> ScenarioDataset.load(dir))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("d.json")
+                .hasMessageContaining(expectedMessage);
+    }
+
+    static Stream<Arguments> invalidRows() {
+        return Stream.of(
+                Arguments.of("unknown kind", row("r1").replace("\"kind\":\"happy\"", "\"kind\":\"sad\""),
+                        "row 'r1': unknown kind 'sad'"),
+                Arguments.of("unknown source", row("r2").replace("\"source\":\"synthetic\"", "\"source\":\"guess\""),
+                        "row 'r2': unknown source 'guess'"),
+                Arguments.of("missing dependsOn", row("r3").replace("\"dependsOn\":[\"get_weather\"],", ""),
+                        "row 'r3': dependsOn is missing or empty"),
+                Arguments.of("empty dependsOn", row("r4").replace("[\"get_weather\"]", "[]"),
+                        "row 'r4': dependsOn is missing or empty"),
+                Arguments.of("no domains", row("r5").replace("[\"d\"]", "[]"),
+                        "row 'r5': domains is missing or empty"),
+                Arguments.of("no turns", row("r6").replace("[\"oi\"]", "[]"),
+                        "row 'r6': turns is missing or empty"),
+                Arguments.of("no expected outcome", row("r7").replace("\"outcome\":\"ANSWERED\",", ""),
+                        "row 'r7': expect.trajectory.outcome is missing"),
+                Arguments.of("no id", row("").replace("\"id\":\"\",", ""),
+                        "row 2: id is missing"),
+                Arguments.of("duplicate id", row("fine"),
+                        "row 'fine': id is already used by an earlier row"),
+                Arguments.of("upstream-failure without upstream",
+                        row("r8").replace("\"kind\":\"happy\"", "\"kind\":\"upstream-failure\""),
+                        "row 'r8': kind upstream-failure requires an upstream override"),
+                Arguments.of("upstream on another kind",
+                        row("r9").replace("\"critical\":false",
+                                "\"critical\":false,\"upstream\":{\"catalogueKey\":\"k\",\"failure\":\"timeout\"}"),
+                        "row 'r9': an upstream override is only allowed on kind upstream-failure"),
+                Arguments.of("multi-turn with one turn",
+                        row("r10").replace("\"kind\":\"happy\"", "\"kind\":\"multi-turn\""),
+                        "row 'r10': kind multi-turn needs at least two turns"));
+    }
+
     private static String row(String id) {
         return """
                 {"id":"%s","domains":["d"],"kind":"happy","source":"synthetic",
                  "turns":["oi"],"expect":{"trajectory":{"outcome":"ANSWERED","toolsCalled":[]}},
-                 "dependsOn":[],"critical":false}""".formatted(id);
+                 "dependsOn":["get_weather"],"critical":false}""".formatted(id);
     }
 }

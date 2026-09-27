@@ -4,10 +4,12 @@ import com.fasterxml.jackson.annotation.JsonValue;
 
 import java.net.URI;
 import java.time.Duration;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * One row of the scenario dataset: a scripted conversation and what must be true after it.
@@ -31,6 +33,29 @@ public record Scenario(String id,
                        List<String> dependsOn,
                        boolean critical,
                        UpstreamFailure upstream) {
+
+    public static final String HAPPY = "happy";
+    public static final String UPSTREAM_FAILURE = "upstream-failure";
+    public static final String MULTI_TURN = "multi-turn";
+
+    /**
+     * The named bad paths: the ones that count toward a domain's coverage floor. Out-of-scope,
+     * cross-domain and multi-turn rows are kinds too, but not in this set.
+     */
+    public static final Set<String> BAD_PATH_KINDS = Collections.unmodifiableSortedSet(new TreeSet<>(Set.of(
+            "missing-info", "out-of-territory", UPSTREAM_FAILURE, "injection", "ambiguous")));
+
+    /** Every kind a row may declare. */
+    public static final Set<String> KINDS = kinds();
+
+    private static Set<String> kinds() {
+        var kinds = new TreeSet<>(BAD_PATH_KINDS);
+        kinds.addAll(Set.of(HAPPY, MULTI_TURN, "cross-domain", "out-of-scope"));
+        return Collections.unmodifiableSortedSet(kinds);
+    }
+
+    /** Where a row's input came from. */
+    public static final Set<String> SOURCES = Collections.unmodifiableSortedSet(new TreeSet<>(Set.of("trace", "synthetic", "user")));
 
     /**
      * @param trajectory how the agent must have reached its answer, across every turn; the outcome
@@ -108,7 +133,7 @@ public record Scenario(String id,
         public Map<String, Object> properties(URI stubServer, Set<String> catalogue) {
             if (!catalogue.contains(catalogueKey)) {
                 throw new IllegalArgumentException("Upstream override names '" + catalogueKey
-                        + "', which is not a catalogue key; known keys: " + new java.util.TreeSet<>(catalogue));
+                        + "', which is not a catalogue key; known keys: " + new TreeSet<>(catalogue));
             }
             var prefix = "agentic.tools.apis." + catalogueKey + ".";
             var properties = new LinkedHashMap<String, Object>();
