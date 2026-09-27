@@ -105,7 +105,9 @@ conversation. That inflates every stored item and replays the same prose into
 every later prompt of the session.
 
 Retrieval is cheap enough to redo per turn. Storing it is not. Find the flag and
-turn it off.
+turn it off. In LangChain4j 1.20.x it is `storeRetrievedContentInChatMemory(false)`
+on the AI Service builder; the default, `true`, stores the augmented user message
+[sourced — `AiServices` javadoc, https://github.com/langchain4j/langchain4j/blob/1.20.1/langchain4j/src/main/java/dev/langchain4j/service/AiServices.java, read 2026-09-27].
 
 ## Warm the model at startup
 

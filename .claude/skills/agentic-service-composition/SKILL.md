@@ -92,7 +92,9 @@ attached one layer up, inspecting nothing. Three ways a control silently does no
   `executeWithContext`; only one is ever called. Read the call site.
 - **The short-circuit path.** A hallucinated tool name resolves to no executor, so
   every decorator is skipped for exactly the input an attacker steers — and the
-  default handler throws, turning a model typo into a 500.
+  default handler throws, turning a model typo into a 500. In LangChain4j 1.20.x
+  that default is `hallucinatedToolNameStrategy` = `THROW_EXCEPTION`; set it to
+  return text the model can correct from [sourced — https://github.com/langchain4j/langchain4j/blob/1.20.1/langchain4j/src/main/java/dev/langchain4j/service/tool/HallucinatedToolNameStrategy.java, read 2026-09-27].
 - **The provider that cannot disclose.** Resolved at startup or at the invocation layer,
   it returns one fixed tool set — activation changes nothing the model sees, no test fails.
 

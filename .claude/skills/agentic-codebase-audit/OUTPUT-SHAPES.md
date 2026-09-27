@@ -119,44 +119,45 @@ verdict is the score turned into one of four words by the rule in
 `OWASP-COVERAGE.md`.
 
 ```
-ASI01 Goal Hijack          guardrails 0        uncovered   also prompt assembly 2
-ASI02 Tool Misuse          tool boundary 0     uncovered
-ASI03 Identity & Privilege tool boundary 0     uncovered   also memory 0
-ASI04 Supply Chain         discovery 0         uncovered
-ASI05 Code Execution       tool boundary 0     uncovered
-ASI06 Memory Poisoning     memory 0            uncovered
-ASI07 Inter-Agent Comms    sub-agents n/a      n/a — until an agent is addressed
-                                               over a wire
-ASI08 Cascading Failures   sub-agents n/a      uncovered at the second seam:
-                           model access 0      the SDK's 2 automatic retries are
-                                               a retry loop nobody chose (1.4), so
-                                               the trigger fires with no fan-out
-                                               anywhere
-ASI09 Human-Agent Trust    guardrails 0        uncovered — 5.2 a, b and c each
-                                               answered "no"
-ASI10 Rogue Agents         observability 1     uncovered — 1 is not covered; the
-                                               nightly job at 8.6 fires the
-                                               trigger. also evals 0
+ASI01  guardrails 0        uncovered   also prompt assembly 2
+ASI02  tool boundary 0     uncovered
+ASI03  tool boundary 0     uncovered   also memory 0
+ASI04  discovery 0         uncovered
+ASI05  tool boundary 0     uncovered
+ASI06  memory 0            uncovered
+ASI07  sub-agents n/a      n/a — until an agent is addressed
+                           over a wire
+ASI08  sub-agents n/a      uncovered at the second seam:
+       model access 0      the SDK's 2 automatic retries are
+                           a retry loop nobody chose (1.4), so
+                           the trigger fires with no fan-out
+                           anywhere
+ASI09  guardrails 0        uncovered — 5.2 a, b and c each
+                           answered "no"
+ASI10  observability 1     uncovered — 1 is not covered; the
+                           nightly job at 8.6 fires the
+                           trigger. also evals 0
 ```
 
 A time-boxed run writes the same ten lines. The seams it never reached carry the
 fourth word, and the ones Step 1 located as `n/a` are unaffected by the budget:
 
 ```
-ASI04 Supply Chain         discovery not yet probed  unmeasured — discovery not
-                                                     yet probed; 4.1 goes first
-                                                     next run
-ASI07 Inter-Agent Comms    sub-agents n/a            n/a — until an agent is
-                                                     addressed over a wire
-ASI06 Memory Poisoning     memory 0                  uncovered — 6.2 alone; the
-                                                     seam's other probes are
-                                                     unrun and cannot lift a 0
+ASI04  discovery not yet probed  unmeasured — discovery not
+                                 yet probed; 4.1 goes first
+                                 next run
+ASI07  sub-agents n/a            n/a — until an agent is
+                                 addressed over a wire
+ASI06  memory 0                  uncovered — 6.2 alone; the
+                                 seam's other probes are
+                                 unrun and cannot lift a 0
 ```
 
 Five things this block gets wrong when it is improvised:
 
-- **Keyed on the identifier.** The words after `ASI04` are shorthand; published
-  wording varies between sources, and `OWASP-COVERAGE.md` says why.
+- **Keyed on the identifier.** A line carries `ASI04`, never a title: a title
+  shortened to fit a column is a second spelling of it. The one title per item is
+  in `OWASP-COVERAGE.md`.
 - **`n/a` is not a free pass.** ASI07 earns it — no sub-agents, no gap — and
   carries the trigger that ends it. ASI08 does not: its primary seam is `n/a` and
   its second seam is not, so the verdict comes from the second.

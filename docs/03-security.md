@@ -70,8 +70,8 @@ Two traps in building that decorator, both of which fail silently:
 | **ASI01** | Agent Goal Hijack | Input guardrail chain: normalize → deterministic score → gray-zone classifier. System prompt is assembled from config at startup and never derived from a request or from memory. | 71 corpus cases, half of them benign traffic that looks like an attack |
 | **ASI02** | Tool Misuse and Exploitation | Tools name a catalogue key, never a URL. Arguments screened for credential shapes. Results screened for injection. `maxToolCallingRoundTrips(6)`. Per-endpoint timeouts and byte budgets (a transport bound, applied before link scrubbing). Addresses outside the catalogue are removed from a tool body before the model reads it. Redirects are followed hop by hop, only to a host and port the catalogue names. | SSRF refusal via an unconfigured catalogue key; a `302` to `169.254.169.254` not followed; credential-shaped argument refused; injected result neutralised |
 | **ASI03** | Identity and Privilege Abuse | `ConversationId` is validated before it builds a storage key in either store — the memory-isolation boundary. No tool parameter may be named like a credential. | 13 `ConversationId` cases naming each rejected shape; the parameter-name test over every tool |
-| **ASI04** | Agentic Supply Chain | All tools are compiled `@Tool` methods in this repository. There is no runtime tool registry, no MCP mount, no dynamic descriptor. | ArchUnit: tools may not open their own connections |
-| **ASI05** | Unexpected Code Execution | There is no code-execution tool, no `eval`, no template engine reachable from a prompt. The applicable slice is deserialization hygiene on anything persisted. | ArchUnit no-cycles and the tool-boundary rules |
+| **ASI04** | Agentic Supply Chain Vulnerabilities | All tools are compiled `@Tool` methods in this repository. There is no runtime tool registry, no MCP mount, no dynamic descriptor. | ArchUnit: tools may not open their own connections |
+| **ASI05** | Unexpected Code Execution (RCE) | There is no code-execution tool, no `eval`, no template engine reachable from a prompt. The applicable slice is deserialization hygiene on anything persisted. | ArchUnit no-cycles and the tool-boundary rules |
 | **ASI06** | Memory & Context Poisoning | Output guardrails use `fatalWithMessageRemoval`, so a poisoned assistant message is deleted from memory rather than replayed. Compaction preserves activations together with the messages that requested them, and empties a failed trajectory's payload without removing the message — a result whose request was summarised away is a list the provider rejects. | Leaked-canary message removal; the compaction invariant test |
 | **ASI07** | Insecure Inter-Agent Communication | Sub-agents are in-process objects. **There is no wire between them to protect.** | — see below |
 | **ASI08** | Cascading Failures | Bounded round trips, bounded retries (never on 4xx or 429), per-endpoint timeouts, and a triage gate that fails *open* so a classifier outage degrades rather than stops. | Per-endpoint timeout test; the retry-once test |
@@ -157,7 +157,7 @@ is not mitigated, and nothing here should be read as implying otherwise.
 - **ASI04 runtime supply chain** — SBOM/AIBOM attestation, signed tool
   descriptors, registry pinning. The runtime composition surface OWASP describes
   does not exist here; all tools are compiled into the artefact.
-- **ASI09 UI safeguards** — risk badges, manipulation-pattern reminders, adaptive
+- **ASI09's UI safeguards** — risk badges, manipulation-pattern reminders, adaptive
   trust calibration. This is a headless backend. The server-side half is built;
   the visual layer is out of scope and stays out.
 - **ASI05 sandboxing** — containers, syscall limits, safe interpreters. There is
