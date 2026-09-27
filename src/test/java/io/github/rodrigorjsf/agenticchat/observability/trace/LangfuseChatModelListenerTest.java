@@ -42,7 +42,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>Four cases are driven by constructing the listener contexts directly instead. That
  * is not a shortcut around the double: the double always reports usage, never fails, and
  * reports no {@code ModelProvider}, so a response with no usage, an error, the
- * provider-derived {@code gen_ai.system} and a response whose model name differs from
+ * provider-derived {@code gen_ai.provider.name} and a response whose model name differs from
  * the request's cannot be expressed through it. Those tests call the same three methods,
  * in the same order, with the same shared attribute map that LangChain4j's own
  * {@code ChatModelListenerUtils} uses.
@@ -275,7 +275,7 @@ class LangfuseChatModelListenerTest {
         // These buy nothing in Langfuse, which gives its own namespace precedence.
         // They are what a Tempo query or the spanmetrics connector groups by.
         assertThat(generation().getAttributes().asMap())
-                .containsEntry(GenAiAttributes.SYSTEM, "google_ai_gemini")
+                .containsEntry(GenAiAttributes.PROVIDER_NAME, "google_ai_gemini")
                 .containsEntry(GenAiAttributes.OPERATION_NAME, "chat")
                 .containsEntry(GenAiAttributes.REQUEST_MODEL, GEMINI);
     }

@@ -89,7 +89,7 @@ class LangfuseEmbeddingModelListenerTest {
                 .containsEntry(GenAiAttributes.REQUEST_MODEL, MODEL)
                 // What LangChain4j's own enum says about an in-process model, rather than a
                 // provider name invented for the trace.
-                .containsEntry(GenAiAttributes.SYSTEM, "other");
+                .containsEntry(GenAiAttributes.PROVIDER_NAME, "other");
     }
 
     @Test

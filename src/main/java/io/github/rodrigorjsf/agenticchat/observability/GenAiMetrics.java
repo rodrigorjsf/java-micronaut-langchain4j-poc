@@ -44,7 +44,7 @@ import java.util.List;
  * {@code google_ai_gemini}, {@code open_ai} — and not the value from the semantic
  * conventions' registry. That is a deliberate trade: the registry value would be more
  * portable in the abstract, and it would not join to anything. The spans this application
- * exports carry {@code gen_ai.system = google_ai_gemini}, the collector's span_metrics
+ * exports carry the same {@code gen_ai.provider.name = google_ai_gemini}, the collector's span_metrics
  * connector derives {@code gen_ai_request_model} from the same spans, and a metric that
  * named the provider differently could not be correlated with either. One vocabulary that
  * joins beats two that are each half right.

@@ -2088,6 +2088,7 @@ the script exists.
 | `langfuse.observation.status_message` | survives | survives | — |
 | `langfuse.environment` | survives | survives | eval traffic can still be separated from production |
 | `langfuse.observation.model.name` | survives | survives | — |
+| `gen_ai.provider.name` (replaced `gen_ai.system`) | **not measured on 4.16.0** — its source maps the key for no scope this project uses [sourced]. On **4.46.0**, the image the floating `langfuse:4` tag pulled on 2026-09-27, it is filed unmapped as `metadata["attributes.gen_ai.provider.name"]` [verified] | unmapped metadata [verified] | nothing. Neither version maps the provider key for this instrumentation scope, so the rename changed one metadata key and nothing a chart reads |
 | `langfuse.observation.usage_details` | mapped, exclusive buckets and all | **ignored.** Usage came from `gen_ai.usage.*` instead, reading back `{"input":2140,"output":96,"total":2236}` — the cached and reasoning buckets are lost | emit `gen_ai.usage.input_tokens` and `gen_ai.usage.output_tokens`, which this project does. Accept that the bucket detail does not survive |
 | `langfuse.observation.cost_details` | the ingested number | **not mapped** — `totalCost` reads `0` | nothing on the wire carries cost on this version |
 | `langfuse.user.id` | survives | survives | — |

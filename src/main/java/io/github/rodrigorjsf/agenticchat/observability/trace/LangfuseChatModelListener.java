@@ -165,7 +165,7 @@ public class LangfuseChatModelListener implements ChatModelListener {
         }
         String requestedModel = request.modelName();
         observation.model(requestedModel, parametersOf(request.parameters()));
-        observation.genAi(systemOf(context.modelProvider()), GenAiAttributes.OPERATION_CHAT, requestedModel);
+        observation.genAi(providerNameOf(context.modelProvider()), GenAiAttributes.OPERATION_CHAT, requestedModel);
         // The system prompt is one of these messages and goes through the same policy as
         // the user's text: it is the largest single thing this application sends a
         // provider, and it is not automatically safe to forward to a third one.
@@ -365,7 +365,7 @@ public class LangfuseChatModelListener implements ChatModelListener {
     }
 
     /**
-     * {@code gen_ai.system} from LangChain4j's own provider enum, lower-cased.
+     * {@code gen_ai.provider.name} from LangChain4j's own provider enum, lower-cased.
      *
      * <p>The enum is on the compile classpath and names which SDK actually made the call,
      * so this spelling is derived rather than remembered. The OpenTelemetry GenAI
@@ -374,7 +374,7 @@ public class LangfuseChatModelListener implements ChatModelListener {
      * reconstructed from recall — which is the one thing this repository's conventions
      * forbid.
      */
-    private static String systemOf(ModelProvider provider) {
+    private static String providerNameOf(ModelProvider provider) {
         return provider == null ? null : provider.name().toLowerCase(Locale.ROOT);
     }
 

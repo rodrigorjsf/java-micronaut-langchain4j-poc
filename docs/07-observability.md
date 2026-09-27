@@ -279,9 +279,21 @@ thousand and still plot.
 
 **`gen_ai.provider.name` carries the LangChain4j spelling** (`google_ai_gemini`), not the
 value from the conventions' registry. The registry value would be more portable in the
-abstract and would join to nothing: the spans carry `gen_ai.system = google_ai_gemini` and
-the span metrics derive `gen_ai_request_model` from those same spans. One vocabulary that
-joins beats two that are each half right.
+abstract and would join to nothing: the spans carry the same key with the same value,
+`gen_ai.provider.name = google_ai_gemini`, and the span metrics derive `gen_ai_request_model`
+from those same spans. One vocabulary that joins beats two that are each half right.
+
+The spans used to write the provider under `gen_ai.system`. The GenAI conventions renamed it:
+`gen_ai.provider.name` is **Required** on inference spans, and the registry marks
+`gen_ai.system` deprecated [sourced — `open-telemetry/semantic-conventions-genai`
+`docs/gen-ai/gen-ai-spans.md` and `open-telemetry/semantic-conventions`
+`docs/registry/attributes/gen-ai.md`, status Development, read 2026-09-27]. Langfuse maps
+neither key for spans from this instrumentation: on 4.16.0 `gen_ai.system` is read only for
+the Vercel AI SDK scope (`ai`) and `gen_ai.provider.name` only to recognise the Microsoft Agent
+Framework, and 3.80.0 reads neither [sourced — `OtelIngestionProcessor.ts` and
+`chatml/adapters/*.ts` at tags `v4.16.0` and `v3.80.0`]. `gen_ai.provider.name` lands in Langfuse's unmapped
+catch-all [verified — `scripts/check-langfuse-ingestion.sh` on 4.46.0, the image the floating
+`langfuse:4` tag pulls, and `scripts/check-langfuse-3x-compat.sh` on 3.80.0, both 2026-09-27].
 
 They are exported **only when a collector is configured**. `otel.metrics.exporter` follows
 `agentic.observability.otlp.endpoint`, because a `MeterProvider` dials on an *interval*
