@@ -33,10 +33,33 @@ public record Scenario(String id,
                        UpstreamFailure upstream) {
 
     /**
-     * @param trajectory how the agent must have reached its answer
-     * @param answer     what the answer itself must satisfy; absent when the row asserts nothing on it
+     * @param trajectory how the agent must have reached its answer, across every turn; the outcome
+     *                   is the last turn's
+     * @param answer     what the last turn's answer must satisfy; absent when the row asserts nothing on it
+     * @param turns      checks aimed at one turn of a multi-turn row; empty when the row has none
      */
-    public record Expectation(TrajectoryExpectation trajectory, AnswerExpectation answer) {
+    public record Expectation(TrajectoryExpectation trajectory, AnswerExpectation answer,
+                              List<TurnExpectation> turns) {
+
+        public Expectation {
+            turns = turns == null ? List.of() : List.copyOf(turns);
+        }
+
+        public Expectation(TrajectoryExpectation trajectory, AnswerExpectation answer) {
+            this(trajectory, answer, List.of());
+        }
+    }
+
+    /**
+     * The checks of one turn, run against that turn alone: its outcome, its tool calls, its answer.
+     * Grounding still reaches back to tool results of earlier turns, because a value the agent
+     * fetched in turn one and repeats from memory in turn two is grounded all the same.
+     *
+     * @param turn       1-based position in {@link Scenario#turns()}
+     * @param trajectory what this turn must show; null checks nothing on it
+     * @param answer     what this turn's answer must satisfy; null checks nothing on it
+     */
+    public record TurnExpectation(int turn, TrajectoryExpectation trajectory, AnswerExpectation answer) {
     }
 
     /**

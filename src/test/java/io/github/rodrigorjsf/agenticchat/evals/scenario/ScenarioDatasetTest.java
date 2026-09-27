@@ -81,6 +81,36 @@ class ScenarioDatasetTest {
         assertThat(ids).containsExactly("a2", "a1", "b1");
     }
 
+    @Test
+    @DisplayName("a multi-turn, cross-domain row loads its turns, both domains and the checks aimed at one turn")
+    void loadsAMultiTurnCrossDomainRow(@TempDir Path dir) throws Exception {
+        Files.writeString(dir.resolve("cross.json"), """
+                [{"id":"dollar-and-weather","domains":["currency","weather"],"kind":"cross-domain",
+                  "source":"synthetic","turns":["Qual a cotação do dólar?","E vai chover em São Paulo amanhã?"],
+                  "expect":{"trajectory":{"outcome":"ANSWERED","toolsCalled":["get_weather"]},
+                            "turns":[{"turn":2,"trajectory":{"toolsCalled":["get_weather"]},
+                                      "answer":{"contains":["chuva"]}}]},
+                  "dependsOn":["get_weather"],"critical":false}]""");
+
+        var row = ScenarioDataset.load(dir).getFirst();
+
+        assertThat(row.domains()).containsExactly("currency", "weather");
+        assertThat(row.turns()).hasSize(2);
+        assertThat(row.expect().turns()).singleElement().satisfies(turn -> {
+            assertThat(turn.turn()).isEqualTo(2);
+            assertThat(turn.trajectory().toolsCalled()).containsExactly("get_weather");
+            assertThat(turn.answer().contains()).containsExactly("chuva");
+        });
+    }
+
+    @Test
+    @DisplayName("a row with no per-turn checks loads with an empty list, never null")
+    void aRowWithoutTurnChecksHasNone(@TempDir Path dir) throws Exception {
+        Files.writeString(dir.resolve("a.json"), "[" + row("a1") + "]");
+
+        assertThat(ScenarioDataset.load(dir).getFirst().expect().turns()).isEmpty();
+    }
+
     private static String row(String id) {
         return """
                 {"id":"%s","domains":["d"],"kind":"happy","source":"synthetic",

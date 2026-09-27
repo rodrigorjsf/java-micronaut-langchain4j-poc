@@ -213,6 +213,55 @@ class EvalReportRendererTest {
                 .contains("<span class=\"fail\">FAIL</span> grounded: (\\d+)\\s*mm&lt;: [31,7] appear in no captured tool result");
     }
 
+    @Test
+    @DisplayName("coverage per domain counts a scenario with two domains toward both")
+    void aCrossDomainScenarioCountsTowardBothDomains() {
+        var cross = new Scenario("dollar-and-weather", List.of("currency", "weather"), "cross-domain", "synthetic",
+                List.of("Qual a cotação do dólar e vai chover amanhã em São Paulo?"),
+                WEATHER.expect(), List.of("get_weather"), false, null);
+
+        var html = EvalReportRenderer.render(List.of(once(passing(WEATHER)), once(passing(cross))));
+
+        assertThat(summaryLine(html, "Coverage per domain"))
+                .contains("currency: 1 scenario")
+                .contains("weather: 2 scenarios");
+    }
+
+    @Test
+    @DisplayName("a multi-turn run shows every turn's message, trajectory and answer")
+    void showsEveryTurn() {
+        var scenario = new Scenario("weather-multi-turn-memory", List.of("weather"), "multi-turn", "synthetic",
+                List.of("Vai chover amanhã em São Paulo?", "De qual cidade eu perguntei?"),
+                new Scenario.Expectation(WEATHER.expect().trajectory(), null, List.of(
+                        new Scenario.TurnExpectation(2, null,
+                                new Scenario.AnswerExpectation(null, List.of("São Paulo"), null)))),
+                List.of("get_weather"), false, null);
+        var firstTools = new Trajectory("ANSWERED", List.of(), List.of(
+                new ToolCall("get_weather", "{\"latitude\":\"-23.55\"}", "{\"precipitation_sum\":[0.0,12.4]}")));
+        var secondTools = new Trajectory("ANSWERED", List.of(), List.of());
+        var run = new ScenarioResult(scenario, firstTools, "Você perguntou sobre <São Paulo>.",
+                List.of(new CheckResult("turn 2: contains: São Paulo", true, "found")),
+                Duration.ofMillis(900), 10, 5, Cost.NONE, false, List.of(
+                new ScenarioResult.TurnResult(1, "Vai chover amanhã em São Paulo?", "conv-1", firstTools,
+                        "Sim: 12,4 mm."),
+                new ScenarioResult.TurnResult(2, "De qual cidade eu perguntei?", "conv-1", secondTools,
+                        "Você perguntou sobre <São Paulo>.")));
+
+        var html = EvalReportRenderer.render(List.of(once(run)));
+
+        assertThat(html)
+                .contains("Turn 1 of 2")
+                .contains("Turn 2 of 2")
+                .contains("Sim: 12,4 mm.")
+                .contains("Você perguntou sobre &lt;São Paulo&gt;.")
+                .contains("De qual cidade eu perguntei?")
+                .contains("conv-1")
+                .contains("Expected at turn 2")
+                .contains("turn 2: contains: São Paulo");
+        assertThat(html.indexOf("Turn 1 of 2")).isLessThan(html.indexOf("Sim: 12,4 mm."));
+        assertThat(html.indexOf("Sim: 12,4 mm.")).isLessThan(html.indexOf("Turn 2 of 2"));
+    }
+
     /** The one summary row that starts with {@code label}, so an assertion cannot match elsewhere. */
     private static String summaryLine(String html, String label) {
         return html.lines()
