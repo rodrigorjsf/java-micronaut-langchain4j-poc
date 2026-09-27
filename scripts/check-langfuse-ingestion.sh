@@ -511,6 +511,9 @@ spans = [
         # from every generation this application exports.
         attr("gen_ai.usage.input_tokens", 3164, "intValue"),
         attr("gen_ai.usage.output_tokens", 406, "intValue"),
+        # The provider under the name the GenAI conventions require, in the LangChain4j
+        # spelling the application writes. It replaced gen_ai.system; asserted below.
+        attr("gen_ai.provider.name", "google_ai_gemini"),
     ]),
 
     # EVENT — a point in time with no duration of its own. Compaction is one.
@@ -637,6 +640,19 @@ if [[ "$GEN_AI_INPUT" == "3164" ]]; then
   ok "gen_ai.usage.* arrives and is filed unmapped, under metadata.attributes"
 else
   fail "gen_ai.usage.input_tokens read back as '$GEN_AI_INPUT', expected 3164 in the catch-all"
+fi
+
+# gen_ai.provider.name replaced gen_ai.system on the application's spans. Langfuse's source
+# maps neither for this instrumentation scope (gen_ai.system only for the Vercel AI SDK
+# scope, gen_ai.provider.name only to recognise the Microsoft Agent Framework), so the
+# rename should be invisible except for this one metadata key. Asserted, so a version that
+# starts mapping the provider — or typing on it — is noticed rather than inferred.
+PROVIDER=$(jq -r '.data[] | select(.name=="agent") | .metadata["attributes.gen_ai.provider.name"] // empty' <<<"$SHAPE_OBS" 2>/dev/null | head -1)
+PROVIDER_GEN_TYPE=$(jq -r '.data[] | select(.name=="agent") | .type // empty' <<<"$SHAPE_OBS" 2>/dev/null | head -1)
+if [[ "$PROVIDER" == "google_ai_gemini" && "$PROVIDER_GEN_TYPE" == "GENERATION" ]]; then
+  ok "gen_ai.provider.name arrives unmapped under metadata.attributes; the generation stays GENERATION"
+else
+  fail "gen_ai.provider.name read back as '$PROVIDER' on a '$PROVIDER_GEN_TYPE', expected google_ai_gemini on a GENERATION"
 fi
 
 REFUSED_OBS=""

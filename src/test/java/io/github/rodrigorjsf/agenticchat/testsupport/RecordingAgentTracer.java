@@ -141,7 +141,7 @@ public class RecordingAgentTracer implements AgentTracer {
         }
 
         @Override
-        public Observation genAi(String system, String operationName, String requestModel) {
+        public Observation genAi(String providerName, String operationName, String requestModel) {
             return this;
         }
 

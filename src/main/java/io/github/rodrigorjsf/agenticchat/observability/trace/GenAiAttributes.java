@@ -49,7 +49,16 @@ public final class GenAiAttributes {
     private GenAiAttributes() {
     }
 
-    public static final AttributeKey<String> SYSTEM = AttributeKey.stringKey("gen_ai.system");
+    /**
+     * Which provider served the call — the name the GenAI conventions REQUIRE on inference
+     * spans. It replaced {@code gen_ai.system}, which the registry now marks deprecated.
+     * Neither Langfuse 4.16.0 nor 3.80.0 maps either key for spans from this instrumentation
+     * scope (both are filed as unmapped metadata), so the rename costs Langfuse nothing and
+     * makes the spans agree with {@code GenAiMetrics}, which already used this name.
+     * Semantic conventions: open-telemetry/semantic-conventions-genai,
+     * {@code docs/gen-ai/gen-ai-spans.md}, status Development, read 2026-09-27.
+     */
+    public static final AttributeKey<String> PROVIDER_NAME = AttributeKey.stringKey("gen_ai.provider.name");
     public static final AttributeKey<String> OPERATION_NAME = AttributeKey.stringKey("gen_ai.operation.name");
     public static final AttributeKey<String> REQUEST_MODEL = AttributeKey.stringKey("gen_ai.request.model");
     public static final AttributeKey<String> RESPONSE_MODEL = AttributeKey.stringKey("gen_ai.response.model");

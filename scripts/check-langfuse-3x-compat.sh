@@ -143,6 +143,9 @@ spans = [
         attr("gen_ai.usage.input_tokens", 2140, "intValue"),
         attr("gen_ai.usage.output_tokens", 96, "intValue"),
         attr("gen_ai.request.model", "gemini-3.1-flash-lite"),
+        # The provider under the name the GenAI conventions require, which replaced
+        # gen_ai.system on the application's spans.
+        attr("gen_ai.provider.name", "google_ai_gemini"),
     ]),
     span("guardrail-in", "guardrail", parent="turn", name="input-guardrails"),
     span("guardrail-out", "guardrail", parent="turn", name="voice-compliance", extra=[
@@ -242,6 +245,9 @@ check '.data[] | select(.name=="voice-compliance") | .level' 'WARNING' "observat
 check '.data[] | select(.name=="voice-compliance") | .statusMessage // ""' 'reprompted' "status message survives"
 check '.data[] | select(.name=="chat-turn") | .environment' 'compat' "langfuse.environment survives"
 check '.data[] | select(.name=="agent") | .model // ""' 'gemini-3.1-flash-lite' "model name survives"
+# 3.80.0's OtelIngestionProcessor reads neither gen_ai.system nor gen_ai.provider.name, so
+# the provider should arrive only as unmapped metadata — the same place 4.x files it.
+check '.data[] | select(.name=="agent") | .metadata.attributes["gen_ai.provider.name"] // .metadata["attributes.gen_ai.provider.name"] // ""' 'google_ai_gemini' "gen_ai.provider.name survives as unmapped metadata"
 
 USAGE=$(jq -r '.data[] | select(.name=="agent") | .usageDetails | tostring' <<<"$OBS" 2>/dev/null)
 if [[ "$USAGE" == *"input_cached_tokens"* ]]; then

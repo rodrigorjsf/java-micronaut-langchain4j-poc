@@ -151,7 +151,7 @@ public class LangfuseEmbeddingModelListener implements EmbeddingModelListener {
 
     private void describe(Observation observation, EmbeddingModelRequestContext context) {
         observation.model(modelName, parametersOf(context.embeddingRequest()));
-        observation.genAi(systemOf(context.modelProvider()), GenAiAttributes.OPERATION_EMBEDDINGS, modelName);
+        observation.genAi(providerNameOf(context.modelProvider()), GenAiAttributes.OPERATION_EMBEDDINGS, modelName);
 
         List<TextSegment> segments = context.textSegments();
         observation.metadata(INPUTS, segments.size());
@@ -264,12 +264,12 @@ public class LangfuseEmbeddingModelListener implements EmbeddingModelListener {
     }
 
     /**
-     * {@code gen_ai.system} from LangChain4j's own provider enum, lower-cased — derived
+     * {@code gen_ai.provider.name} from LangChain4j's own provider enum, lower-cased — derived
      * rather than remembered, for the reason {@link LangfuseChatModelListener} gives. For
      * the in-process model this is {@code "other"}, which is what the enum says and is
      * therefore the true answer rather than a placeholder.
      */
-    private static String systemOf(ModelProvider provider) {
+    private static String providerNameOf(ModelProvider provider) {
         return provider == null ? null : provider.name().toLowerCase(Locale.ROOT);
     }
 }

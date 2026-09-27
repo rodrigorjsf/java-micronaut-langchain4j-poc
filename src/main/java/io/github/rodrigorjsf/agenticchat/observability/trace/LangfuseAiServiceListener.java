@@ -298,7 +298,7 @@ public class LangfuseAiServiceListener {
     }
 
     /**
-     * {@code gen_ai.system} in the spelling the GenAI conventions use — lower snake case,
+     * {@code gen_ai.provider.name} in the spelling the GenAI conventions use — lower snake case,
      * matching the {@code google_genai} this project already writes on generations.
      */
     private static String providerOf(InvocationContext invocation) {
