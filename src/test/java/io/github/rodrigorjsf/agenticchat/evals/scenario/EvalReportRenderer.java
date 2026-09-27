@@ -50,6 +50,13 @@ public final class EvalReportRenderer {
             white-space:pre-wrap;word-break:break-word;font-size:13px}
             """;
 
+    /**
+     * How the page qualifies every rubric verdict. Nothing has measured the Grader against human
+     * labels, so a reader must never take its verdict for a result of the suite.
+     */
+    private static final String UNCALIBRATED =
+            "Grader verdicts, uncalibrated: reported only, never counted toward a pass or the gate";
+
     private EvalReportRenderer() {
     }
 
@@ -81,6 +88,7 @@ public final class EvalReportRenderer {
         long inputTokens = repetitions.stream().mapToLong(ScenarioResult::inputTokens).sum();
         long outputTokens = repetitions.stream().mapToLong(ScenarioResult::outputTokens).sum();
         var cost = repetitions.stream().map(ScenarioResult::cost).reduce(Cost.NONE, Cost::plus);
+        var verdicts = repetitions.stream().flatMap(result -> result.rubric().stream()).toList();
         String gateFailures = scenarios.stream().filter(ScenarioRuns::failsGate)
                 .map(runs -> escape(runs.scenario().id())).collect(Collectors.joining(", "));
         String flaky = scenarios.stream().filter(runs -> runs.status() == Status.FLAKY)
@@ -99,9 +107,12 @@ public final class EvalReportRenderer {
                 .append(flaky.isEmpty() ? "none" : flaky).append("</li>\n")
                 .append("<li><strong>Skipped repetitions</strong> (rate limited, counted neither way): ")
                 .append(skipped).append("</li>\n")
+                .append("<li><strong>Rubric</strong> (").append(UNCALIBRATED).append("): ")
+                .append(rubricSummary(verdicts))
+                .append("</li>\n")
                 .append("<li><strong>Tokens</strong> (as <code>/api/chat</code> reported them) ").append(inputTokens).append(" in / ")
                 .append(outputTokens).append(" out</li>\n")
-                .append("<li><strong>Estimated cost</strong> (every model call the tracer saw, judge and sub-agents included) $")
+                .append("<li><strong>Estimated cost</strong> (every model call the tracer saw, judge, sub-agents and grader included) $")
                 .append(cost.usd().setScale(6, RoundingMode.HALF_UP).toPlainString())
                 .append(cost.unpricedCalls() == 0 ? "" : " (" + cost.unpricedCalls()
                         + " model calls unpriced, not included)")
@@ -163,6 +174,16 @@ public final class EvalReportRenderer {
         };
     }
 
+    private static String rubricSummary(List<RubricVerdict> verdicts) {
+        if (verdicts.isEmpty()) {
+            return "no criterion graded";
+        }
+        long passed = verdicts.stream().filter(v -> v.verdict() == RubricVerdict.Verdict.PASS).count();
+        long ungraded = verdicts.stream().filter(v -> v.verdict() == RubricVerdict.Verdict.UNGRADED).count();
+        return passed + " of " + verdicts.size() + " criterion verdicts passed"
+                + (ungraded == 0 ? "" : ", " + ungraded + " ungraded");
+    }
+
     private static void scenario(StringBuilder html, ScenarioRuns runs) {
         var scenario = runs.scenario();
         var status = runs.status();
@@ -196,6 +217,9 @@ public final class EvalReportRenderer {
             }
             row(html, "Expected at turn " + turn.turn(), parts.isEmpty() ? "nothing" : String.join("; ", parts));
         }
+        if (!scenario.expect().rubric().isEmpty()) {
+            row(html, "Rubric", "<p class=\"meta\">" + UNCALIBRATED + "</p>" + list(scenario.expect().rubric()));
+        }
         html.append("</table>\n");
         var repetitions = runs.repetitions();
         for (int i = 0; i < repetitions.size(); i++) {
@@ -222,6 +246,9 @@ public final class EvalReportRenderer {
             renderTurn(html, trajectory, result.answer());
         }
         row(html, "Checks", checks(result.checks()));
+        if (!result.rubric().isEmpty()) {
+            row(html, "Rubric (uncalibrated)", rubric(result.rubric()));
+        }
         row(html, "Latency", result.latency().toMillis() + " ms");
         row(html, "Tokens", result.inputTokens() + " in / " + result.outputTokens() + " out");
         html.append("</table>\n");
@@ -266,6 +293,15 @@ public final class EvalReportRenderer {
         return cell.append("</ul>").toString();
     }
 
+    private static String rubric(List<RubricVerdict> verdicts) {
+        var cell = new StringBuilder("<ul>");
+        for (RubricVerdict verdict : verdicts) {
+            cell.append("<li>").append(badge(verdict.verdict())).append(' ')
+                    .append(escape(verdict.criterion())).append(": ").append(escape(verdict.critique())).append("</li>");
+        }
+        return cell.append("</ul>").toString();
+    }
+
     private static String list(List<String> items) {
         var cell = new StringBuilder("<ol>");
         items.forEach(item -> cell.append("<li>").append(escape(item)).append("</li>"));
@@ -278,6 +314,14 @@ public final class EvalReportRenderer {
 
     private static String badge(boolean passed) {
         return passed ? "<span class=\"pass\">PASS</span>" : "<span class=\"fail\">FAIL</span>";
+    }
+
+    private static String badge(RubricVerdict.Verdict verdict) {
+        return switch (verdict) {
+            case PASS -> badge(true);
+            case FAIL -> badge(false);
+            case UNGRADED -> "<span class=\"skipped\">UNGRADED</span>";
+        };
     }
 
     private static String badge(Status status) {

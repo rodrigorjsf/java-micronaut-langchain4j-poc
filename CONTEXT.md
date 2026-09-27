@@ -144,7 +144,7 @@ stayed green.
 
 ### Models
 
-**Role** — how the code addresses a model: `judge`, `agent`. No class names a
+**Role** — how the code addresses a model: `judge`, `agent`, `grader`. No class names a
 model id; roles are resolved by `ChatModelRegistry` from configuration. This is
 what makes per-role cost and latency separately measurable, and what makes
 swapping a model a deployment decision.
@@ -211,8 +211,8 @@ captured during the same run. It is how a scenario asserts on live data whose va
 changes daily.
 
 **Grader** — the model that scores a scenario's rubric. Not the **Judge**, which
-triages turns. It is the last layer of checks and the only one that is itself a
-model.
+triages turns. It runs after every check and is the only layer that is itself a
+model; until it is calibrated its verdicts are reported, never counted as checks.
 
 ---
 

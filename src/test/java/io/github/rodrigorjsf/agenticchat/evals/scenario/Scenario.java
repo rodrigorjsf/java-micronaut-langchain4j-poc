@@ -62,16 +62,24 @@ public record Scenario(String id,
      *                   is the last turn's
      * @param answer     what the last turn's answer must satisfy; absent when the row asserts nothing on it
      * @param turns      checks aimed at one turn of a multi-turn row; empty when the row has none
+     * @param rubric     criteria the Grader scores, each pass or fail with a critique; reported only,
+     *                   never a check, because the Grader is uncalibrated. Empty when the row has none
      */
     public record Expectation(TrajectoryExpectation trajectory, AnswerExpectation answer,
-                              List<TurnExpectation> turns) {
+                              List<TurnExpectation> turns, List<String> rubric) {
 
         public Expectation {
             turns = turns == null ? List.of() : List.copyOf(turns);
+            rubric = rubric == null ? List.of() : List.copyOf(rubric);
         }
 
         public Expectation(TrajectoryExpectation trajectory, AnswerExpectation answer) {
             this(trajectory, answer, List.of());
+        }
+
+        public Expectation(TrajectoryExpectation trajectory, AnswerExpectation answer,
+                           List<TurnExpectation> turns) {
+            this(trajectory, answer, turns, List.of());
         }
     }
 

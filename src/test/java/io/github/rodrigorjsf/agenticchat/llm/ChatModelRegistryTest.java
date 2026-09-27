@@ -1,5 +1,6 @@
 package io.github.rodrigorjsf.agenticchat.llm;
 
+import io.github.rodrigorjsf.agenticchat.llm.config.ModelRoleValidator;
 import io.micronaut.context.ApplicationContext;
 import org.junit.jupiter.api.Test;
 
@@ -37,6 +38,34 @@ class ChatModelRegistryTest {
                     .isZero();
             assertThat(registry.configFor("judge").timeout())
                     .isLessThanOrEqualTo(registry.configFor("agent").timeout());
+        }
+    }
+
+    @Test
+    void theShippedGraderIsAModelOtherThanTheAgent() {
+        try (var ctx = ApplicationContext.run(CREDENTIALS)) {
+            var registry = ctx.getBean(ChatModelRegistry.class);
+
+            assertThat(registry.forRole("grader")).isNotNull();
+            assertThat(registry.configFor("grader").modelName())
+                    .as("a model grading its own answers is the self-preference bias the grader role exists to avoid")
+                    .isNotEqualTo(registry.configFor("agent").modelName());
+        }
+    }
+
+    @Test
+    void aGraderConfiguredToTheAgentsModelFailsAtStartup() {
+        try (var ctx = ApplicationContext.run(with(Map.of(
+                "agentic.llm.models.grader.provider", "GOOGLE",
+                "agentic.llm.models.grader.model-name", "gemini-3.1-flash-lite",
+                "agentic.llm.models.grader.thinking-level", "low")))) {
+
+            assertThatThrownBy(() -> ctx.getBean(ChatModelRegistry.class))
+                    .rootCause()
+                    .isInstanceOf(ModelRoleValidator.InvalidModelConfigurationException.class)
+                    .hasMessageContaining("agentic.llm.models.grader")
+                    .hasMessageContaining("agent")
+                    .hasMessageContaining("gemini-3.1-flash-lite");
         }
     }
 

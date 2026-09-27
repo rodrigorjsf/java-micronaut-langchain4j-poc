@@ -20,6 +20,9 @@ import java.util.List;
  *                     it is neither a pass nor a failure
  * @param turns        each turn that completed, in order; {@code trajectory} and {@code answer} are
  *                     the whole scenario seen at once
+ * @param rubric       the Grader's verdict on each rubric criterion. Deliberately not among
+ *                     {@code checks}: the Grader is uncalibrated, so its verdicts are reported and
+ *                     never decide {@link #passed()}
  */
 public record ScenarioResult(Scenario scenario,
                              Trajectory trajectory,
@@ -30,16 +33,31 @@ public record ScenarioResult(Scenario scenario,
                              long outputTokens,
                              Cost cost,
                              boolean skipped,
-                             List<TurnResult> turns) {
+                             List<TurnResult> turns,
+                             List<RubricVerdict> rubric) {
 
     public ScenarioResult {
         checks = List.copyOf(checks);
         turns = turns == null ? List.of() : List.copyOf(turns);
+        rubric = rubric == null ? List.of() : List.copyOf(rubric);
     }
 
     public ScenarioResult(Scenario scenario, Trajectory trajectory, String answer, List<CheckResult> checks,
                           Duration latency, long inputTokens, long outputTokens, Cost cost) {
         this(scenario, trajectory, answer, checks, latency, inputTokens, outputTokens, cost, false, List.of());
+    }
+
+    public ScenarioResult(Scenario scenario, Trajectory trajectory, String answer, List<CheckResult> checks,
+                          Duration latency, long inputTokens, long outputTokens, Cost cost, boolean skipped,
+                          List<TurnResult> turns) {
+        this(scenario, trajectory, answer, checks, latency, inputTokens, outputTokens, cost, skipped, turns,
+                List.of());
+    }
+
+    /** The same repetition with the Grader's verdicts attached, and the cost of grading added. */
+    public ScenarioResult withRubric(List<RubricVerdict> verdicts, Cost cost) {
+        return new ScenarioResult(scenario, trajectory, answer, checks, latency, inputTokens, outputTokens,
+                cost, skipped, turns, verdicts);
     }
 
     /**

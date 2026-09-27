@@ -124,14 +124,16 @@ Each scenario is one row in a JSON file per scenario domain under
 and one upstream failure of each shape.
 A row says what the user types (`turns`) and what must be true afterwards:
 `expect.trajectory` (the final `outcome`, and the tools that must have run) and,
-optionally, `expect.answer` (what the answer itself must satisfy):
+optionally, `expect.answer` (what the answer itself must satisfy) and `expect.rubric`
+(criteria a model grades, see below):
 
 ```json
 {"id": "weather-happy-forecast-tomorrow", "domains": ["weather"], "kind": "happy",
  "source": "synthetic", "turns": ["Vai chover amanhã em São Paulo?"],
  "expect": {"trajectory": {"outcome": "ANSWERED", "toolsCalled": ["get_weather"]},
             "answer": {"language": "pt-BR",
-                       "grounded": ["(-?\\d+(?:[.,]\\d+)?)\\s*(?:mm|milímetros|°C|ºC|°|graus|%)"]}},
+                       "grounded": ["(-?\\d+(?:[.,]\\d+)?)\\s*(?:mm|milímetros|°C|ºC|°|graus|%)"]},
+            "rubric": ["The answer tells the user directly whether rain is expected ..."]},
  "dependsOn": ["geo-and-weather", "get_weather", "open-meteo-forecast"],
  "critical": true}
 ```
@@ -147,7 +149,37 @@ reason in the report:
 | 2 | answer | `language` | the answer reads as the expected tag, measured by the same stopword ratio triage uses (`pt-BR` or `en` only; a non-English answer reads as `pt-BR`, see #48) |
 | 2 | answer | `contains: <text>` | the answer contains the text, case-insensitively |
 | 2 | answer | `grounded: <regex>` | the regex finds at least one value in the answer, and **every** value it finds appears in a tool result captured during the same run |
-| 3 | rubric | — | not built yet; it will run after these and never gate |
+| 3 | rubric | one verdict per criterion | **never gates.** The **Grader** marks each criterion PASS or FAIL with a one-sentence critique; the report shows it labelled uncalibrated, and it never counts toward a scenario's pass or the critical gate |
+
+**The rubric, and why it never gates.** Tone, a polite refusal or a complete answer
+are not things a regex can check, so a row may list plain-language criteria in
+`expect.rubric`. After every deterministic check, `RubricGrader` sends each criterion
+— one call per criterion, so each verdict is about one thing — with the user's turns
+and the final answer to the `grader` model role, and reads back
+`{"pass": true|false, "critique": "..."}`.
+
+| Situation | What the report shows | Effect on the scenario |
+|---|---|---|
+| Grader says the criterion holds | `PASS` + critique | none |
+| Grader says it does not | `FAIL` + critique | none: the scenario can still pass, and a critical one does not trip the gate |
+| Grader errors, or answers something that is not a verdict | `UNGRADED` + the reason | none |
+
+Two rules keep that honest:
+
+- **The Grader is not the agent.** `grader` is a model role in the same registry as
+  `judge` and `agent` (`agentic.llm.models.grader`, shipped as OpenAI `gpt-4o-mini`
+  while the agent is Gemini). A model grading its own answers favours them, so
+  `ChatModelRegistry` refuses to build when `grader` and `agent` name the same
+  provider and model, so the eval fails before its first scenario with a message
+  naming both. The application never calls the grader; the eval resolves it from the
+  registry like any other role. (The registry is built on first use, not when the
+  server starts — see #51.)
+- **Uncalibrated means report-only.** Nobody has measured this Grader against human
+  labels yet, so its verdict is an opinion, not a measurement. Until a calibration set
+  exists (TPR and TNR per criterion, see the `agentic-evals` skill; tracked in #33), a failing rubric
+  can never fail the eval. `ScenarioRunnerTest` proves it in the ordinary build: a
+  scripted grader fails the committed critical row's rubric, and the row still passes
+  and the gate stays green.
 
 **Grounding, by example.** The row cannot say "12.4 mm" — tomorrow's rainfall
 changes daily. So it says *where* a value sits in the answer, and the check looks
@@ -176,14 +208,18 @@ flowchart LR
     app -- "outcome, reply, tokens" --> checks
     checks --> answer[answer checks: links, language, content, grounding]
     tracer -- "tool results" --> answer
-    answer --> html[eval-report.html]
+    answer --> rubric[rubric: grader role, report-only]
+    rubric -. "verdicts, uncalibrated, never gate" .-> html[eval-report.html]
+    answer -- "checks that gate" --> html
     classDef input fill:#2d6cdf,stroke:#9ec1ff,color:#ffffff
     classDef seam fill:#b86e00,stroke:#ffc870,color:#ffffff
     classDef step fill:#5a6275,stroke:#aab3c5,color:#ffffff
+    classDef soft fill:#7a4fa3,stroke:#d2b3f0,color:#ffffff
     classDef out fill:#1f7a3f,stroke:#8fd9a8,color:#ffffff
     class row input
     class app,tracer seam
     class runner,tools,checks,answer step
+    class rubric soft
     class html out
     linkStyle default stroke:#8892b0
 ```
