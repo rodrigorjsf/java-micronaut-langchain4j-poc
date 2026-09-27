@@ -150,11 +150,11 @@ public final class ScenarioRunner {
                 .filter(Objects::nonNull)
                 .reduce((first, second) -> second);
         if (lastError.isPresent() && FailoverTriageJudge.isRateLimit(lastError.get())) {
-            return ScenarioResult.skipped(scenario, "SKIPPED: the provider rate-limited the turn ("
-                    + lastError.get().getMessage() + ")", latency, Cost.of(tracer.recorded()));
+            return ScenarioResult.skipped(scenario, "SKIPPED: the provider rate-limited turn " + (completed.size() + 1)
+                    + " (" + lastError.get().getMessage() + ")", latency, Cost.of(tracer.recorded()), completed);
         }
-        var check = new CheckResult("request", false,
-                "POST /api/chat answered HTTP " + response.statusCode() + ": " + response.body());
+        var check = new CheckResult("request", false, "turn " + (completed.size() + 1)
+                + ": POST /api/chat answered HTTP " + response.statusCode() + ": " + response.body());
         return new ScenarioResult(scenario, trajectory(null, tracer.recorded()), null, List.of(check),
                 latency, 0, 0, Cost.of(tracer.recorded()), false, completed);
     }

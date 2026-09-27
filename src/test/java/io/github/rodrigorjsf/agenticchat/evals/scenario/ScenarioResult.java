@@ -47,13 +47,17 @@ public record ScenarioResult(Scenario scenario,
      * as a regression.
      */
     public static ScenarioResult skipped(Scenario scenario, String reason, Duration latency) {
-        return skipped(scenario, reason, latency, Cost.NONE);
+        return skipped(scenario, reason, latency, Cost.NONE, List.of());
     }
 
-    /** @param cost what the calls made before the quota error cost — they are billed all the same */
-    public static ScenarioResult skipped(Scenario scenario, String reason, Duration latency, Cost cost) {
+    /**
+     * @param cost      what the calls made before the quota error cost — they are billed all the same
+     * @param completed the turns that finished before the quota error, kept for the report
+     */
+    public static ScenarioResult skipped(Scenario scenario, String reason, Duration latency, Cost cost,
+                                         List<TurnResult> completed) {
         return new ScenarioResult(scenario, new Trajectory(null, List.of(), List.of()), null,
-                List.of(new CheckResult("rate limit", false, reason)), latency, 0, 0, cost, true, List.of());
+                List.of(new CheckResult("rate limit", false, reason)), latency, 0, 0, cost, true, completed);
     }
 
     public boolean passed() {

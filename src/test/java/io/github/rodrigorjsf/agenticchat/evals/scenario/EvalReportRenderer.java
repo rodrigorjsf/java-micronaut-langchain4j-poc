@@ -159,16 +159,16 @@ public final class EvalReportRenderer {
                 .append(result.skipped() ? badge(Status.SKIPPED) : badge(result.passed()))
                 .append("</h3>\n<table>\n");
         var turns = result.turns();
-        if (turns.size() > 1) {
+        if (result.scenario().turns().size() > 1) {
             for (var turn : turns) {
                 html.append("<tr><th colspan=\"2\">Turn ").append(turn.number()).append(" of ")
                         .append(result.scenario().turns().size()).append("</th></tr>\n");
                 row(html, "Message", escape(turn.message()));
                 row(html, "Conversation", escape(turn.conversationId()));
-                turn(html, turn.trajectory(), turn.answer());
+                renderTurn(html, turn.trajectory(), turn.answer());
             }
         } else {
-            turn(html, trajectory, result.answer());
+            renderTurn(html, trajectory, result.answer());
         }
         row(html, "Checks", checks(result.checks()));
         row(html, "Latency", result.latency().toMillis() + " ms");
@@ -176,7 +176,7 @@ public final class EvalReportRenderer {
         html.append("</table>\n");
     }
 
-    private static void turn(StringBuilder html, Trajectory trajectory, String answer) {
+    private static void renderTurn(StringBuilder html, Trajectory trajectory, String answer) {
         row(html, "Outcome", escape(trajectory.outcome()));
         row(html, "Activations", escape(String.join(", ", trajectory.activations())));
         row(html, "Tool calls", toolCalls(trajectory.toolCalls()));

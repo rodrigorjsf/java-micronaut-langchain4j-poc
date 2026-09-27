@@ -262,6 +262,23 @@ class EvalReportRendererTest {
         assertThat(html.indexOf("Sim: 12,4 mm.")).isLessThan(html.indexOf("Turn 2 of 2"));
     }
 
+    @Test
+    @DisplayName("a multi-turn run that stopped after turn 1 still shows turn 1 in the per-turn layout")
+    void showsTheTurnsOfAnInterruptedRun() {
+        var scenario = new Scenario("weather-multi-turn-memory", List.of("weather"), "multi-turn", "synthetic",
+                List.of("Vai chover amanhã em São Paulo?", "De qual cidade eu perguntei?"),
+                WEATHER.expect(), List.of("get_weather"), false, null);
+        var first = new Trajectory("ANSWERED", List.of(), List.of());
+        var run = new ScenarioResult(scenario, first, null,
+                List.of(new CheckResult("request", false, "turn 2: POST /api/chat answered HTTP 500")),
+                Duration.ofMillis(900), 0, 0, Cost.NONE, false, List.of(
+                new ScenarioResult.TurnResult(1, "Vai chover amanhã em São Paulo?", "conv-1", first, "Sim.")));
+
+        var html = EvalReportRenderer.render(List.of(once(run)));
+
+        assertThat(html).contains("Turn 1 of 2").contains("<pre>Sim.</pre>");
+    }
+
     /** The one summary row that starts with {@code label}, so an assertion cannot match elsewhere. */
     private static String summaryLine(String html, String label) {
         return html.lines()

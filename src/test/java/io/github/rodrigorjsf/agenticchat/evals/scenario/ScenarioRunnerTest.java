@@ -323,6 +323,42 @@ class ScenarioRunnerTest {
         assertThat(result.passed()).isFalse();
     }
 
+    @Test
+    @DisplayName("a rate limit on turn 2 is SKIPPED and keeps turn 1 for the report")
+    void aRateLimitMidConversationKeepsTheCompletedTurns() {
+        models.model("judge").fallbackTo(IN_SCOPE);
+        var agent = models.model("agent");
+        agent.replyWith("Sim, amanhã deve chover em São Paulo.");
+        agent.reply(request -> {
+            throw new IllegalStateException("429 RESOURCE_EXHAUSTED: quota exceeded for this model");
+        });
+
+        var result = runner.run(twoTurns(null));
+
+        assertThat(result.skipped()).isTrue();
+        assertThat(result.turns()).singleElement()
+                .satisfies(turn -> assertThat(turn.answer()).isEqualTo("Sim, amanhã deve chover em São Paulo."));
+    }
+
+    @Test
+    @DisplayName("a server error on turn 2 fails the run and keeps turn 1 for the report")
+    void aFailureMidConversationKeepsTheCompletedTurns() {
+        models.model("judge").fallbackTo(IN_SCOPE);
+        var agent = models.model("agent");
+        agent.replyWith("Sim, amanhã deve chover em São Paulo.");
+        agent.reply(request -> {
+            throw new IllegalStateException("missing thought_signature");
+        });
+
+        var result = runner.run(twoTurns(null));
+
+        assertThat(result.passed()).isFalse();
+        assertThat(result.checks()).singleElement()
+                .satisfies(check -> assertThat(check.reason()).contains("turn 2").contains("HTTP 500"));
+        assertThat(result.turns()).singleElement()
+                .satisfies(turn -> assertThat(turn.answer()).isEqualTo("Sim, amanhã deve chover em São Paulo."));
+    }
+
     private Scenario twoTurns(List<Scenario.TurnExpectation> perTurn) {
         return new Scenario("weather-multi-turn-memory", List.of("weather"), "multi-turn", "synthetic",
                 List.of("Vai chover amanhã em São Paulo?", "De qual cidade eu perguntei?"),

@@ -167,7 +167,8 @@ skill body is instructions, not data about the world.
 ```mermaid
 flowchart LR
     row[scenario row] --> runner[ScenarioRunner]
-    runner -- "POST /api/chat" --> app[embedded app]
+    runner -- "POST /api/chat, once per turn" --> app[embedded app]
+    app -- "conversationId, sent back on the next turn" --> runner
     app --> tools[tool listener]
     tools --> tracer[RecordingAgentTracer]
     tracer -- "tool calls: name, arguments, result" --> checks[trajectory checks]
@@ -254,7 +255,11 @@ under `expect.turns`:
 
 Turns are 1-based. In the report, a multi-turn repetition lists every turn in order
 — message, conversation id, outcome, activations, tool calls, answer — before the
-checks; a single-turn repetition keeps the flat layout. `ScenarioRunnerTest` proves
+checks; a single-turn repetition keeps the flat layout. A run that stops partway —
+HTTP 500 or a rate limit on turn 2 — keeps the turns that finished, and its failed
+check names the turn it stopped at. Each turn's trajectory is the slice of observations
+recorded between that turn's request and its response, which holds because the tool
+listener records synchronously, inside the request. `ScenarioRunnerTest` proves
 both behaviours with a scripted model: the second request carries the first turn,
 both turns share one conversation id, and each turn keeps only its own tool calls.
 
