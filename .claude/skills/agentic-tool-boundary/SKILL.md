@@ -59,12 +59,17 @@ for any server-side client that fetches on a model's behalf.
 
 So the door owns the redirects:
 
-1. **Turn automatic following off** in the client. Most follow by default —
-   Micronaut's did, in this repository, until `follow-redirects: false`.
-2. **Follow each hop yourself**, and only to a host a catalogue entry names
-   **exactly**. Exact host, not registrable domain: a link is read by a person,
-   a request is made by your process, and a sibling subdomain of a catalogued
-   API is a host nobody reviewed.
+1. **Turn automatic following off** in the tool door's own client — not the
+   shared one, where the same switch silently changes every other caller. Most
+   clients follow by default; Micronaut's followed a `302` to an off-catalogue
+   host in this repository's red test until its tool client set
+   `follow-redirects: false` [sourced — `ToolHttpClientTest`, run in a ticket
+   session rather than the main thread].
+2. **Follow each hop yourself**, and only to a host **and port** a catalogue
+   entry names **exactly**. Exact host, not registrable domain: a link is read
+   by a person, a request is made by your process, and a sibling subdomain of a
+   catalogued API is a host nobody reviewed. The port matters for the same
+   reason: `localhost:6379` is not the service the catalogue reviewed.
 3. **Never downgrade** `https` to `http`, and **cap the hops** (three is
    plenty; a longer chain is a loop or someone shopping for a host).
 4. **Share one deadline** across the hops, so a chain cannot multiply the
