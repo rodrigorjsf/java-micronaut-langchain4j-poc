@@ -33,6 +33,7 @@ public final class EvalReportRenderer {
             h1{font-size:1.5rem;margin:0 0 4px}
             .summary{color:var(--muted);margin:0 0 24px;padding-left:20px}
             .summary strong{color:var(--fg)}
+            h2{font-size:1.15rem;margin:24px 0 8px}
             h3{font-size:1rem;margin:16px 0 4px}
             details{background:var(--card);border:1px solid var(--line);border-radius:8px;\
             margin:0 0 12px;padding:12px 16px}
@@ -49,13 +50,20 @@ public final class EvalReportRenderer {
     private EvalReportRenderer() {
     }
 
-    public static String render(List<ScenarioRuns> scenarios) {
+    /**
+     * @param scenarios the runs of the selected rows
+     * @param coverage  what the whole dataset covers, whichever rows were selected
+     * @param selection what the run was narrowed to
+     */
+    public static String render(List<ScenarioRuns> scenarios, ScenarioCoverage coverage, ScenarioSelection selection) {
         var html = new StringBuilder(8_192)
                 .append("<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n")
                 .append("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n")
                 .append("<title>Scenario eval report</title>\n<style>\n").append(STYLE).append("</style>\n")
                 .append("</head>\n<body>\n<main>\n<h1>Scenario eval report</h1>\n");
-        summary(html, scenarios);
+        summary(html, scenarios, selection);
+        coverage(html, coverage);
+        html.append("<h2>Scenarios</h2>\n");
         for (ScenarioRuns runs : scenarios) {
             scenario(html, runs);
         }
@@ -63,7 +71,7 @@ public final class EvalReportRenderer {
     }
 
     /** One line per fact, each opening with its label, so the page reads at a glance. */
-    private static void summary(StringBuilder html, List<ScenarioRuns> scenarios) {
+    private static void summary(StringBuilder html, List<ScenarioRuns> scenarios, ScenarioSelection selection) {
         long passed = scenarios.stream().filter(runs -> runs.status() == Status.PASSED).count();
         var repetitions = scenarios.stream().flatMap(runs -> runs.repetitions().stream()).toList();
         long skipped = repetitions.stream().filter(ScenarioResult::skipped).count();
@@ -77,6 +85,7 @@ public final class EvalReportRenderer {
                 .collect(Collectors.joining(", "));
 
         html.append("<ul class=\"summary\">\n")
+                .append("<li><strong>Selection</strong> ").append(escape(selection.describe())).append("</li>\n")
                 .append("<li><strong>").append(passed).append(" of ").append(scenarios.size())
                 .append(" scenarios passed</strong> every repetition that ran</li>\n")
                 .append("<li><strong>Gate failures</strong> (critical, any repetition failed): ")
@@ -92,6 +101,48 @@ public final class EvalReportRenderer {
                 .append(cost.unpricedCalls() == 0 ? "" : " (" + cost.unpricedCalls()
                         + " model calls unpriced, not included)")
                 .append("</li>\n</ul>\n");
+    }
+
+    /** Over the whole dataset: a narrowed run still shows what the dataset is missing. */
+    private static void coverage(StringBuilder html, ScenarioCoverage coverage) {
+        html.append("<h2>Coverage per domain</h2>\n<table>\n<tr><th>Domain</th><th>Rows</th><th>Happy</th>")
+                .append("<th>Bad</th><th>Multi-turn</th><th>Holds state</th><th>Floor</th></tr>\n");
+        for (var domain : coverage.domains()) {
+            html.append("<tr><td>").append(escape(domain.domain())).append("</td><td>").append(domain.rows())
+                    .append("</td><td>").append(domain.happy()).append("</td><td>").append(domain.bad())
+                    .append("</td><td>").append(domain.multiTurn()).append("</td><td>")
+                    .append(domain.stateful() ? "yes" : "no").append("</td><td>")
+                    .append(domain.gaps().isEmpty()
+                            ? "<span class=\"pass\">meets the floor</span>"
+                            : "<span class=\"fail\">below the floor</span>: "
+                              + escape(String.join("; ", domain.gaps())))
+                    .append("</td></tr>\n");
+        }
+        html.append("</table>\n<h2>Uncovered artifacts</h2>\n");
+        if (coverage.uncovered().isEmpty()) {
+            html.append("<p>none: every artifact is named by at least one scenario</p>\n");
+        } else {
+            html.append("<ul>\n");
+            coverage.uncovered().forEach(artifact -> html.append("<li>").append(kind(artifact.kind()))
+                    .append(" <code>").append(escape(artifact.id())).append("</code></li>\n"));
+            html.append("</ul>\n");
+        }
+        if (!coverage.unknownDependencies().isEmpty()) {
+            html.append("<h2>Unknown dependencies</h2>\n<ul>\n");
+            coverage.unknownDependencies().forEach(entry ->
+                    html.append("<li>").append(escape(entry)).append("</li>\n"));
+            html.append("</ul>\n");
+        }
+    }
+
+    private static String kind(ArtifactInventory.Kind kind) {
+        return switch (kind) {
+            case SKILL -> "skill";
+            case TOOL -> "tool";
+            case SYSTEM_PROMPT_SECTION -> "system-prompt section";
+            case CATALOGUE_KEY -> "catalogue key";
+            case SUB_AGENT -> "sub-agent";
+        };
     }
 
     private static void scenario(StringBuilder html, ScenarioRuns runs) {

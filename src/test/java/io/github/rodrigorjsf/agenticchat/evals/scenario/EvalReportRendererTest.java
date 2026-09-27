@@ -63,7 +63,7 @@ class EvalReportRendererTest {
     @Test
     @DisplayName("every field of a scenario run appears in the report")
     void rendersEveryFieldOfARun() {
-        var html = EvalReportRenderer.render(List.of(once(result("Vai chover 12,4 mm amanhã.", List.of(
+        var html = render(List.of(once(result("Vai chover 12,4 mm amanhã.", List.of(
                 new CheckResult("outcome", true, "outcome ANSWERED"),
                 new CheckResult("tool called: get_weather", false, "expected get_weather to be called; called []"))))));
 
@@ -94,7 +94,7 @@ class EvalReportRendererTest {
                 ScenarioResult.skipped(WEATHER, "SKIPPED: the provider rate-limited the turn (RESOURCE_EXHAUSTED)",
                         Duration.ofMillis(40))));
 
-        var html = EvalReportRenderer.render(List.of(runs));
+        var html = render(List.of(runs));
 
         assertThat(html)
                 .contains("Repetition 1 of 3")
@@ -113,7 +113,7 @@ class EvalReportRendererTest {
         var criticalFlaky = scenario("critical-two-of-three", true);
         var reportedFlaky = scenario("reported-two-of-three", false);
 
-        var html = EvalReportRenderer.render(List.of(
+        var html = render(List.of(
                 new ScenarioRuns(passed, List.of(passing(passed), passing(passed), passing(passed))),
                 new ScenarioRuns(criticalFlaky, List.of(passing(criticalFlaky), failing(criticalFlaky),
                         passing(criticalFlaky))),
@@ -131,7 +131,7 @@ class EvalReportRendererTest {
     @Test
     @DisplayName("the summary totals tokens and estimated cost across every repetition")
     void totalsTokensAndCost() {
-        var html = EvalReportRenderer.render(List.of(
+        var html = render(List.of(
                 new ScenarioRuns(WEATHER, List.of(passing(WEATHER), passing(WEATHER))),
                 new ScenarioRuns(WEATHER, List.of(new ScenarioResult(WEATHER,
                         new Trajectory("ANSWERED", List.of(), List.of()), "ok",
@@ -145,7 +145,7 @@ class EvalReportRendererTest {
     @Test
     @DisplayName("model text is escaped, so an answer can never become markup in the report")
     void escapesModelText() {
-        var html = EvalReportRenderer.render(List.of(once(result(
+        var html = render(List.of(once(result(
                 "<script>alert('x')</script> & <img src=x onerror=alert(1)>",
                 List.of(new CheckResult("outcome", true, "outcome ANSWERED"))))));
 
@@ -166,7 +166,7 @@ class EvalReportRendererTest {
         var fakedRun = new ScenarioResult(faked, new Trajectory("ANSWERED", List.of(), List.of()), "indisponível",
                 List.of(new CheckResult("outcome", true, "outcome ANSWERED")), Duration.ofMillis(10), 1, 1, ScenarioResult.Cost.NONE);
 
-        var html = EvalReportRenderer.render(List.of(once(fakedRun), once(result("ok",
+        var html = render(List.of(once(fakedRun), once(result("ok",
                 List.of(new CheckResult("outcome", true, "outcome ANSWERED"))))));
 
         assertThat(html)
@@ -177,7 +177,7 @@ class EvalReportRendererTest {
     @Test
     @DisplayName("the report is self-contained: it makes no request when opened")
     void makesNoExternalRequest() {
-        var html = EvalReportRenderer.render(List.of(once(result("ok",
+        var html = render(List.of(once(result("ok",
                 List.of(new CheckResult("outcome", true, "outcome ANSWERED"))))));
 
         assertThat(html)
@@ -201,7 +201,7 @@ class EvalReportRendererTest {
                 new CheckResult("no link outside the catalogue", true, "the answer carries no link"),
                 new CheckResult("grounded: (\\d+)\\s*mm<", false, "[31,7] appear in no captured tool result")));
 
-        var html = EvalReportRenderer.render(List.of(once(new ScenarioResult(scenario, run.trajectory(), run.answer(),
+        var html = render(List.of(once(new ScenarioResult(scenario, run.trajectory(), run.answer(),
                 run.checks(), run.latency(), run.inputTokens(), run.outputTokens(), run.cost()))));
 
         assertThat(html)
@@ -211,6 +211,71 @@ class EvalReportRendererTest {
                 .contains("grounded [(\\d+)\\s*mm&lt;]")
                 .contains("<span class=\"pass\">PASS</span> no link outside the catalogue: the answer carries no link")
                 .contains("<span class=\"fail\">FAIL</span> grounded: (\\d+)\\s*mm&lt;: [31,7] appear in no captured tool result");
+    }
+
+    @Test
+    @DisplayName("the report lists coverage per domain with each shortfall of the floor")
+    void rendersCoveragePerDomain() {
+        var coverage = new ScenarioCoverage(List.of(
+                new ScenarioCoverage.DomainCoverage("weather", 4, 1, 3, 0, true,
+                        List.of("1 happy path of the 2 required", "no multi-turn scenario, and the domain holds state")),
+                new ScenarioCoverage.DomainCoverage("cnpj<b>", 5, 2, 3, 0, false, List.of())),
+                List.of(), List.of());
+
+        var html = EvalReportRenderer.render(List.of(once(passing(WEATHER))), coverage, EVERYTHING);
+
+        assertThat(html)
+                .contains("<h2>Coverage per domain</h2>")
+                .contains("<tr><td>weather</td><td>4</td><td>1</td><td>3</td><td>0</td><td>yes</td>"
+                        + "<td><span class=\"fail\">below the floor</span>: 1 happy path of the 2 required; "
+                        + "no multi-turn scenario, and the domain holds state</td></tr>")
+                .contains("<tr><td>cnpj&lt;b&gt;</td><td>5</td><td>2</td><td>3</td><td>0</td><td>no</td>"
+                        + "<td><span class=\"pass\">meets the floor</span></td></tr>");
+    }
+
+    @Test
+    @DisplayName("the report lists every artifact no scenario depends on, and every dependsOn that names nothing")
+    void rendersUncoveredArtifacts() {
+        var coverage = new ScenarioCoverage(List.of(), List.of(
+                new ArtifactInventory.Artifact(ArtifactInventory.Kind.TOOL, "lookup_company_by_cnpj"),
+                new ArtifactInventory.Artifact(ArtifactInventory.Kind.SUB_AGENT, "weather_reporter")),
+                List.of("w9 depends on 'get_wether'"));
+
+        var html = EvalReportRenderer.render(List.of(), coverage, EVERYTHING);
+
+        assertThat(html)
+                .contains("<h2>Uncovered artifacts</h2>")
+                .contains("<li>tool <code>lookup_company_by_cnpj</code></li>")
+                .contains("<li>sub-agent <code>weather_reporter</code></li>")
+                .contains("<h2>Unknown dependencies</h2>")
+                .contains("<li>w9 depends on &#39;get_wether&#39;</li>");
+    }
+
+    @Test
+    @DisplayName("with every artifact covered and every dependency known, the report says so")
+    void rendersFullCoverage() {
+        var html = EvalReportRenderer.render(List.of(), new ScenarioCoverage(List.of(), List.of(), List.of()), EVERYTHING);
+
+        assertThat(html)
+                .contains("<p>none: every artifact is named by at least one scenario</p>")
+                .doesNotContain("Unknown dependencies");
+    }
+
+    @Test
+    @DisplayName("the summary names what the run was narrowed to")
+    void rendersTheSelection() {
+        var selection = new ScenarioSelection("weather", null, "main", java.util.Set.of("get_weather"));
+
+        var html = EvalReportRenderer.render(List.of(), new ScenarioCoverage(List.of(), List.of(), List.of()), selection);
+
+        assertThat(summaryLine(html, "Selection"))
+                .contains("domain weather; depends on an artifact changed since main: [get_weather]");
+    }
+
+    private static final ScenarioSelection EVERYTHING = new ScenarioSelection(null, null, null, java.util.Set.of());
+
+    private static String render(List<ScenarioRuns> runs) {
+        return EvalReportRenderer.render(runs, new ScenarioCoverage(List.of(), List.of(), List.of()), EVERYTHING);
     }
 
     /** The one summary row that starts with {@code label}, so an assertion cannot match elsewhere. */
