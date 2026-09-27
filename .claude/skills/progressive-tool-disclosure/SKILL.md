@@ -39,8 +39,8 @@ of any framework's search:
 | Measured | Without search | With search |
 |---|---|---|
 | Context used before any work (50+ MCP tools) | ~77K tokens | ~8.7K tokens (an 85% reduction) |
-| Tool selection accuracy, Opus 4 | 49% | 74% |
-| Tool selection accuracy, Opus 4.5 | 79.5% | 88.1% |
+| Accuracy on MCP evaluations, Opus 4 | 49% | 74% |
+| Accuracy on MCP evaluations, Opus 4.5 | 79.5% | 88.1% |
 
 Treat ten as the point where disclosure starts to pay, not as a hard rule. A
 set of nine tools with very long schemas can cross the 10K-token line first.
@@ -98,8 +98,8 @@ The tutorial states the partition: "Skill-scoped tools are never searchable",
 "Regular tools remain searchable", and "`activate_skill` is always visible"
 [sourced — docs.langchain4j.dev/tutorials/skills, *Using Skills with Tool
 Search*, read 2026-09-27]. The code explains why it holds, in two cases
-[verified — javap on langchain4j-skills 1.18.1-beta28 and langchain4j 1.18.1;
-sourced — the same code at tag 1.20.1]:
+[sourced — `Skills` and `ToolService` read in the langchain4j-skills
+1.18.1-beta28 and langchain4j 1.18.1 jars, and again at tag 1.20.1, read 2026-09-27]:
 
 - **At least one skill has tools.** `Skills.toolProvider()` is then a *dynamic*
   provider (`isDynamic()` returns true). `ToolService.createContext` runs the
@@ -135,9 +135,9 @@ hope that search will also find it never appears in a search result, and
 nothing reports that. If a tool has to be findable by search, keep it out of
 every skill.
 
-Deciding which tools stay searchable is where this page stops. Actually rolling it out — the census that
-records how each tool reaches the model, keyword against semantic, the rewrites
-that make descriptions retrievable, per-caller scope and the guardrail that
+Deciding which tools stay searchable is where this page stops. Actually rolling
+it out — the census that records how each tool reaches the model, keyword
+against semantic, the rewrites that make descriptions retrievable, per-caller scope and the guardrail that
 enforces it — is `tool-search-rollout`, and a model cannot load it: **ask the user
 to run it, which they invoke by name.**
 

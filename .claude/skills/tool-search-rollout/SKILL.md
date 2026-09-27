@@ -12,8 +12,8 @@ only those enter the request. The standing prompt carries one schema instead of
 fifty.
 
 Whether that is the right mechanism at all belongs to
-`progressive-tool-disclosure` — the token math, which tools stay searchable beside skills, when
-disclosure backfires. This skill assumes that question was asked and search won.
+`progressive-tool-disclosure` — the token math, which tools stay searchable
+beside skills, when disclosure backfires. This skill assumes that question was asked and search won.
 It is the rollout: a pass with a start, an approval gate and an artefact.
 
 The pass runs **delegate → decide → propose → approve → execute → verify**, and

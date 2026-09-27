@@ -193,8 +193,8 @@ count grew and selection accuracy fell with it.
   conversation, unchanged from the first turn to the last — see
   [chapter 2](02-context-engineering.md) and
   [ADR 0005](adr/0005-progressive-tool-disclosure-through-skills.md).
-- Someone proposes tool *search* instead of skills and the two are being treated as
-  complementary.
+- Someone proposes tool *search* instead of skills, and nobody has yet decided
+  which tools stay searchable and which go behind a skill.
 - The catalogue doubled and the model started reaching for the wrong tool; the
   answer is a level of indirection, not a better description on each of them.
 
