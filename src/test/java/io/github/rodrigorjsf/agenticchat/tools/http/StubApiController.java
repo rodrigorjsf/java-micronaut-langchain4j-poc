@@ -170,6 +170,28 @@ public class StubApiController {
                 """;
     }
 
+    // ------------------------------------------------------------------
+    // Redirect routes for the redirect-hop tests.
+    //
+    // An open redirect on purpose: a catalogued host that answers 302 to wherever
+    // the test says is exactly the shape an attacker needs — a compromised or
+    // misconfigured upstream bouncing the tool client to 169.254.169.254.
+    // ------------------------------------------------------------------
+
+    /** Counts arrivals, so a test can prove a refused hop was never requested. */
+    public static final AtomicInteger LANDED_CALLS = new AtomicInteger();
+
+    @Get("/redirect")
+    public HttpResponse<String> redirect(@QueryValue String to) {
+        return HttpResponse.<String>status(HttpStatus.FOUND).header("Location", to);
+    }
+
+    @Get("/landed")
+    public String landed() {
+        LANDED_CALLS.incrementAndGet();
+        return "{\"landed\":true}";
+    }
+
     @Get("/slow")
     public String slow() throws InterruptedException {
         Thread.sleep(3_000);

@@ -1,6 +1,8 @@
 package io.github.rodrigorjsf.agenticchat.tools.http;
 
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.client.HttpClient;
@@ -15,7 +17,9 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -34,6 +38,13 @@ import java.util.stream.Collectors;
  *   <li><b>No tool can name a host.</b> Callers pass a catalogue key and a path;
  *       the base URL comes from {@link ApiEndpointProperties}. That removes SSRF as
  *       a category rather than filtering for it.</li>
+ *   <li><b>No redirect leaves the catalogue.</b> The catalogue stops a tool from
+ *       naming a host, but a catalogued host can still answer {@code 302} to
+ *       {@code 169.254.169.254}, and an HTTP client that follows redirects by default
+ *       re-opens the door the catalogue closed. The shared client does not follow
+ *       ({@code micronaut.http.client.follow-redirects: false}); this class follows
+ *       each hop itself, and only to a host some catalogue entry already names —
+ *       see {@link #MAX_REDIRECTS}.</li>
  *   <li><b>Bounded output.</b> Every response is capped at the endpoint's byte
  *       budget, and truncation is reported to the model instead of silently
  *       dropping data.</li>
@@ -92,8 +103,16 @@ public class ToolHttpClient {
      */
     private static final Duration PERMIT_WAIT = Duration.ofSeconds(5);
 
+    /**
+     * How many redirect hops one call follows. An upstream that moved a route answers
+     * one 301; a chain longer than this is a loop or someone shopping for a host.
+     */
+    private static final int MAX_REDIRECTS = 3;
+
     private final HttpClient httpClient;
     private final Map<String, ApiEndpointProperties> catalogue;
+    /** Exact hosts of every catalogue base URL: the only places a redirect may land. */
+    private final Set<String> catalogueHosts;
     private final String defaultUserAgent;
     private final LinkPolicy links;
     private final Semaphore inFlight = new Semaphore(IN_FLIGHT_LIMIT);
@@ -108,6 +127,11 @@ public class ToolHttpClient {
         this.links = links;
         this.catalogue = endpoints.stream().collect(Collectors.toUnmodifiableMap(
                 ApiEndpointProperties::name, e -> e));
+        this.catalogueHosts = endpoints.stream()
+                .map(e -> URI.create(e.baseUrl()).getHost())
+                .filter(host -> host != null)
+                .map(host -> host.toLowerCase(Locale.ROOT))
+                .collect(Collectors.toUnmodifiableSet());
         LOG.info("Tool API catalogue: {}", new java.util.TreeSet<>(catalogue.keySet()));
     }
 
@@ -197,18 +221,68 @@ public class ToolHttpClient {
         String userAgent = endpoint.userAgent() == null || endpoint.userAgent().isBlank()
                 ? defaultUserAgent
                 : endpoint.userAgent();
-        MutableHttpRequest<?> request = HttpRequest.GET(uri)
-                .accept("application/json")
-                .header("User-Agent", userAgent);
-        String body = Mono.from(httpClient.retrieve(request, String.class))
-                .block(endpoint.timeout());
-        // Scrubbed AFTER truncation, and the order is deliberate. A cut lands
-        // anywhere, so a truncated body can end mid-address — "https://doi.o" is
-        // still a host to the output guardrail's URL scan, and still costs the whole
-        // answer. Scrubbing the survivor catches the stump too, and spends no cycles
-        // on bytes that were already thrown away.
-        var truncated = truncate(body == null ? "" : body, endpoint.maxResponseBytes());
-        return new ToolResponse(links.scrub(truncated.body()), truncated.outcome(), truncated.truncated());
+        // One deadline across every hop, so a redirect chain cannot stretch the
+        // endpoint's timeout by the number of hops.
+        long deadline = System.nanoTime() + endpoint.timeout().toNanos();
+        URI current = uri;
+        for (int hop = 0; ; hop++) {
+            MutableHttpRequest<?> request = HttpRequest.GET(current)
+                    .accept("application/json")
+                    .header("User-Agent", userAgent);
+            Duration remaining = Duration.ofNanos(Math.max(1, deadline - System.nanoTime()));
+            HttpResponse<String> response = Mono.from(httpClient.exchange(request, String.class))
+                    .block(remaining);
+            if (response == null || response.code() < 300 || response.code() >= 400) {
+                String body = response == null ? null : response.body();
+                // Scrubbed AFTER truncation, and the order is deliberate. A cut lands
+                // anywhere, so a truncated body can end mid-address — "https://doi.o" is
+                // still a host to the output guardrail's URL scan, and still costs the whole
+                // answer. Scrubbing the survivor catches the stump too, and spends no cycles
+                // on bytes that were already thrown away.
+                var truncated = truncate(body == null ? "" : body, endpoint.maxResponseBytes());
+                return new ToolResponse(links.scrub(truncated.body()), truncated.outcome(), truncated.truncated());
+            }
+            URI next = redirectTarget(current, response);
+            if (hop == MAX_REDIRECTS || next == null || !mayFollow(current, next)) {
+                // A value, not an exception: the attempt loop retries exceptions, and a
+                // refused hop is deterministic — asking again gets the same Location.
+                // The target goes to operators only; an address in the prompt is an
+                // address the model can repeat.
+                LOG.warn("Tool API {} redirect refused after {} hop(s): {} -> {}",
+                        endpoint.name(), hop, current, next);
+                return ToolResponse.failure(ToolResponse.Outcome.UPSTREAM_ERROR,
+                        "the service redirected outside the tool catalogue, which is refused.");
+            }
+            current = next;
+        }
+    }
+
+    private static URI redirectTarget(URI current, HttpResponse<?> response) {
+        String location = response.getHeaders().get(HttpHeaders.LOCATION);
+        if (location == null || location.isBlank()) {
+            return null;
+        }
+        try {
+            return current.resolve(location.strip());
+        } catch (IllegalArgumentException malformed) {
+            return null;
+        }
+    }
+
+    /**
+     * A hop may land only on a host a catalogue entry names exactly, and never
+     * downgrades https to http. Exact host, not registrable domain: the link policy
+     * widens to subdomains because a link is read by a person, while a request is
+     * made by this process, and a sibling subdomain of a catalogued API is a host
+     * nobody reviewed.
+     */
+    private boolean mayFollow(URI from, URI to) {
+        String scheme = to.getScheme() == null ? "" : to.getScheme().toLowerCase(Locale.ROOT);
+        if (!scheme.equals("https") && !(scheme.equals("http") && "http".equalsIgnoreCase(from.getScheme()))) {
+            return false;
+        }
+        String host = to.getHost();
+        return host != null && catalogueHosts.contains(host.toLowerCase(Locale.ROOT));
     }
 
     private static ToolResponse truncate(String body, int maxBytes) {

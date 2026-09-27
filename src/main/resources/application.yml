@@ -22,6 +22,11 @@ micronaut:
       # Per-endpoint transport limits are the version that would make this derived
       # rather than chosen; see docs/03-security.md.
       max-content-length: 3145728
+      # Redirects are followed by ToolHttpClient, hop by hop, and only to a host the tool
+      # catalogue names. Left at Micronaut's default (true), a catalogued host answering
+      # 302 to http://169.254.169.254 is followed before any code here sees it.
+      # ToolHttpClientTest#aRedirectToTheMetadataAddressIsNotFollowed pins it.
+      follow-redirects: false
   server:
     port: 8080
 
