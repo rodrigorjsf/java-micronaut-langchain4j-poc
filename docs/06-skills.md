@@ -839,11 +839,11 @@ rows for one skill fails the same way one row for none does.
 
 **A skill never points into another skill's files.** A pointer to a sibling's
 reference file dangles the day its owner renames or splits it, and when the sibling
-is invoked by name the model reading the pointer can never load it at all. So a skill
+is invoked by name the model reading the pointer can never invoke it. So a skill
 hands off to a sibling by the sibling's name, and the sibling routes to its own
 files. The same script fails on a link climbing out of a skill (`](../`), a
-`.claude/skills/<other>/` path, or a backticked file name that exists only in
-another skill's directory.
+`.claude/skills/<other>/` path, a backticked file name that exists only in
+another skill's directory, or one qualified with another skill's name.
 
 ---
 

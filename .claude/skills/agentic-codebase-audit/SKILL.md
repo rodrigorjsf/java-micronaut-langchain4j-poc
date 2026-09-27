@@ -26,9 +26,9 @@ seams, ask at each one what job must be done there, then go find who does it.
 | You are here because | Start at |
 |---|---|
 | this is the first audit of this codebase | *An empty result is a finding*, then *Run it in this order* |
-| an earlier audit exists | Step 1 — it opens the previous table first — and [`ARTEFACT.md`](ARTEFACT.md) |
+| an earlier audit exists | *Step 1 — Locate*, which opens the previous table first, and [`ARTEFACT.md`](ARTEFACT.md) |
 | you are probing a seam | [`SEAM-PROBES.md`](SEAM-PROBES.md), then [`SCORING.md`](SCORING.md) before the first score |
-| every seam carries a score and the coverage lines are next | Step 3 and [`OWASP-COVERAGE.md`](OWASP-COVERAGE.md) |
+| every seam carries a score and the coverage lines are next | *Step 3 — Answer the ten coverage items*, and [`OWASP-COVERAGE.md`](OWASP-COVERAGE.md) |
 | you are ranking findings and writing the plan | [`RANKING-AND-PLAN.md`](RANKING-AND-PLAN.md) |
 | you are writing any of the three blocks | [`OUTPUT-SHAPES.md`](OUTPUT-SHAPES.md) |
 | the budget will not cover every probe | [`TIME-BOXED-RUN.md`](TIME-BOXED-RUN.md) |

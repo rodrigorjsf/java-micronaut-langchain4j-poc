@@ -25,15 +25,17 @@ WHY    A skill is two artefacts that nothing pairs: a directory a model loads, a
        A pointer into another skill's files is a dependency nothing enforces. The
        target may be renamed or split by its owner, and the pointer dangles in a
        page its owner never opens. When the target skill is user-invoked the
-       pointer is worse: the model reading it can never load that skill at all. A
+       pointer is worse: the model reading it can never invoke that skill. A
        skill hands off to a sibling by the sibling's name, and the sibling routes
        to its own files. Three forms are caught: a link climbing out of the skill
        (`](../`), a `.claude/skills/<other>/` path, and a backticked file name that
-       exists only in another skill's directory.
+       exists only in another skill's directory, or is qualified with another
+       skill's name (`<other>/FILE.md`).
 
 WHEN   After adding, renaming or removing a skill, after editing the tables in
-       `docs/06-skills.md`, and after merging skill work written in parallel — which
-       is exactly when the two halves drift.
+       `docs/06-skills.md`, after editing any skill body or reference file (the
+       pointer check reads them all), and after merging skill work written in
+       parallel — which is exactly when the two halves drift.
 
 HOW    ./scripts/check-skill-docs.py
        Exit 0 when both sides agree and no skill points into another, 1 otherwise.
@@ -81,9 +83,10 @@ def skills_documented() -> dict[str, list[int]]:
     return documented
 
 
-CLIMBING_LINK = re.compile(r"\]\(\.\./")
+CLIMBING_LINK = re.compile(r"\]\((?:\./)*\.\./")
 SKILLS_PATH = re.compile(r"\.claude/skills/([a-z0-9][a-z0-9-]*)/")
 BACKTICKED_FILE = re.compile(r"`([A-Za-z0-9_./-]+\.md)`")
+QUALIFIED_FILE = re.compile(r"`([a-z0-9][a-z0-9-]*)/[A-Za-z0-9_./-]+`")
 
 
 def cross_skill_pointers() -> list[str]:
@@ -103,8 +106,11 @@ def cross_skill_pointers() -> list[str]:
                 reasons = []
                 if CLIMBING_LINK.search(line):
                     reasons.append("a link that climbs out of the skill")
+                names = {entry.name for entry in skills}
                 reasons += [f"a path into {name}/" for name in SKILLS_PATH.findall(line)
                             if name != skill.name]
+                reasons += [f"a file qualified with {name}/" for name in QUALIFIED_FILE.findall(line)
+                            if name in names and name != skill.name]
                 for name in BACKTICKED_FILE.findall(line):
                     holders = owners.get(name, set())
                     if holders and skill.name not in holders:
@@ -151,7 +157,7 @@ def main() -> int:
 
     if pointers:
         print("\nPOINTS INTO ANOTHER SKILL — hand off to the sibling by name instead; "
-              "a user-invoked sibling is one the model can never load:")
+              "a user-invoked sibling is one the model can never invoke:")
         for line in pointers:
             print(line)
 

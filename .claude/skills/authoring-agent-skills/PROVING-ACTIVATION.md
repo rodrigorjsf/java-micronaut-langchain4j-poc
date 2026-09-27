@@ -17,8 +17,8 @@ Run the labelled set **first**. It is the only check here that can fail *before*
 reached, and everything below assumes activation happened — read those results without this one and
 a routing miss gets attributed to the mount.
 
-Building the set and scoring the run are written down in `reviewing-agent-tools-and-skills` — read
-that file, or ask the user to run it; no skill can invoke it. What this file adds is the position:
+Building the set and scoring the run belong to `reviewing-agent-tools-and-skills`, which no skill
+can invoke: ask the user to run it, which they invoke by name. What this file adds is the position:
 nothing below is diagnostic until this one is green.
 
 ## The lesson arrives, not just the tools

@@ -1,6 +1,6 @@
 ---
 name: tool-search-rollout
-description: Run when tool search was chosen for an existing tool layer and must be rolled out — census, strategy, description rewrites, scoped discovery, and the execution guardrail that makes the scope real.
+description: Run when tool search was chosen for an existing tool layer and must be rolled out, when tool descriptions must be rewritten so search can find them, or when search has to be scoped per caller behind an execution guardrail.
 disable-model-invocation: true
 ---
 

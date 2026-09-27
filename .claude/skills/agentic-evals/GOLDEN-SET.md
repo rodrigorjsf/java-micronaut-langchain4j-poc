@@ -46,7 +46,8 @@ can label twice is a number that moves when the labellers do.
 each labelled with the item that should fire: no code changes, so no functional
 test can break. This skill owns how a dataset is built and sized; the
 `reviewing-agent-tools-and-skills` skill owns that particular set and the
-before/after run it feeds. What follows applies to it as to any live set.
+before/after run it feeds — a model cannot load it, so ask the user to run it,
+which they invoke by name. What follows applies to it as to any live set.
 
 **One run is one sample — here, not in the deterministic suite.** That one
 reproduces its own number exactly; a live one does not, so a gate set at the

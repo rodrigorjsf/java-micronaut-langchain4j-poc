@@ -1,6 +1,6 @@
 ---
 name: progressive-tool-disclosure
-description: Use when an agent has ten or more tools, when the system prompt is dominated by tool schemas, when tool selection accuracy drops as tools are added, or when deciding which tools go behind skills and which stay searchable. With fewer than ten tools, a wrong pick is one description's fault — use agentic-tool-boundary. Once search is the chosen mechanism, rolling it out over a real layer is a pass a person runs: ask the user to run tool-search-rollout.
+description: Use when an agent has ten or more tools, when the system prompt is dominated by tool schemas, when tool selection accuracy drops as tools are added, or when deciding which tools go behind skills and which stay searchable. With fewer than ten tools, a wrong pick is one description's fault — use agentic-tool-boundary. Once search is the chosen mechanism, rolling it out over a real layer is a pass a person runs: ask the user to run tool-search-rollout, which they invoke by name.
 ---
 
 # Progressive tool disclosure
