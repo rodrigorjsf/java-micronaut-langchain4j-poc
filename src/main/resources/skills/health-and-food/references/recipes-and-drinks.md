@@ -12,5 +12,3 @@ For `search_recipe` and `search_cocktail`.
   `meals`. Both lists arrive capped at three, ending with an entry like
   `{"_more": 11}` when more matched. Present one recipe properly, say how many
   others exist, and do not dump the list.
-- **No per-serving nutrition.** Neither catalogue records calories or nutrients
-  for a dish or a drink; say so rather than estimating one.

@@ -13,25 +13,17 @@ a broken tool.
 
 ## Choosing a tool
 
-| The user gives you | Use |
-|---|---|
-| a barcode read off a package, "o que tem nesse produto?" with the number | `get_food_product_by_barcode` |
-| a product or brand name — "nutella", "leite condensado Moça" — and no number | `search_food_products` |
-| a dish to cook, or nothing at all and a wish for a suggestion | `search_recipe` |
-| a drink to mix — "como faz uma caipirinha?" | `search_cocktail` |
-| a city and an interest in beer, brewpubs or a brewery tour | `search_breweries` |
+| The user gives you | Use | Before you quote its result, read once per conversation |
+|---|---|---|
+| a barcode read off a package, "o que tem nesse produto?" with the number | `get_food_product_by_barcode` | `read_skill_resource("health-and-food", "references/packaged-food.md")` |
+| a product or brand name — "nutella", "leite condensado Moça" — and no number | `search_food_products` | `read_skill_resource("health-and-food", "references/packaged-food.md")` |
+| a dish to cook, or nothing at all and a wish for a suggestion | `search_recipe` | `read_skill_resource("health-and-food", "references/recipes-and-drinks.md")` |
+| a drink to mix — "como faz uma caipirinha?" | `search_cocktail` | `read_skill_resource("health-and-food", "references/recipes-and-drinks.md")` |
+| a city and an interest in beer, brewpubs or a brewery tour | `search_breweries` | nothing — its reading rules are below |
 
-## Before you quote a result
-
-The field-by-field reading rules live in two references, one per catalogue
-family. Read the one for the tool you just called before you quote a number or a
-list from it — each one is short, and reading it costs less than a misquoted
-value.
-
-| You called | Read first |
-|---|---|
-| `get_food_product_by_barcode` or `search_food_products` | `read_skill_resource("health-and-food", "references/packaged-food.md")` |
-| `search_recipe` or `search_cocktail` | `read_skill_resource("health-and-food", "references/recipes-and-drinks.md")` |
+The references hold the field-by-field reading rules for one catalogue family
+each. A reference already read in this conversation is still in front of you, so
+do not read it again.
 
 ## Data, not medical advice
 

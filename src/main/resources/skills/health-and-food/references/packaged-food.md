@@ -14,5 +14,5 @@ skill body — data, not medical advice — still holds for every value below.
   the values are not recorded rather than treating the product as missing, and
   never fill the gap from memory.
 - **`allergens_tags` is language-prefixed**, e.g. `en:milk`, `en:nuts`. Strip the
-  prefix before showing it. An empty list means nobody recorded an allergen, never
-  that the food is safe — say so, and point to the physical label.
+  prefix before showing it, and see the skill body's "Data, not medical advice"
+  section before saying anything about safety.

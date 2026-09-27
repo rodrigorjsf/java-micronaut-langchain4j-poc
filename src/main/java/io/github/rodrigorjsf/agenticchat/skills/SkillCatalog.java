@@ -60,7 +60,7 @@ import java.util.stream.Collectors;
 public class SkillCatalog {
 
     private static final Logger LOG = LoggerFactory.getLogger(SkillCatalog.class);
-    private static final String SKILLS_DIRECTORY = "skills";
+    static final String SKILLS_DIRECTORY = "skills";
 
     private final Skills skills;
     private final List<String> names;

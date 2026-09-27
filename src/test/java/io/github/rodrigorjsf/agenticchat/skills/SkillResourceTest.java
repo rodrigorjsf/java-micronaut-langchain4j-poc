@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeSet;
 import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -35,6 +36,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  * the tool offered, and the reference text coming back as its result.
  */
 class SkillResourceTest {
+
+    private static final Pattern RESOURCE_CALL =
+            Pattern.compile("read_skill_resource\\(\\s*\"([^\"]+)\"\\s*,\\s*\"([^\"]+)\"\\s*\\)");
 
     private ApplicationContext ctx;
     private StubChatModelRegistry models;
@@ -105,8 +109,6 @@ class SkillResourceTest {
                 .contains("allergens_tags");
     }
 
-    private static final Pattern RESOURCE_CALL =
-            Pattern.compile("read_skill_resource\\(\"([^\"]+)\", \"([^\"]+)\"\\)");
 
     /**
      * The resource path is model-visible text matched by exact string equality, so a
@@ -116,11 +118,11 @@ class SkillResourceTest {
     @Test
     @DisplayName("every resource a skill body names exists, and every resource is named by its body")
     void skillBodiesAndResourcesAgree() {
-        List<Skill> skills = ClassPathSkillLoader.loadSkills("skills");
+        List<Skill> skills = ClassPathSkillLoader.loadSkills(SkillCatalog.SKILLS_DIRECTORY);
         int routed = 0;
 
         for (Skill skill : skills) {
-            var named = new java.util.TreeSet<String>();
+            var named = new TreeSet<String>();
             var matcher = RESOURCE_CALL.matcher(skill.content());
             while (matcher.find()) {
                 assertThat(matcher.group(1))
@@ -128,7 +130,7 @@ class SkillResourceTest {
                         .isEqualTo(skill.name());
                 named.add(matcher.group(2));
             }
-            var shipped = new java.util.TreeSet<String>();
+            var shipped = new TreeSet<String>();
             skill.resources().stream().map(SkillResource::relativePath).forEach(shipped::add);
 
             assertThat(named).as("resource paths named in the body of '%s'", skill.name())
