@@ -1,4 +1,4 @@
-# Micronaut 5 + LangChain4j 1.18 — traps that cost real time here
+# Micronaut 5 + LangChain4j 1.20 — traps that cost real time here
 
 Framework-specific gotchas hit in this repository. Each one compiled, or ran, or
 passed a test while being wrong. The concepts behind them live in
@@ -99,17 +99,14 @@ half by hand. Skip `1.19.1`: its release page reads "This release was published
 by mistake. Do not use it."
 
 **Async AI Services (1.20.0+) reverse two tool defaults.** A method returning
-`CompletableFuture`/`CompletionStage` or `Flow.Publisher` runs several tool calls
-from one response **concurrently**, and a tool **execution** error **fails the
-invocation** instead of reaching the model — a recoverable tool error becomes a
-5xx. (An argument-parse error flips the other way: sent to the model.) An
-explicitly configured `toolExecutionErrorHandler`/`toolArgumentsErrorHandler` is
-used by every mode, so keep both set before adopting async, and pass
-`executeToolsConcurrently(Executors.newSingleThreadExecutor())` for tools that
-are not thread-safe. This application is synchronous today. Sources: LangChain4j
-1.20.0 release notes (https://github.com/langchain4j/langchain4j/releases/tag/1.20.0)
-and "Non-blocking and Reactive", section "Defaults that differ from the synchronous
-modes" (https://docs.langchain4j.dev/tutorials/non-blocking), both read 2026-09-27.
+`CompletableFuture`/`CompletionStage`/`Flow.Publisher` runs a response's tool
+calls **concurrently**, and a tool **execution** error **fails the invocation**
+instead of reaching the model — a recoverable tool error becomes a 5xx. Keep
+`toolExecutionErrorHandler` and `toolArgumentsErrorHandler` set explicitly (they
+apply in every mode) before adopting async; the table and the concurrency knob are
+in `agentic-tool-boundary` §3. This application is synchronous today. `[sourced]`
+LangChain4j 1.20.0 release notes
+(https://github.com/langchain4j/langchain4j/releases/tag/1.20.0), read 2026-09-27.
 
 ## The tool layer
 
