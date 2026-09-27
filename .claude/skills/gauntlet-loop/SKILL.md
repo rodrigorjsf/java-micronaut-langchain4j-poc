@@ -19,7 +19,7 @@ The human sets the destination and the boundaries. The loop runs the feedback cy
 | you are choosing what to measure against | *A bar is a thing, not an adjective* |
 | the work is large and you are deciding how to split it | [`CUTTING-THE-WORK.md`](CUTTING-THE-WORK.md) |
 | a critic keeps returning the same grade round after round | [`UNREACHABLE-BAR.md`](UNREACHABLE-BAR.md) — read this before touching the work |
-| a round came back with blocking findings | *A round measures; a fix wave closes* |
+| a round came back with blocking findings | *A round measures; a fix wave closes*, then [`FIX-WAVES.md`](FIX-WAVES.md) |
 | the findings are not falling, or rise after each fix | *Watch the trend* |
 | the run may outlive the session, the quota or the machine | [`LONG-RUNS.md`](LONG-RUNS.md) |
 | the thing has no obvious reference to be judged against | [`CHOOSING-A-BAR.md`](CHOOSING-A-BAR.md) |

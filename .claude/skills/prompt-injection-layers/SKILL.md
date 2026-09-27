@@ -26,9 +26,10 @@ LOOP    5 contain      untrusted text never chooses a consequential action
 | a detector is producing false positives | *Three false-positive controls, and they are the whole game* |
 | you are adding an output guardrail | *4. Output side: a canary, and the two exfiltration channels* |
 | the agent reads tool results, fetched pages or retrieved documents | [`TOOL-RESULT-INJECTION.md`](TOOL-RESULT-INJECTION.md) |
-| text a tool returned could become an argument of a tool that writes, sends or pays | *5. Containment: untrusted text never chooses a consequential action* |
+| text a tool returned could become an argument of a tool that writes, sends or pays | *5. Containment: untrusted text never chooses a consequential action*, then [`CONTAINMENT.md`](CONTAINMENT.md) |
 | deciding what a rejected request should be told | *What the user is told* |
 | a new rule is about to go live | *Rolling out a rule* |
+| the defence has to be mapped to OWASP | *Where this sits in OWASP*, then [`OWASP-MAPPING.md`](OWASP-MAPPING.md) |
 
 ## Detection is probabilistic; plan for the miss
 

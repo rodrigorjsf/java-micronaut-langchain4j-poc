@@ -17,8 +17,9 @@ from the model?*, waits for §4 and a shape to ask it of.
 |---|---|
 | someone asked for a tool that does not exist yet, or asked as an implementation | *1. What does the user actually say?*, then questions 2 and 3 in order |
 | the interview is answered and you are choosing parameters | *From the answers to the parameter set* |
-| the parameters are settled and the text is next | *Write the description from the open sentences*, then the error taxonomy and the result shape |
-| one proposed tool may really be two | *4. What decision would this tool hide from the model?* |
+| the tool changes anything outside the process | [`WRITES-AND-FLAGS.md`](WRITES-AND-FLAGS.md) |
+| the parameters are settled and the text is next | *Write the description from the open sentences*, then the error taxonomy and the result shape ([`RESULT-BUDGET.md`](RESULT-BUDGET.md)) |
+| one proposed tool may really be two | *4. What decision would this tool hide from the model?*, then [`SPLIT-TRIGGERS.md`](SPLIT-TRIGGERS.md) |
 | the contract is written and the tool is about to be built or shipped | *The tests that gate the ship*, then *Before it ships* |
 
 ## 1. What does the user actually say?

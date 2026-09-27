@@ -26,6 +26,7 @@ a container that ships it to a model that did not ask.
 | you know what moves and want to start writing documents | not yet: [`RETRIEVAL-SETTINGS.md`](RETRIEVAL-SETTINGS.md), then `writing-retrievable-knowledge` |
 | the corpus answers the question and the prompt still carries the block | *The removal half*, then [`REMOVAL.md`](REMOVAL.md) |
 | a document you migrated is never retrieved | [`RE-RUNS.md`](RE-RUNS.md), *The check runs in both directions* |
+| you are writing the plan and the committed ledger | *The plan, and the committed ledger*, then [`MIGRATION-LEDGER.md`](MIGRATION-LEDGER.md) |
 | this ran before | [`RE-RUNS.md`](RE-RUNS.md) |
 | the question is whether to retrieve at all, or what a corpus is for | `retrieval-that-earns-its-place` — not this skill |
 

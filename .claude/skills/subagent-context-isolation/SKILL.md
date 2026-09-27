@@ -13,9 +13,9 @@ That **discard** is the entire product.
 |---|---|
 | work is being split across several agents | *1. The discard test* — a path you can write down is code |
 | you are writing the brief a child agent receives | *2. The briefing is a contract, like the return* |
-| fan-out or recursion has no call budget | *3. The budget is in model calls, and in seconds*, then *4. The shapes* |
+| fan-out or recursion has no call budget | *3. The budget is in model calls, and in seconds*, then *4. The shapes* and [`FAN-OUT-SHAPES.md`](FAN-OUT-SHAPES.md) |
 | an agent pipeline is going on the default path of every request | *5. On the default path, or behind a tool* |
-| a sub-agent's output is spliced into the parent's prompt | *6. Isolation destroys the evidence, so the return is untrusted* |
+| a sub-agent's output is spliced into the parent's prompt | *6. Isolation destroys the evidence, so the return is untrusted*, then [`RETURN-SEAMS.md`](RETURN-SEAMS.md) |
 | a multi-agent system fails and you need to name how | *7. What multi-agent systems actually fail on* |
 | a sub-agent already ships and you are reviewing it | *Reviewing an existing sub-agent* |
 

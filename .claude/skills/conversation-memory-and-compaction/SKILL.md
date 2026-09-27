@@ -20,9 +20,9 @@ from, or a wrong "the user prefers X" is permanent and invisible.
 |---|---|
 | history grows unbounded, or you are choosing a message window or a token budget | *Window or token budget* |
 | a long conversation silently changes what the agent can do | *What a turn must remember: the invariant* |
-| you are writing or reviewing a compaction or summarisation pass | *Compaction you should not build*, then *The cheap pass runs before any model pass* |
+| you are writing or reviewing a compaction or summarisation pass | *Compaction you should not build*, then *The cheap pass runs before any model pass* and [`COMPACTION-PASS.md`](COMPACTION-PASS.md) |
 | a summary is about to be stored or replayed | *The summary is text you did not write* |
-| a cache is going in front of the conversation store | *A cache in front of the durable store* |
+| a cache is going in front of the conversation store | *A cache in front of the durable store*, then [`STORAGE-TIER.md`](STORAGE-TIER.md) |
 | a memory layer already ships and you are reviewing it | *Reviewing an existing memory layer* |
 
 ## Window or token budget — the difference is reproducibility

@@ -12,12 +12,12 @@ page too, so it is entered from here:
 
 | You are here because | Start at |
 |---|---|
-| you have decided to group tools behind a skill | *The body is a lesson*, sized against the budget below |
+| you have decided to group tools behind a skill | *The body is a lesson*, sized against the budget below, and [`ASSEMBLED-EXAMPLE.md`](ASSEMBLED-EXAMPLE.md) |
 | it fires on the wrong turns, or never on the right ones | *A description bounds a territory*, then *Routing fails in two shapes* |
 | two descriptions cover the same ground | *A description bounds a territory* — first the one-skill-or-two fork, then the hand-off clause |
 | a rule belongs to the whole tool set, not one call | *Boundaries only the body can carry* |
-| the body serves paths that only some turns take | *Resources are the third tier, cut by scope* |
-| activation appears to change nothing | *Prove that activation changed something* |
+| the body serves paths that only some turns take | *Resources are the third tier, cut by scope*, and [`SCOPED-REFERENCES.md`](SCOPED-REFERENCES.md) |
+| activation appears to change nothing | *Prove that activation changed something*, and [`PROVING-ACTIVATION.md`](PROVING-ACTIVATION.md) |
 | a draft is finished and about to ship | *Hold the draft to writing-great-skills*, then the review table |
 
 **The description routes; the body teaches.** The description is loaded every turn and is all the

@@ -18,7 +18,7 @@ the questions that must retrieve **nothing**.
 
 | You are here because | Start at |
 |---|---|
-| you are building the query set for the first time | *The query set is a committed file, not test code* |
+| you are building the query set for the first time | *The query set is a committed file, not test code*, then [`QUERY-SET.md`](QUERY-SET.md) |
 | your suite is all positives and passes | *The negative half is the load-bearing half* |
 | you are deciding what a test should actually assert | *What to assert* |
 | you are deciding whether the suite gates every commit or runs live | [`WHERE-IT-RUNS.md`](WHERE-IT-RUNS.md) |
