@@ -21,12 +21,12 @@ a container that ships it to a model that did not ask.
 
 | You are here because | Start at |
 |---|---|
-| the prompt has grown and nobody can say what is in it | *The noun, and how to inventory it* |
+| the prompt has grown and nobody can say what is in it | *The noun, and how to inventory it*, then [`COST.md`](COST.md) |
 | a block is in front of you and you must decide whether it may leave | *The test for what may move* — the section this skill exists for |
-| you know what moves and want to start writing documents | not yet: *Read the retrieval configuration first*, then `writing-retrievable-knowledge` |
-| the corpus answers the question and the prompt still carries the block | *The removal half* |
-| a document you migrated is never retrieved | *The check runs in both directions* |
-| this ran before | *Running it again* |
+| you know what moves and want to start writing documents | not yet: [`RETRIEVAL-SETTINGS.md`](RETRIEVAL-SETTINGS.md), then `writing-retrievable-knowledge` |
+| the corpus answers the question and the prompt still carries the block | *The removal half*, then [`REMOVAL.md`](REMOVAL.md) |
+| a document you migrated is never retrieved | [`RE-RUNS.md`](RE-RUNS.md), *The check runs in both directions* |
+| this ran before | [`RE-RUNS.md`](RE-RUNS.md) |
 | the question is whether to retrieve at all, or what a corpus is for | `retrieval-that-earns-its-place` — not this skill |
 
 **Three skills, four steps, one order, and it does not commute:** audit and plan
@@ -82,44 +82,10 @@ whether the content *belongs* there. That question is this document's.
 
 ## What it costs, computed
 
-Three inputs per block, two of them cheap:
-
-```
-B  bytes the block adds to the prompt           length of the block, from the payload
-C  share of turns that carry it                 1.00 for standing text, by definition
-U  share of carrying turns whose answer it changes
-
-waste = B × C × (1 − U)   bytes shipped per turn for nothing
-```
-
-The arithmetic is the whole point and it is arithmetic, not a benchmark: at
-`C = 1.00` and `U = 0.10`, nine tenths of `B` ships on every turn and does no
-work; halving `B` halves the waste, and getting `U` to 1.00 removes it entirely,
-which is what the block staying in the prompt means.
-
-**`C` is 1.00 by definition and is not a per-row column.** It is in the formula
-so that a block which is only *nearly* standing — carried by one request route of
-three, or by one locale's assembly — can be costed on the same line as the rest.
-
-**`U` is the one people guess, and the guess is always generous.** You cannot
-measure it without labels. What you can do instead is state the qualifying
-condition in one sentence — *this block changes the answer when the user asks
-about X*. If you cannot write that sentence, `U` is not small, it is **unknown**,
-and the next section's second question has already failed. Write `U unknown` in
-the ledger rather than a number; a fabricated share is the one entry that gets an
-otherwise correct plan thrown out.
-
-**The second cost is not bytes and does not shrink when the block does.** Text
-that is present and irrelevant competes for the model's attention with the text
-that matters, and a prompt that answers a question the turn did not ask teaches
-the model to answer questions nobody asked: the returns policy in front of the
-model during a shipping turn comes back in the answer.
-
-**The third cost is the one that produces wrong answers rather than slow ones.** A
-fact in the prompt is the model's closest and most trusted context, so it outranks
-the tool that would have returned the current value. A stale fact in the prompt is
-worse than an absent one — absent, the model asks a tool or says it does not know;
-present, it asserts last quarter's number with the prompt's authority.
+`waste = B × C × (1 − U)` — the bytes a block adds, the share of turns carrying it
+(1.00 for standing text), and the share of carrying turns whose answer it changes.
+It is arithmetic, not a benchmark → [`COST.md`](COST.md), with how each input is
+measured.
 
 ## The test for what may move
 
@@ -184,57 +150,10 @@ shortcut around the three questions:
 
 ## Read the retrieval configuration first
 
-The chunker decides the shape of what you write, so reading it after the plan
-produces a plan measured in blocks and a corpus measured in chunks, with no
-correspondence between them. Six settings, and in every stack they live somewhere
-different:
-
-| Read | Where it hides | What it decides |
-|---|---|---|
-| segment size and overlap | as often a constant beside the ingestion loop as a config file | whether a block is one document or five, and where a heading may go |
-| the embedding model, and whether it runs in-process | the store's construction, usually a model id string | which vocabulary matches, and what re-embedding costs when you edit |
-| top-k | config | how many chunks compete to be the answer |
-| the score threshold | config | whether a correct chunk that scores just under counts as retrieved at all |
-| whether a router exists, and on which signal | there may be none — then retrieval runs on every turn, and *is* standing text | whether question 2 above is answerable in this system |
-| what metadata rides each chunk | the ingestion loop | whether an answer can cite its source |
-
-**The six are a committed block, not a scratch note.** They are the ledger's
-first block, at the stable path — one line each, carrying the value with its
-unit where it has one, the file it was read from, and the value the previous run
-recorded — because the documents you are about to write are written against
-them. A segment size that moves from 800 to 1,200 between runs re-chunks every
-document already migrated, and a ledger that never held the old number cannot
-tell you it moved: you read 1,200 on run 2, find it plausible, and the corpus is
-mis-chunked with nothing red. The record is also what
-`writing-retrievable-knowledge` reads on a migration run, rather than deriving
-the same numbers a second time out of the same files.
-
-**A default nobody set is still a decision.** Where you find no size, no overlap
-and no threshold, the library's defaults are in force — go and read them in its
-documentation and write them into that block, with the library, its version from
-the lock file, and the page you read as the provenance. An unstated default is the
-value most likely to change under you on a minor version bump.
-
-One repository's values, as an illustration of what these entries look like when
-found — **not** as numbers to copy. Measured on one small Portuguese corpus (three
-Markdown files, 118 lines by `wc -l`) with a quantized MiniLM embedding model:
-`rag/KnowledgeBase.java` splits at 600-character segments with 100 of overlap, and
-its comment says why — "Small enough that a retrieved segment is mostly signal,
-large enough to keep a heading with the paragraph under it. The overlap exists so
-a fact split across a boundary survives in one of the two halves." Retrieval in
-`application.yml` under `agentic.rag` reads `max-results: 3`, `min-score: 0.72`.
-Different corpus, different language, different model, different numbers.
-
-Whether a threshold separates relevant questions from irrelevant ones is
-**measured, not assumed** — on that corpus the distributions overlapped, which is
-why a router exists at all. The measurement and what to do when it fails to
-separate are `retrieval-that-earns-its-place`'s; do not re-derive them here. What
-this skill takes from it is one consequence: a proof gate may never read "the
-score looked high".
-
-This document stops at the configuration. **How the splitter cuts, what makes a
-chunk survive alone, and how a document is worded so a user's phrasing matches it
-are `writing-retrievable-knowledge`'s**, and that is the next thing you open.
+The chunker decides the shape of what you write. Read six settings — segment size
+and overlap, the embedding model, top-k, the score threshold, whether a router
+exists and on which signal, what metadata rides each chunk — and commit them as the
+ledger's first block before the plan → [`RETRIEVAL-SETTINGS.md`](RETRIEVAL-SETTINGS.md).
 
 ## The removal half
 
@@ -253,42 +172,9 @@ Five steps per block, with a gate before each one. The gates are the document.
 | 3 | **Delete the block** | the deletion is its own commit and changes nothing else |
 | 4 | **Re-measure** | a **freshly captured payload** does not contain the block, and the end-to-end answers to the acceptance list are still right |
 
-**Step 0 is first because a list written afterwards is graded against itself.**
-Write the document first and the questions come out of its own vocabulary, so
-every one of them passes and the suite proves nothing. Draw the questions from
-real turns wherever logs have them — where the sentences come from is one
-priority-ordered list, owned by `corpus-retrieval-tests`, and this skill points at
-it rather than printing a second one.
-
-**Step 2's gate says "through the router" for a reason.** A proof run with the
-router bypassed proves the chunk exists. It does not prove the turn reaches it,
-which is the only thing the deletion depends on.
-
-**Step 3 is its own commit** because a deletion bundled with the document cannot
-be reverted without also reverting the corpus, and the first production surprise
-wants exactly that revert and nothing else.
-
-**What stays behind is at most a capability line** — one sentence saying the
-capability exists so the model knows to look — and **never a restatement of a
-fact**. A pointer carrying one fact is the two-answers drift at one-line scale.
-
-### When step 2 fails, which is not "delete anyway"
-
-A query that misses has **four layers** that can be at fault — corpus, chunk
-boundary, vocabulary, threshold-or-router — and, checked ahead of all four, the row
-itself, which is not a layer. Which one it was is diagnosed by
-`corpus-retrieval-tests`, and that diagnosis is not re-derived here; that skill is
-one a model cannot load either, so the diagnosis happens when you ask the user to
-run corpus-retrieval-tests, which they invoke by name. What this skill owns is what
-the migration does with each verdict:
-
-| The diagnosis | The migration |
-|---|---|
-| the corpus layer — the fact is in no document, and the probe finds it only in the prompt | the document was never written for this fact, so this is a migration that did not happen rather than a test failure — back to step 1. `corpus-retrieval-tests` hands that verdict back to this skill by name |
-| the document is at fault — chunk boundary or vocabulary | back to step 1. The block stays in the prompt meanwhile and the branch does not merge half-done |
-| the retrieval layer is at fault — threshold or router — **and a signal for this class of turn exists**, so the layer had something to route on and got it wrong | **stop migrating** and fix the layer first (`retrieval-that-earns-its-place`). Every further block loaded onto a layer that cannot route multiplies one defect |
-| the acceptance row was wrong | fix the row, re-run, **and record the edit in the ledger** — a row edited until it passed is honest only when the edit is visible |
-| the router declined and **no signal for this class of turn exists** — nothing in the turn distinguishes the ones that need this block from the ones that do not | return the block to the **stays** side of the test above and record why. This is a result, not a failure: question 2 answered "yes" on paper and "no" in practice. The layer is not at fault and there is nothing to fix, which is what separates this row from the one above |
+→ [`REMOVAL.md`](REMOVAL.md) — why step 0 comes first, why step 2 runs through the
+router, why step 3 is its own commit, and **when step 2 fails, which is not "delete
+anyway"**. Open it before the first deletion.
 
 ## The plan, and the committed ledger
 
@@ -328,52 +214,11 @@ Open it before writing the first row.
 
 ## Running it again
 
-**Read the ledger before you read the codebase**, and read the audit's prompt
-assembly row next if there is one. Nothing at the ledger's path means this is run
-1 and every **Previous** field reads `first run`.
-
-**The settings block is the first thing you read and the first thing you compare.**
-Read the six out of the codebase again and set them beside the recorded ones before
-touching the inventory. A setting that moved changes what the already-closed
-documents retrieve — a new segment size re-cuts every one of them — so the closed
-section's acceptance suites re-run **before** a new block is ranked. That re-run is
-`corpus-retrieval-tests`, which a model cannot load and this skill cannot execute:
-ask the user to run corpus-retrieval-tests, which they invoke by name, and rank
-nothing until its result is back. A run that
-spends its cap on ten new migrations while the corpus it already owns retrieves
-worse than it did last quarter is a net loss the ledger could have prevented.
-
-**"Already migrated" is a row in the closed section**, carrying the date, the
-document the block became, and the test that proves it. Closed rows are never
-deleted: deleting them is how a fact walks back into the prompt with nobody able
-to say it had ever left.
-
-**The regression this pass exists to catch is new domain prose landing back in the
-prompt**, because the prompt is the easy place to put it — no ingestion, no test,
-no review of a document nobody owns. Detect it by diffing this run's inventory
-against the last: a block that is new is either genuinely new content or a
-re-import, and the closed section's subjects tell you which before you rank it.
-
-### The check runs in both directions
-
-`scripts/check-tool-catalogue.py` in this repository is the precedent, and its own
-header says why the reverse direction earns its keep: a key in code and absent from
-configuration "compiles, passes every unit test, and fails only when a user asks
-the question that reaches it", while "a configured host nothing calls is an
-allow-listed destination with no reason to be reachable". A corpus has both
-failures:
-
-- **prompt → corpus.** A fact present in both is the duplication above. Grep each
-  closed row's subject against a freshly captured payload; a hit is a migration
-  that did not finish.
-- **corpus → prompt, the direction that is easy to skip.** A document the migration
-  wrote that nothing routes to — embedded, correct, never retrieved, invisible
-  because no test asks for it. **Every document in the corpus must be the intended
-  chunk of at least one acceptance row** — `expected_source` in the query set. That
-  is the same assertion `corpus-retrieval-tests` states as its document → row
-  check, and the check itself is owned there, not specified a second time here: ask
-  the user to run corpus-retrieval-tests, which they invoke by name, and record the
-  result in the ledger.
+Read the ledger before the codebase, and compare its settings block before touching
+the inventory: a setting that moved re-cuts every closed document, so the closed
+section's acceptance suites re-run — the user's run of `corpus-retrieval-tests` —
+before anything new is ranked → [`RE-RUNS.md`](RE-RUNS.md), with the closed
+section and *The check runs in both directions*.
 
 ## Not this skill's ground
 
