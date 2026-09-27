@@ -22,7 +22,8 @@ class GitTest {
         assertThatThrownBy(() -> Git.runOrThrow(repository, "diff", "--name-only", "no-such-ref"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("git diff --name-only no-such-ref failed")
-                .hasMessageContaining("no-such-ref");
+                .as("git's own diagnosis, which the command text alone never contains")
+                .hasMessageContaining("fatal:");
         assertThat(Git.run(repository, "diff", "--name-only", "no-such-ref").stderr())
                 .as("stderr is captured apart from stdout")
                 .isNotBlank();
