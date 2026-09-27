@@ -56,7 +56,7 @@ Each entry below carries three things beside its scenarios:
 - **which skills it hands work to** — where its own text stops and says so;
 - **which hand work to it** — the mirror, read from the neighbour's file;
 - **the discriminator** — the noun, or the question, that decides which of the two
-  owns a piece of ground. *"Under fifteen tools or over"* is a discriminator.
+  owns a piece of ground. *"Under ten tools or over"* is a discriminator.
   *"Related"* is not.
 
 One group of edges is an order rather than a preference. **Three of them form a
@@ -120,8 +120,8 @@ flowchart TB
     CT -->|"rows, gates, thresholds"| EV
 
     AT -->|"contract"| BND
-    BND -->|"past ~15 tools"| PD
-    PD -->|"under ~15"| BND
+    BND -->|"10+ tools"| PD
+    PD -->|"under 10"| BND
     BND -->|"rules spanning the set"| AS
     AS -->|"score before shipping"| RV
     RV -->|"single-item defect"| BND
@@ -176,7 +176,7 @@ parameters would let the model name a destination.
 
 | Neighbour | Way | The discriminator |
 |---|---|---|
-| `progressive-tool-disclosure` | both ways | **how many tools the model is choosing from.** Under about fifteen a wrong pick is one description's fault and belongs here; past fifteen it is the length of the list, and belongs there. Both descriptions carry the clause |
+| `progressive-tool-disclosure` | both ways | **how many tools the model is choosing from.** Under ten a wrong pick is one description's fault and belongs here; from ten up it is the length of the list, and belongs there. Both descriptions carry the clause |
 | `authoring-agent-tools` | handed by | **does the tool exist yet?** Not yet is the interview; already shipped is this page |
 | `reviewing-agent-tools-and-skills` | handed by | **one item, or the whole layer?** A defect you can see reading one tool alone is this page's single-item review; one visible only against its neighbours is the sweep's |
 | `agentic-codebase-audit` | handed by | **fact or doctrine.** The audit records what a validated argument looks like today; this page says what it should have been |
@@ -200,7 +200,7 @@ count grew and selection accuracy fell with it.
 
 | Neighbour | Way | The discriminator |
 |---|---|---|
-| `agentic-tool-boundary` | both ways | **the count again, from the other side.** Under about fifteen tools this page has nothing to sell: the fix is one description, not a mechanism |
+| `agentic-tool-boundary` | both ways | **the count again, from the other side.** Under ten tools this page has nothing to sell: the fix is one description, not a mechanism |
 | `authoring-agent-skills` | handed by | **whether to group, or what the grouping document says.** This page decides that tools should sit behind an activation; that page writes the text |
 | `reviewing-agent-tools-and-skills` | handed by | **economics versus inventory.** The cost of disclosure is this page's; which items are exposed on a given turn is the sweep's, and a dump taken with nothing activated never held the deferred half |
 | `agentic-service-composition` | handed by | **the ~80-token schema figure.** Composition borrows it to price a merged service that inherits schemas it never calls; the figure itself is this page's |
@@ -399,7 +399,7 @@ the census column recording how each tool reaches the model rests on the second.
 
 | Neighbour | Way | The discriminator |
 |---|---|---|
-| `progressive-tool-disclosure` | handed by | **whether versus how.** The token math, skills against search, and the roughly-fifteen threshold decide that this mechanism is the right one; this page assumes that decision was made and runs it. A reader who has not made it is sent back, and the first of the four exits here says so |
+| `progressive-tool-disclosure` | handed by | **whether versus how.** The token math, which tools stay searchable beside skills, and the ten-tool threshold decide that this mechanism is the right one; this page assumes that decision was made and runs it. A reader who has not made it is sent back, and the first of the four exits here says so |
 | `agentic-tool-boundary` | both ways | **the description's second job.** House style, bounded results and a failure returned as a value are that page's and do not change. What changes is that a description must now be *retrieved* before it can *route* — a job the boundary never had to give it, and the reason a description can be flawless and still never reach the model |
 | `reviewing-agent-tools-and-skills` | both ways | **rewriting for retrieval versus sweeping for routing.** A rename moves traffic and is measured there; this pass rewrites names and descriptions so search can find them, and hands the routing question back. *Search returned it and the model chose another* is that page's finding, not this one's |
 | `authoring-agent-tools` | hands to | **a description that cannot be written.** When no phrasing separates two tools, the honest finding is one tool where the layer has two, and that is a request for the interview rather than a wording problem |
@@ -677,7 +677,7 @@ looking at the upstream API's query string when they wrote it.
 |---|---|---|---|---|
 | 1 | `authoring-agent-tools` | the model | the request as stated | a sentence list in the words users type, and a contract — or the finding that there is no tool, because the content is stale-but-static and belongs to retrieval, or because two proposed tools answer the same sentences |
 | 2 | `agentic-tool-boundary` | the model | that contract | the argument shape (a catalogue key and a path, never a URL), the projection keep-list, and the value a failed call returns instead of an exception |
-| 3 | `progressive-tool-disclosure` | the model | the resulting tool count | *only past about fifteen*: names in the standing prompt, schemas on activation. Under fifteen this step does not run, and the chain returns to step 2 |
+| 3 | `progressive-tool-disclosure` | the model | the resulting tool count | *only from ten tools up*: names in the standing prompt, schemas on activation. Under ten this step does not run, and the chain returns to step 2 |
 | 4 | `authoring-agent-skills` | the model | the group, plus the rules from step 2 that span the whole set rather than one call | a description that routes and a body that teaches, ordered by when the model needs each part |
 | 5 | `reviewing-agent-tools-and-skills` | **by name** | the new description *and* every neighbouring one | a scored turn set and a verdict per item — and a split request that goes back to step 1 |
 
@@ -693,9 +693,10 @@ says so in its own body.
 *body clean* or *body deferred*. A deferred body is not a failure, it is a finding
 handed back to step 4.
 
-**Step 3 has a second exit.** Past fifteen tools the answer is skills *or* search,
-and they do not compose — a dynamic tool provider, which is how a skill hands its
-tools over, is refreshed after the search filter has already run. When search wins,
+**Step 3 has a second exit.** From ten tools up, skills and search coexist as a
+partition — a dynamic tool provider, which is how a skill hands its tools over, is
+refreshed after the search filter has run, so skill-scoped tools are never
+searchable and regular tools stay searchable. When search is chosen for a layer,
 the chain does not continue here: `tool-search-rollout` is its own by-name pass,
 and a person types it. It re-enters this chain twice, at step 1 when no phrasing
 separates two tools, and at step 5 with the descriptions it rewrote.

@@ -12,7 +12,7 @@ only those enter the request. The standing prompt carries one schema instead of
 fifty.
 
 Whether that is the right mechanism at all belongs to
-`progressive-tool-disclosure` — the token math, skills versus search, when
+`progressive-tool-disclosure` — the token math, which tools stay searchable beside skills, when
 disclosure backfires. This skill assumes that question was asked and search won.
 It is the rollout: a pass with a start, an approval gate and an artefact.
 
@@ -106,7 +106,7 @@ brief 2 — whether a permission model exists is the survey's finding, never an
 assumption made ahead of it. The fourth is answerable only from the census.
 Reaching either of the last two is a completed pass, not a failed one.
 
-**Too few tools.** Under roughly fifteen, search buys a round trip and a
+**Too few tools.** Under ten, search buys a round trip and a
 retrieval failure mode in exchange for a few hundred tokens, and a wrong pick is
 still one description's fault. `agentic-tool-boundary` fixes that layer;
 `progressive-tool-disclosure` carries the threshold argument. Stop here.
