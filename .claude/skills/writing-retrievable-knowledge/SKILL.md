@@ -17,10 +17,11 @@ any one of its pieces, read alone, is worth retrieving.
 | You are here because | Start at |
 |---|---|
 | you are about to write a new corpus document | *Read the splitter before you write a line* |
-| a question that should match this document does not | *An embedding matches the user's words, not the team's*, then *The orphan chunk* |
+| a question that should match this document does not, or the corpus speaks the team's vocabulary | [`USER-VOCABULARY.md`](USER-VOCABULARY.md), then *The orphan chunk* |
 | a retrieved passage arrived meaning nothing on its own | *The orphan chunk* |
 | you are rewriting an existing document to retrieve better | [`WORKED-EXAMPLE.md`](WORKED-EXAMPLE.md) |
 | the document carries a table, a numbered list or a code sample | *Structures that do not survive a cut* |
+| a heading or a tag is expected to help a query match | [`METADATA.md`](METADATA.md) |
 | you are not sure this content belongs in a corpus at all | `retrieval-that-earns-its-place` — that decision comes before this page |
 | this content is currently in a system prompt | ask the user to run `prompt-to-corpus-migration`, which they invoke by name — audit and plan first, write second |
 
@@ -157,43 +158,12 @@ repetition of the subject noun that follows, because that is the point.
 
 ## An embedding matches the user's words, not the team's
 
-The corpus is written by people who know the system, in the vocabulary they use
-with each other. The query is typed by somebody who does not. If the document says
-"circulation period" and the user types "how long can I keep it", nothing anchors,
-and the failure is silent: a top hit with a mediocre score, or nothing above the
-threshold, and no line anywhere saying the words did not meet.
-
-Put the user's phrasing into the document on purpose:
-
-- the **common wrong term** — what people call the thing when they have it slightly
-  wrong;
-- the **abbreviation** and the expansion, both, at least once;
-- the **terse form** somebody types at speed, without punctuation or a verb;
-- the **question itself**, as a heading or as a sentence in the section.
-
-**Where those words come from is one priority-ordered list, and
-`corpus-retrieval-tests` owns it** — a skill a model cannot load, so ask the user to
-run corpus-retrieval-tests, which they invoke by name. Read the list there rather
-than from a second copy on this page: two copies drift, and the one you would be reading is the wrong one. What
-this page needs from that list is only the property that makes it work — the wording
-is somebody else's.
-
-Where this project has none of the sources that list names, write the questions
-yourself and then have
-somebody who has not read the document write twenty more. Questions written by the
-document's author reuse the document's vocabulary and match by construction — a
-rigged green, the same one `authoring-agent-skills` warns about for skill
-descriptions.
-
-**There is one question set, it has one home, and it has one owner.** It is committed
-beside the corpus, and `corpus-retrieval-tests` owns its schema. You build it here to
-know what to write and to check coverage in both directions — or, on a migration run,
-you extend the acceptance questions `prompt-to-corpus-migration` already wrote into
-that same set, rather than starting a second list nobody reconciles. Later,
-`corpus-retrieval-tests` turns each question into a row — the question, the intended
-chunk (`expected_source` in the query set) and the negatives — and owns the diagnosis
-when a row fails. Commit the questions with the document in this pass; do not write
-assertions.
+If the document says "circulation period" and the user types "how long can I keep
+it", nothing anchors, and the miss is silent. Put the user's phrasing into the
+document on purpose — the common wrong term, the abbreviation and its expansion,
+the terse form, the question itself — take the wording from real sources rather
+than from the author, and keep the one question set in its one home →
+[`USER-VOCABULARY.md`](USER-VOCABULARY.md).
 
 ## Structures that do not survive a cut
 
@@ -235,22 +205,10 @@ drifts on the first release nobody thought to re-read this file.
 
 ## Metadata: what travels, and what is matched
 
-Two different questions get confused into one. What **travels with the chunk** is
-what makes attribution and filtering possible, and `retrieval-that-earns-its-place`
-covers why to have it. What is **embedded** is a
-separate setting, and it is the one that changes your writing: if metadata is not
-part of the embedded text, a heading kept only in metadata contributes nothing to
-matching, and every word that must match has to be in the chunk's own text.
-
-**Determine which your framework does; do not assume.** Read the ingest path for
-what is actually passed to the embedding call, or ingest two chunks with identical
-text and different metadata and score a query that matches only the metadata — an
-unchanged score means metadata is not embedded.
-
-What the embedded case costs: metadata repeated on every chunk dilutes the text's
-own signal, since the same few words compete with the sentence they were meant to
-help — which is why a heading that matters belongs in the prose whatever the setting
-turns out to be.
+What travels with a chunk and what is embedded are two settings. If metadata is not
+embedded, every word that must match has to be in the chunk's own text — so find
+out which your framework does rather than assuming →
+[`METADATA.md`](METADATA.md), with the two-chunk comparison that settles it.
 
 ## Where this sits in the order of work
 
