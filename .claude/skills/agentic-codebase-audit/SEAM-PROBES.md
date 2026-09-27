@@ -105,7 +105,8 @@ Doctrine belongs to `agentic-tool-boundary`. These are inventory queries.
 4. **Read the framework's *default* tool-error handler**, not yours, and record
    verbatim what the model would see. Assume nothing here. In LangChain4j it is
    whatever runs where `toolExecutionErrorHandler` and `hallucinatedToolNameStrategy`
-   are unset on the AI Service builder — the second one's default throws.
+   are unset on the AI Service builder — the second one's default throws [sourced — `HallucinatedToolNameStrategy`
+   at tag 1.20.1 of github.com/langchain4j/langchain4j, read 2026-09-27].
 5. **Trigger the largest response each tool can produce and record the bytes.**
    Compare against the per-source budget; having no budget is itself the finding.
    Illustrative bands for the report: over ~10 KB is a plan entry, over ~100 KB

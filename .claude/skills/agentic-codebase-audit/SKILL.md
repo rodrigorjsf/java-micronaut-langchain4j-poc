@@ -285,7 +285,8 @@ common and most expensive:
 2. **Memory, probe 6.2** — the key builder and what partitions one caller from
    another.
 3. **Tool boundary, probes 3.3 and 3.4** — the destination-parameter list, and
-   the framework's default error handler read verbatim.
+   the framework's default error handler read verbatim (in LangChain4j, what runs
+   where `toolExecutionErrorHandler` is unset).
 4. **Model access, probes 1.1 and 1.4** — the construction sites, and the bound
    this codebase chose on the call.
 

@@ -11,7 +11,6 @@ import org.junit.jupiter.params.provider.MethodSource;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -34,7 +33,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * &amp; Exploitation", "Tool Misuse and Exploitation") reads as three items, and a reader
  * searching for one spelling misses the other two. The canonical list below is the entry
  * headings of the primary document — <i>OWASP Top 10 for Agentic Applications 2026</i>,
- * OWASP GenAI Security Project, December 2025, pp. 9–36 [sourced, read 2026-09-27]. Its
+ * OWASP GenAI Security Project, December 2025, pp. 9–36 [sourced —
+ * https://genai.owasp.org/download/52117, read 2026-09-27]. Its
  * at-a-glance page and appendices abbreviate some of them with {@code &amp;}; the entry
  * headings are the document's own titles, so they win.
  *
@@ -42,7 +42,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * ({@code ASI02 Tool Misuse and Exploitation}, {@code ASI02: …}, {@code ASI02 – …},
  * {@code ASI02 (…)}, {@code | ASI02 | …}) or before it ({@code Tool Misuse and Exploitation
  * (ASI02)}). A capitalised word in either position is read as a title and must be the
- * canonical one; lower-case prose ({@code ASI07 in full}) is not a title.
+ * canonical one, and nothing capitalised may extend it on either side; lower-case prose
+ * ({@code ASI07 in full}) is not a title.
  *
  * <p><b>LangChain4j knobs.</b> A skill that stays framework-generic still names the
  * LangChain4j setting in one clause, so a reader can find it. Each name is resolved by
@@ -88,7 +89,8 @@ class TeachingSkillVocabularyTest {
                     continue;
                 }
                 String canonical = CANONICAL_ASI_TITLES.get(id);
-                if (!rest.startsWith(canonical)) {
+                if (!rest.startsWith(canonical)
+                        || startsLikeATitle(rest.substring(canonical.length()).stripLeading())) {
                     violations.add(where + ": " + id + " followed by \"" + excerpt(rest) + "\"");
                 }
             }
@@ -97,12 +99,18 @@ class TeachingSkillVocabularyTest {
             while (before.find()) {
                 String id = before.group(1);
                 String head = text.substring(0, before.start());
-                String lastWord = head.substring(head.lastIndexOf(' ') + 1);
+                String lastWord = head.substring(head.lastIndexOf(' ') + 1).replaceFirst("^\\(", "");
                 if (!startsLikeATitle(lastWord)) {
                     continue;
                 }
                 String canonical = CANONICAL_ASI_TITLES.get(id);
-                if (!head.endsWith(canonical)) {
+                String beforeTitle = head.endsWith(canonical)
+                        ? head.substring(0, head.length() - canonical.length()).stripTrailing()
+                        : null;
+                String wordBefore = beforeTitle == null
+                        ? ""
+                        : beforeTitle.substring(beforeTitle.lastIndexOf(' ') + 1);
+                if (beforeTitle == null || startsLikeATitle(wordBefore)) {
                     violations.add(where + ": \"" + tail(head) + "\" before (" + id + ")");
                 }
             }
@@ -116,26 +124,26 @@ class TeachingSkillVocabularyTest {
     static Stream<Arguments> knobs() {
         return Stream.of(
                 Arguments.of(AiServices.class, "storeRetrievedContentInChatMemory",
-                        "retrieval-that-earns-its-place/SKILL.md"),
+                        "storeRetrievedContentInChatMemory(false)", "retrieval-that-earns-its-place/SKILL.md"),
                 Arguments.of(AiServices.class, "toolExecutionErrorHandler",
-                        "agentic-tool-boundary/SKILL.md"),
+                        "`toolExecutionErrorHandler`", "agentic-tool-boundary/SKILL.md"),
                 Arguments.of(AiServices.class, "toolArgumentsErrorHandler",
-                        "agentic-tool-boundary/SKILL.md"),
+                        "`toolArgumentsErrorHandler`", "agentic-tool-boundary/SKILL.md"),
                 Arguments.of(AiServices.class, "toolExecutionErrorHandler",
-                        "agentic-codebase-audit/SEAM-PROBES.md"),
+                        "`toolExecutionErrorHandler`", "agentic-codebase-audit/SEAM-PROBES.md"),
                 Arguments.of(AiServices.class, "hallucinatedToolNameStrategy",
-                        "agentic-service-composition/SKILL.md"),
+                        "`hallucinatedToolNameStrategy`", "agentic-service-composition/SKILL.md"),
                 Arguments.of(AiServices.class, "hallucinatedToolNameStrategy",
-                        "agentic-codebase-audit/SEAM-PROBES.md"),
+                        "`hallucinatedToolNameStrategy`", "agentic-codebase-audit/SEAM-PROBES.md"),
                 Arguments.of(DocumentSplitters.class, "recursive",
-                        "writing-retrievable-knowledge/SKILL.md"));
+                        "`DocumentSplitters.recursive(", "writing-retrievable-knowledge/SKILL.md"));
     }
 
-    @ParameterizedTest(name = "{0}.{1} is named in {2} and exists in this LangChain4j")
+    @ParameterizedTest(name = "{0}.{1} is named in {3} and exists in this LangChain4j")
     @MethodSource("knobs")
-    void aKnobASkillNamesResolvesInTheLangChain4jInUse(Class<?> owner, String method, String skill) {
+    void aKnobASkillNamesResolvesInTheLangChain4jInUse(
+            Class<?> owner, String method, String reference, String skill) {
         boolean resolves = Arrays.stream(owner.getMethods())
-                .filter(m -> Modifier.isPublic(m.getModifiers()))
                 .map(Method::getName)
                 .anyMatch(method::equals);
         assertThat(resolves)
@@ -143,9 +151,6 @@ class TeachingSkillVocabularyTest {
                         owner.getSimpleName(), method)
                 .isTrue();
 
-        String reference = owner == DocumentSplitters.class
-                ? owner.getSimpleName() + "." + method
-                : method;
         assertThat(read(SKILLS.resolve(skill)))
                 .as("%s should name the LangChain4j knob %s", skill, reference)
                 .contains(reference);

@@ -123,7 +123,10 @@ logs, then in your observability pipeline.
 
 Return a shaped result instead. Log the real cause where operators can see it.
 In LangChain4j that means setting `toolExecutionErrorHandler` on the AI Service
-builder — the async table below is why the default is not even one behaviour.
+builder — the async table below is why the default is not even one behaviour
+[sourced — `AiServices` javadoc,
+https://github.com/langchain4j/langchain4j/blob/1.20.1/langchain4j/src/main/java/dev/langchain4j/service/AiServices.java,
+read 2026-09-27].
 
 **And shape the text for recovery.** A result that only says "error" makes the
 model retry the same call or invent an answer. Each outcome states what happened

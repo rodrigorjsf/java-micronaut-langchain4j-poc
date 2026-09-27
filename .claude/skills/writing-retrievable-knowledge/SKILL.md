@@ -58,8 +58,8 @@ mis-sized by about that factor in one direction or the other. Settle it by readi
 the parameter's documentation for that version, or by ingesting one document and
 printing the length of a produced chunk in both units. In LangChain4j 1.20.x,
 `DocumentSplitters.recursive(size, overlap)` counts characters and the overload that
-takes a `TokenCountEstimator` counts tokens [sourced — `DocumentSplitters` javadoc
-at tag 1.20.1, read 2026-09-27].
+takes a `TokenCountEstimator` counts tokens [sourced — `DocumentSplitters` javadoc,
+https://github.com/langchain4j/langchain4j/blob/1.20.1/langchain4j/src/main/java/dev/langchain4j/data/document/splitter/DocumentSplitters.java, read 2026-09-27].
 
 Then read what each number changes about the writing:
 
