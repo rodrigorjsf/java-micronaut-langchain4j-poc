@@ -46,9 +46,13 @@ public record Scenario(String id,
             "missing-info", "out-of-territory", UPSTREAM_FAILURE, "injection", "ambiguous")));
 
     /** Every kind a row may declare. */
-    public static final Set<String> KINDS = Collections.unmodifiableSortedSet(new TreeSet<>(Set.of(
-            HAPPY, "missing-info", "out-of-territory", UPSTREAM_FAILURE, "injection", "ambiguous",
-            MULTI_TURN, "cross-domain", "out-of-scope")));
+    public static final Set<String> KINDS = kinds();
+
+    private static Set<String> kinds() {
+        var kinds = new TreeSet<>(BAD_PATH_KINDS);
+        kinds.addAll(Set.of(HAPPY, MULTI_TURN, "cross-domain", "out-of-scope"));
+        return Collections.unmodifiableSortedSet(kinds);
+    }
 
     /** Where a row's input came from. */
     public static final Set<String> SOURCES = Collections.unmodifiableSortedSet(new TreeSet<>(Set.of("trace", "synthetic", "user")));

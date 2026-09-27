@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -254,7 +255,7 @@ class EvalReportRendererTest {
     @Test
     @DisplayName("with every artifact covered and every dependency known, the report says so")
     void rendersFullCoverage() {
-        var html = EvalReportRenderer.render(List.of(), new ScenarioCoverage(List.of(), List.of(), List.of()), EVERYTHING);
+        var html = EvalReportRenderer.render(List.of(), ScenarioCoverage.empty(), EVERYTHING);
 
         assertThat(html)
                 .contains("<p>none: every artifact is named by at least one scenario</p>")
@@ -264,18 +265,18 @@ class EvalReportRendererTest {
     @Test
     @DisplayName("the summary names what the run was narrowed to")
     void rendersTheSelection() {
-        var selection = new ScenarioSelection("weather", null, "main", java.util.Set.of("get_weather"));
+        var selection = new ScenarioSelection("weather", null, "main", Set.of("get_weather"));
 
-        var html = EvalReportRenderer.render(List.of(), new ScenarioCoverage(List.of(), List.of(), List.of()), selection);
+        var html = EvalReportRenderer.render(List.of(), ScenarioCoverage.empty(), selection);
 
         assertThat(summaryLine(html, "Selection"))
                 .contains("domain weather; depends on an artifact changed since main: [get_weather]");
     }
 
-    private static final ScenarioSelection EVERYTHING = new ScenarioSelection(null, null, null, java.util.Set.of());
+    private static final ScenarioSelection EVERYTHING = ScenarioSelection.everything();
 
     private static String render(List<ScenarioRuns> runs) {
-        return EvalReportRenderer.render(runs, new ScenarioCoverage(List.of(), List.of(), List.of()), EVERYTHING);
+        return EvalReportRenderer.render(runs, ScenarioCoverage.empty(), EVERYTHING);
     }
 
     /** The one summary row that starts with {@code label}, so an assertion cannot match elsewhere. */

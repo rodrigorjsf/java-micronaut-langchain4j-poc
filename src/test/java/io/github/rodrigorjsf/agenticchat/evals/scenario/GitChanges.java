@@ -16,6 +16,9 @@ import java.util.TreeSet;
  * <p>The working tree, not {@code HEAD}: the change a developer is about to commit is exactly the
  * one whose scenarios they want to run. Uncommitted edits and untracked files both count.
  *
+ * <p>Paths are relative to {@code repositoryRoot} on both sides ({@code --relative}), so the root
+ * need not be the top of the git checkout.
+ *
  * <p>Only the files git reports as changed are read at the ref; every other file is the same on
  * both sides, so the "before" tree is the working tree with those files swapped back.
  */
@@ -30,8 +33,8 @@ public final class GitChanges {
                     + "', which git cannot resolve to a commit in " + repositoryRoot);
         }
         var changedPaths = new TreeSet<String>();
-        changedPaths.addAll(lines(ok(repositoryRoot, "diff", "--name-only", "--no-renames", ref, "--", "src/main")));
-        changedPaths.addAll(lines(ok(repositoryRoot, "ls-files", "--others", "--exclude-standard", "--", "src/main")));
+        changedPaths.addAll(lines(runOrThrow(repositoryRoot, "diff", "--name-only", "--relative", "--no-renames", ref, "--", "src/main")));
+        changedPaths.addAll(lines(runOrThrow(repositoryRoot, "ls-files", "--others", "--exclude-standard", "--", "src/main")));
         changedPaths.removeIf(path -> !ArtifactInventory.isInventoried(path));
 
         var after = ArtifactInventory.readWorkingTree(repositoryRoot);
@@ -49,7 +52,7 @@ public final class GitChanges {
     private record Result(int exitCode, String output) {
     }
 
-    private static String ok(Path directory, String... args) {
+    private static String runOrThrow(Path directory, String... args) {
         var result = run(directory, args);
         if (result.exitCode() != 0) {
             throw new IllegalStateException("git " + String.join(" ", args) + " failed: " + result.output());

@@ -7,11 +7,15 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -86,10 +90,10 @@ public record ArtifactInventory(Map<Artifact, String> fingerprints) {
      */
     public static Set<String> changed(ArtifactInventory before, ArtifactInventory after) {
         var changed = new TreeSet<String>();
-        var all = new java.util.HashSet<>(before.fingerprints.keySet());
+        var all = new HashSet<>(before.fingerprints.keySet());
         all.addAll(after.fingerprints.keySet());
         for (Artifact artifact : all) {
-            if (!java.util.Objects.equals(before.fingerprints.get(artifact), after.fingerprints.get(artifact))) {
+            if (!Objects.equals(before.fingerprints.get(artifact), after.fingerprints.get(artifact))) {
                 changed.add(artifact.id());
             }
         }
@@ -105,7 +109,7 @@ public record ArtifactInventory(Map<Artifact, String> fingerprints) {
         skills(sorted, fingerprints);
         sorted.forEach((path, content) -> {
             if (path.startsWith(JAVA) && path.endsWith(".java")) {
-                tools(content, fingerprints);
+                tools(path, content, fingerprints);
                 subAgent(content, fingerprints);
                 if (path.endsWith("/" + PROMPT_BUILDER)) {
                     promptSections(content, fingerprints);
@@ -123,6 +127,11 @@ public record ArtifactInventory(Map<Artifact, String> fingerprints) {
             }
         });
         return new ArtifactInventory(fingerprints);
+    }
+
+    /** The inventory of a checkout as it is on disk, uncommitted edits included. */
+    public static ArtifactInventory ofWorkingTree(Path repositoryRoot) {
+        return scan(readWorkingTree(repositoryRoot));
     }
 
     /** Reads every file under {@code src/main} of a checkout, keyed the way {@link #scan} expects. */
@@ -168,34 +177,43 @@ public record ArtifactInventory(Map<Artifact, String> fingerprints) {
      * description and parameters the model reads. What is left of the file once every header is
      * cut out is code the class's tools may share, so it is part of every tool's fingerprint.
      */
-    private static void tools(String source, Map<Artifact, String> fingerprints) {
+    private static void tools(String path, String source, Map<Artifact, String> fingerprints) {
+        var starts = new ArrayList<Integer>();
         Matcher annotation = TOOL_ANNOTATION.matcher(source);
-        var headers = new LinkedHashMap<String, int[]>();
         while (annotation.find()) {
-            Matcher method = PUBLIC_METHOD.matcher(source);
-            if (!method.find(annotation.start())) {
-                continue;
-            }
-            int brace = source.indexOf('{', method.end());
-            headers.put(method.group(1), new int[]{annotation.start(), brace < 0 ? source.length() : brace});
+            starts.add(annotation.start());
         }
-        if (headers.isEmpty()) {
-            return;
+        var headers = new ArrayList<Header>();
+        for (int i = 0; i < starts.size(); i++) {
+            int limit = i + 1 < starts.size() ? starts.get(i + 1) : source.length();
+            Matcher method = PUBLIC_METHOD.matcher(source).region(starts.get(i), limit);
+            int brace = method.find() ? source.indexOf('{', method.end()) : -1;
+            if (brace < 0 || brace > limit) {
+                // Crediting the annotation to the next tool's method would drop this tool from the
+                // inventory without a trace, so it can neither be selected nor reported uncovered.
+                throw new IllegalStateException("A @Tool in " + path
+                        + " is not followed by a public method before the next @Tool; the inventory cannot name it");
+            }
+            headers.add(new Header(method.group(1), starts.get(i), brace));
         }
         var shared = new StringBuilder();
         int from = 0;
-        for (int[] span : headers.values()) {
-            shared.append(source, from, span[0]);
-            from = span[1];
+        for (Header header : headers) {
+            shared.append(source, from, header.start());
+            from = header.end();
         }
         shared.append(source.substring(from));
-        headers.forEach((name, span) ->
-                put(fingerprints, Kind.TOOL, name, source.substring(span[0], span[1]) + "\n--\n" + shared));
+        headers.forEach(header -> put(fingerprints, Kind.TOOL, header.name(),
+                source.substring(header.start(), header.end()) + "\n--\n" + shared));
+    }
+
+    /** The span of a tool's header: from its {@code @Tool} to its method's opening brace. */
+    private record Header(String name, int start, int end) {
     }
 
     private static void subAgent(String source, Map<Artifact, String> fingerprints) {
         Matcher agent = AGENT_NAME.matcher(source);
-        if (agent.find()) {
+        while (agent.find()) {
             put(fingerprints, Kind.SUB_AGENT, agent.group(1), source);
         }
     }
@@ -238,12 +256,21 @@ public record ArtifactInventory(Map<Artifact, String> fingerprints) {
         }
     }
 
+    /**
+     * A {@code dependsOn} entry is a bare identifier, so two artifacts sharing one — of the same
+     * kind or not — could not be told apart: an edit to one would select, or cover, the other.
+     */
     private static void put(Map<Artifact, String> fingerprints, Kind kind, String id, String text) {
+        fingerprints.keySet().stream().filter(existing -> existing.id().equals(id)).findFirst()
+                .ifPresent(existing -> {
+                    throw new IllegalStateException("Two artifacts are named '" + id + "' (" + existing.kind()
+                            + " and " + kind + "); a scenario's dependsOn could not tell them apart");
+                });
         fingerprints.put(new Artifact(kind, id), text);
     }
 
     private static String slug(String heading) {
-        return heading.strip().toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9]+", "-")
+        return heading.strip().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "-")
                 .replaceAll("(^-|-$)", "");
     }
 }

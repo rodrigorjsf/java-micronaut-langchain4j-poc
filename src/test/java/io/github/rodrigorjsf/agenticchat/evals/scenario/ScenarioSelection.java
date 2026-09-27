@@ -38,6 +38,11 @@ public record ScenarioSelection(String domain, List<String> ids, String changedS
         changedArtifacts = Collections.unmodifiableSortedSet(new TreeSet<>(changedArtifacts));
     }
 
+    /** No filter: every row runs. */
+    public static ScenarioSelection everything() {
+        return new ScenarioSelection(null, null, null, Set.of());
+    }
+
     /**
      * @param property         reads a system property; {@code System::getProperty} in the eval
      * @param changedArtifacts the artifacts changed since a git ref; only called in diff mode

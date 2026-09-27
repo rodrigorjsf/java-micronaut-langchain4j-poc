@@ -102,7 +102,7 @@ class ScenarioCoverageTest {
     @Test
     @DisplayName("every dependsOn of the committed dataset names an artifact of this repository")
     void theCommittedDatasetNamesOnlyRealArtifacts() {
-        var repository = ArtifactInventory.scan(ArtifactInventory.readWorkingTree(Path.of(System.getProperty("user.dir"))));
+        var repository = ArtifactInventory.ofWorkingTree(Path.of(System.getProperty("user.dir")));
 
         var coverage = ScenarioCoverage.of(ScenarioDataset.loadCommitted(), ScenarioDataset.loadStatefulDomains(),
                 repository);

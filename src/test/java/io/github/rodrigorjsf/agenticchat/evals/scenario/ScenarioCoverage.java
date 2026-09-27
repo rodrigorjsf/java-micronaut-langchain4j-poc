@@ -40,6 +40,11 @@ public record ScenarioCoverage(List<DomainCoverage> domains, List<Artifact> unco
                                  boolean stateful, List<String> gaps) {
     }
 
+    /** Nothing measured yet: what the report shows when the dataset never loaded. */
+    public static ScenarioCoverage empty() {
+        return new ScenarioCoverage(List.of(), List.of(), List.of());
+    }
+
     public ScenarioCoverage {
         domains = List.copyOf(domains);
         uncovered = List.copyOf(uncovered);

@@ -8,8 +8,10 @@ import org.junit.jupiter.api.Test;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ArtifactInventoryTest {
 
@@ -198,9 +200,52 @@ class ArtifactInventoryTest {
     }
 
     @Test
+    @DisplayName("a @Tool without a public method is refused rather than credited to the next tool")
+    void aToolWithoutAPublicMethodIsRefused() {
+        var files = tree();
+        files.put(TOOLS, TOOLS_SOURCE.replace("public String find_place(", "String find_place("));
+
+        assertThatThrownBy(() -> ArtifactInventory.scan(files))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining(TOOLS);
+    }
+
+    @Test
+    @DisplayName("two artifacts with one identifier are refused: dependsOn could not tell them apart")
+    void aDuplicateIdentifierIsRefused() {
+        var files = tree();
+        files.put("src/main/java/demo/tools/OtherTools.java", """
+                public class OtherTools {
+                    @Tool("Another forecast.")
+                    public String get_weather(String q) {
+                        return q;
+                    }
+                }
+                """);
+
+        assertThatThrownBy(() -> ArtifactInventory.scan(files))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("get_weather");
+    }
+
+    @Test
+    @DisplayName("every sub-agent of a file is inventoried")
+    void everySubAgentOfAFileCounts() {
+        var files = tree();
+        files.put(AGENT, files.get(AGENT) + """
+                interface SecondAgent {
+                    @Agent(name = "holiday_checker")
+                    String check(@V("date") String date);
+                }
+                """);
+
+        assertThat(ArtifactInventory.scan(files).ids()).contains("weather_reporter", "holiday_checker");
+    }
+
+    @Test
     @DisplayName("the repository's own sources yield the artifacts the committed dataset names")
     void scansThisRepository() {
-        var inventory = ArtifactInventory.scan(ArtifactInventory.readWorkingTree(Path.of(System.getProperty("user.dir"))));
+        var inventory = ArtifactInventory.ofWorkingTree(Path.of(System.getProperty("user.dir")));
 
         assertThat(inventory.ids()).contains("geo-and-weather", "get_weather", "open-meteo-forecast",
                 "weather_reporter", "trip_briefing", "system-prompt#role", "system-prompt#non-negotiable-rules",
@@ -208,7 +253,7 @@ class ArtifactInventoryTest {
         assertThat(inventory.ids()).doesNotContain("system-prompt#code");
     }
 
-    private static java.util.Set<String> changed(Map<String, String> before, Map<String, String> after) {
+    private static Set<String> changed(Map<String, String> before, Map<String, String> after) {
         return ArtifactInventory.changed(ArtifactInventory.scan(before), ArtifactInventory.scan(after));
     }
 }

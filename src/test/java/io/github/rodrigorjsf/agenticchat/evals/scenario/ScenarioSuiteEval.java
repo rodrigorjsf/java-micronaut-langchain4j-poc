@@ -21,7 +21,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -69,8 +68,8 @@ class ScenarioSuiteEval {
     private EmbeddedServer stub;
     private ScenarioRunner runner;
     private final List<ScenarioRuns> scenarioRuns = new ArrayList<>();
-    private ScenarioCoverage coverage = new ScenarioCoverage(List.of(), List.of(), List.of());
-    private ScenarioSelection selection = new ScenarioSelection(null, null, null, Set.of());
+    private ScenarioCoverage coverage = ScenarioCoverage.empty();
+    private ScenarioSelection selection = ScenarioSelection.everything();
 
     @BeforeAll
     void startApp() {
@@ -134,7 +133,7 @@ class ScenarioSuiteEval {
         var dataset = ScenarioDataset.loadCommitted();
         assertThat(dataset).isNotEmpty();
         coverage = ScenarioCoverage.of(dataset, ScenarioDataset.loadStatefulDomains(),
-                ArtifactInventory.scan(ArtifactInventory.readWorkingTree(REPOSITORY)));
+                ArtifactInventory.ofWorkingTree(REPOSITORY));
         selection = ScenarioSelection.fromProperties(System::getProperty,
                 ref -> GitChanges.changedArtifactsSince(REPOSITORY, ref));
         var scenarios = selection.apply(dataset);

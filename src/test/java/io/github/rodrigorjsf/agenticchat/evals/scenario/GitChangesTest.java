@@ -7,6 +7,8 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -58,9 +60,9 @@ class GitChangesTest {
     }
 
     private void git(String... args) throws Exception {
-        var command = new java.util.ArrayList<>(java.util.List.of("git", "-c", "user.name=test",
+        var command = new ArrayList<>(List.of("git", "-c", "user.name=test",
                 "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false"));
-        command.addAll(java.util.List.of(args));
+        command.addAll(List.of(args));
         var process = new ProcessBuilder(command).directory(repo.toFile()).redirectErrorStream(true).start();
         var output = new String(process.getInputStream().readAllBytes());
         assertThat(process.waitFor()).as(output).isZero();

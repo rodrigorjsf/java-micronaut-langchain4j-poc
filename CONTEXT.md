@@ -194,7 +194,17 @@ calls), the answer, and optionally a rubric. A scenario belongs to one domain, o
 to several when the turn crosses them, and declares the artifacts it depends on so
 that a change to one of them names the scenarios to revisit. Its kind is a happy
 path or a bad path; injection, out-of-scope and multi-turn memory are kinds of
-scenario, not domains.
+scenario, not domains. Five kinds are the **named bad paths** that count toward a
+domain's coverage floor (at least 2 happy paths, 3 named bad paths, and one
+multi-turn scenario when the domain holds state): missing information, a request
+outside the territory, an upstream failure, an injection inside a domain request,
+and an ambiguous request.
+
+**Artifact** — anything whose change can change what the model answers, as a
+scenario's `dependsOn` names it: a skill, a tool, a system-prompt section, a
+tool-catalogue key, a sub-agent. An artifact no scenario depends on is
+**uncovered**; **diff mode** runs the scenarios whose artifacts changed since a git
+ref.
 
 **Grounding** — the check that a value in the answer appears in a tool result
 captured during the same run. It is how a scenario asserts on live data whose value
