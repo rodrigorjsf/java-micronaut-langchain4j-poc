@@ -26,9 +26,9 @@ in both tables below.
 | **the model** | the harness matches the turn against the `description` and loads the body | you do not ask for it; you describe the problem, and a description written for that sentence pulls the skill in |
 | **by name** | the frontmatter carries `disable-model-invocation: true`, so nothing fires it automatically | a person runs it deliberately — these are sweeps and audits, work with a start and an artefact, not advice mid-turn |
 
-Five skills carry `disable-model-invocation: true`. The by-name ones are the passes
+Six skills carry `disable-model-invocation: true`. The by-name ones are the passes
 that produce a document: an audit, a sweep, a migration plan, a committed query
-set, a tool-search rollout. A skill that would only ever be right on a turn nobody types is better as a
+set, a tool-search rollout, a scenario dataset. A skill that would only ever be right on a turn nobody types is better as a
 procedure someone invokes than as a description paid for on every turn of every
 conversation.
 
@@ -110,6 +110,7 @@ flowchart TB
         GL["gauntlet-loop"]
         SA["subagent-context-isolation"]
         EV["agentic-evals"]
+        SS["agentic-scenario-suite<br/><i>by name</i>"]
     end
 
     RT -->|"corpus justified"| PM
@@ -137,13 +138,14 @@ flowchart TB
 
     GL -->|"the split"| SA
     GL -->|"does the judge track anything?"| EV
+    SS -->|"sizing, gates, grader calibration"| EV
     SA -->|"roles in one process"| SC
 
     class AU,RT entry
     class PM,WK,CT corpus
     class AT,BND,PD,AS,RV,TSR tools
     class SC,PI,CO,MEM,TG runtime
-    class GL,SA,EV bar
+    class GL,SA,EV,SS bar
 ```
 
 ## Skills that describe a piece of this design
@@ -307,6 +309,7 @@ assemble and drive the runtime.
 | [`writing-retrievable-knowledge`](../.claude/skills/writing-retrievable-knowledge/SKILL.md) | writing a document so that one retrieved chunk of it answers the user alone | the model |
 | [`corpus-retrieval-tests`](../.claude/skills/corpus-retrieval-tests/SKILL.md) | the committed query set that proves a corpus answers, and the diagnosis when one row stops | **by name** |
 | [`agentic-evals`](../.claude/skills/agentic-evals/SKILL.md) | proving a prompt, classifier or guardrail change safe — what gates a build and what only reports | the model |
+| [`agentic-scenario-suite`](../.claude/skills/agentic-scenario-suite/SKILL.md) | the committed end-to-end scenario dataset: every artifact that changes an answer inventoried, every domain at its coverage floor, and the rows an artifact change puts at risk | **by name** |
 | [`agentic-service-composition`](../.claude/skills/agentic-service-composition/SKILL.md) | wiring a runtime out of one service per role, and attaching guardrails where they actually run | the model |
 | [`conversation-memory-and-compaction`](../.claude/skills/conversation-memory-and-compaction/SKILL.md) | deciding what a turn carries forward and what it may forget | the model |
 | [`subagent-context-isolation`](../.claude/skills/subagent-context-isolation/SKILL.md) | spending a sub-agent only where the context it throws away is worth the extra calls | the model |
@@ -531,7 +534,33 @@ and someone has to show nothing regressed.
 | `reviewing-agent-tools-and-skills` | hands to | **the routing turn set**, which that sweep owns end to end |
 | `conversation-memory-and-compaction` | hands to | **the invariant versus the assertion.** That page owns *compaction preserves the state that gates behaviour*; this page owns the test that keeps it true through the next edit |
 | `agentic-service-composition` | both ways | the same split at the cache floor — *the standing prompt is byte-identical across turns* is composition's invariant and this page's assertion — and composition hands back the other direction, because answering an in-scope turn is behaviour, so it is an eval case rather than a wiring rule |
-| `corpus-retrieval-tests`, `authoring-agent-tools`, `agentic-codebase-audit` | handed by | **row counts, thresholds and the flaky-case rule**, deferred here from three different sets |
+| `corpus-retrieval-tests`, `authoring-agent-tools`, `agentic-codebase-audit`, `agentic-scenario-suite` | handed by | **row counts, thresholds and the flaky-case rule**, deferred here from four different sets — and, from the scenario suite, grader calibration before a rubric may gate |
+
+### `agentic-scenario-suite`
+
+**Invoked by name.** Reach for it when a system prompt, a tool description, a skill
+or a sub-agent changed and nothing tells you which conversations that change puts
+at risk — every unit test stays green because none sends a user sentence through
+the whole turn.
+
+- A new tool or skill is about to ship and no scenario depends on it; the report
+  would list it as an uncovered artifact.
+- A domain has one happy path and no bad paths: nobody has asked what happens when
+  the user leaves out the city, or the upstream times out.
+- Scenario inputs are written in the team's vocabulary, not in the sentences users
+  type — the skill asks for exported real traffic first, paraphrased and
+  anonymised before it is committed.
+
+It drafts only user inputs with a model; every expectation is read off an artifact,
+every row records its `source`, and every change reaches a human as a diff. Its
+[worked example](../.claude/skills/agentic-scenario-suite/WORKED-EXAMPLE.md) maps it
+onto this repository's runner; the runner itself is taught in
+[chapter 5](05-evaluation.md#end-to-end-scenarios).
+
+| Neighbour | Way | The discriminator |
+|---|---|---|
+| `agentic-evals` | hands to | **rows here, measurement there.** Row counts for a gate, thresholds, repetitions and calibrating a grader before its rubric may gate are evals'; this page writes the rows |
+| `corpus-retrieval-tests` | hands to | **what the agent answers versus what the corpus retrieves.** A question about retrieval goes there — and that page is by-name, so **ask the user to run it** |
 
 ### `agentic-service-composition`
 
