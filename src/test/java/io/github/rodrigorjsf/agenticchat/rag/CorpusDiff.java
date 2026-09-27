@@ -1,10 +1,8 @@
 package io.github.rodrigorjsf.agenticchat.rag;
 
 import io.github.rodrigorjsf.agenticchat.rag.RetrievalReport.Query;
+import io.github.rodrigorjsf.agenticchat.testsupport.Git;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -47,32 +45,12 @@ record CorpusDiff(String ref, List<String> changedDocuments) {
      */
     static CorpusDiff since(String ref, Path repositoryRoot) {
         var names = new TreeSet<String>();
-        names.addAll(git(repositoryRoot, "diff", "--name-only", "--no-renames", ref, "--", CORPUS_DIRECTORY));
-        names.addAll(git(repositoryRoot, "ls-files", "--others", "--exclude-standard", "--", CORPUS_DIRECTORY));
+        names.addAll(Git.lines(Git.runOrThrow(repositoryRoot, "diff", "--name-only", "--no-renames", ref, "--", CORPUS_DIRECTORY)));
+        names.addAll(Git.lines(Git.runOrThrow(repositoryRoot, "ls-files", "--others", "--exclude-standard", "--", CORPUS_DIRECTORY)));
         var documents = names.stream()
                 .filter(name -> name.endsWith(".md"))
                 .map(name -> Path.of(name).getFileName().toString())
                 .toList();
         return new CorpusDiff(ref, documents);
-    }
-
-    private static List<String> git(Path directory, String... arguments) {
-        var command = new ArrayList<String>();
-        command.add("git");
-        command.addAll(List.of(arguments));
-        try {
-            Process process = new ProcessBuilder(command).directory(directory.toFile())
-                    .redirectErrorStream(true).start();
-            String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-            if (process.waitFor() != 0) {
-                throw new IllegalStateException("git " + String.join(" ", arguments) + " failed: " + output.strip());
-            }
-            return output.lines().filter(line -> !line.isBlank()).toList();
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException(e);
-        }
     }
 }
