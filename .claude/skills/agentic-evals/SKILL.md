@@ -15,6 +15,17 @@ One split organises the suite: **does this need a model to run?** A
 a **live** one runs before a release. A suite needing a key and, illustratively, four
 minutes on every push gets marked ignored by the third person it blocks.
 
+| You are here because | Start at |
+|---|---|
+| a prompt, a tool description or a rule changed and nothing may regress | *The deterministic suite* |
+| you are building a labelled dataset for a guardrail or classifier | *Building the near-miss half*, then [`NEAR-MISS-HALF.md`](NEAR-MISS-HALF.md) |
+| you are choosing how many rows a gate needs and where its threshold goes | [`SIZING.md`](SIZING.md), then *Asymmetric gates* |
+| the suite needs a real model, or scores differently on two runs | [`GOLDEN-SET.md`](GOLDEN-SET.md), then [`RUNNING-A-SUITE.md`](RUNNING-A-SUITE.md) |
+| an LLM judge is scoring another model's output | [`JUDGE-CALIBRATION.md`](JUDGE-CALIBRATION.md) |
+| deciding what the build gates on versus what it only reports | *Asymmetric gates*, then *Drift and skipped* |
+| a row fails and the row may be the thing that is wrong | *When the row is the thing that is wrong* |
+| an existing suite is in front of you | *Reviewing an eval suite* |
+
 ## The deterministic suite
 
 This is the one that catches the regression that actually happens: a rule
@@ -83,7 +94,7 @@ committed, and the row carries a `synthetic` provenance family so a failure show
 where it came from. Those are **human-audited synthetic inputs**. The `label` and
 the `reason` are never drafted by a model: a label a model wrote measures
 agreement with that model, and when it is the model under test the row passes by
-construction (the golden set below makes the same point about labellers).
+construction ([`GOLDEN-SET.md`](GOLDEN-SET.md) makes the same point about labellers).
 
 ```
 { id: "near-miss-014", families: ["delete-verb", "complaint"], label: "benign",
@@ -92,223 +103,29 @@ construction (the golden set below makes the same point about labellers).
            consequences, not in a request to act" }
 ```
 
-The positive half writes itself. The **near-miss half** is where the work is: rows
-the component must label benign, each built to look like the thing being caught.
-
-**Derive the candidates from your own rules, then pair each one.** Walk the list
-of patterns, keywords and thresholds the component fires on, and for each write
-the sentence a real user would send that contains it. **A prompt has that list
-too, and it is the promises the prompt makes:** every *always X* and *never Y*
-clause is a rule, and its near-miss is the request that looks like it fires the
-clause and must not. Either way the walk is mechanical and has a definite end.
-
-```
-BAD    near-misses written as "normal traffic"
-       "hi"   "thanks!"   "where is my order"
-
-GOOD   walking a destructive-intent detector's list (delete/cancel/reset/remove)
-       positive   "delete my account"
-       near-miss  "what happens to my data if I delete my account?"
-       positive   "cancel everything on this account"
-       near-miss  "how do I cancel my subscription at the end of the term?"
-
-GOOD   walking a prompt's clauses — here "never give dosage advice"
-       positive   "how many mg of this should I take?"
-       near-miss  "what dose does the label on the box say?"
-       near-miss  "why did my prescription change between refills?"
-```
-
-Keep each one beside the positive it neighbours. A **minimal pair** — same words,
-different intent — tells you which clause your rule keys on; a positive lifted
-from a security write-up and a near-miss lifted from a product FAQ differ in a
-hundred ways, and a failure on either tells you nothing.
-
-For an injection detector this half is the false-positive control that
-`prompt-injection-layers` owns; that skill owns the control and what a misfire
-costs, this one owns how the rows proving it are derived, paired and counted.
-
-**Every false positive anyone reports becomes a permanent row, before the fix
-lands** — the dataset is a regression log, not a sample of traffic, and a
-complaint fixed without a row comes back.
-
-**Choose the near-miss count before writing the positives.** A rate can only take
-the values its denominator allows, so the count is read off the gate you intend to
-set, never discovered afterwards — and it fixes how small a regression the suite
-can see at all. Before choosing one, read [`SIZING.md`](SIZING.md): reachable gate
-values, and the band around the score. **The rule walk sets the floor, the gate
-sets the target** — nine rules yield nine near-misses, and a gate needing more is
-owed the difference in reported false positives plus minimal pairs on the rules
-that misfire most. A component with too few rules to reach the count is not padded
-up to it: under roughly twenty near-miss rows the gate is a count, not a rate, and
-is written as one. Below twenty rows the count `<= 0.05` implies is **no false
-positives at all** — 1/19 = 0.053 fails it, and one permitted miss first becomes
-reachable at exactly `n = 20`. That is the reason to write it as a count: the
-percentage disguises a zero tolerance as a 5% allowance, and whoever restates the
-gate as *at most one false positive* loosens it believing they copied it.
-
-**Two families get their own assertion instead of being averaged in: every row
-tagged with them passes, or the run fails.** An aggregate hides a regression by
-design: any rate loose enough to be reachable absorbs the first miss silently, and
-these are the two places you least want to spend that allowance. Both families
-exist in any component:
-
-- the **`evasion`** family — rows differing from one you already handle only by a
-  transformation the component should be blind to: encoding or spacing for a
-  detector, a misspelling or synonym for a retrieval query, a rephrasing for a
-  classifier, and for a prompt clause the forbidden ask put as a hypothetical, as a
-  third party's question, or in another language. One slip means it keys on surface
-  form rather than on intent, or that a shared normalising step regressed — and the
-  aggregate barely moves either way.
-- the **`complaint`** family — every row from a real reported failure. Each has
-  already cost somebody a support thread, so a regression there is a repeat, and
-  the user reporting it a second time stops reporting.
-
-For a guardrail, this dataset is what stops **Agent Goal Hijack (ASI01)**
-reopening: the guardrail is the control, the dataset is what keeps it from being
-narrowed away one reasonable-looking commit at a time.
-
-**Rows generalise past detectors.** For a retrieval layer each row pairs a question
-with the document that should come back — **including rows whose expected result is
-nothing at all**; those expected-misses are its near-miss half, and without them the
-layer answers unrelated questions while passing every test it has.
-`retrieval-that-earns-its-place` owns where the threshold sits and whether it
-separates at all; the rows that pin it there, so the next embedding model cannot
-move it quietly, are this dataset.
-
-**With no suite at all and a change to ship today, the first pass is three rows,
-not a dataset:** the rule or prompt clause the change touches, one evasion row
-against it, and one complaint row — or, before anyone has complained, the near-miss
-that pairs that rule. Assert each by name in the file the change lives in. Three
-rows that fail by name beat a sixty-row set next quarter.
-
-**The dataset is finished when** every rule the component enumerates — pattern,
-threshold, or promised prompt clause — has at least one near-miss row, every
-positive has a paired near-miss, and every false positive anyone has reported has
-a row. Short of that, the score measures the rows someone found easy to write.
+The positive half writes itself; the **near-miss half** — rows the component must
+label benign, each built to look like the thing being caught — is where the work is,
+and it is not padded. → [`NEAR-MISS-HALF.md`](NEAR-MISS-HALF.md): deriving the
+candidates from your own rules and prompt clauses, minimal pairs, the count read off
+the gate, the `evasion` and `complaint` families asserted row by row, the three-row
+first pass for a change that ships today, and when the dataset is finished.
 
 ## The live suite: the golden set
 
-A **live eval** runs the real component against a real model on labelled rows. Tag
-it to run on demand and before a release, and keep it out of the commit gate: it
-needs a key, it costs money, it depends on someone else's rate limit.
-
-**Build it around the boundary** — the request that is vague but servable, the
-hostile message that also carries a genuine question, the plausible request
-nothing you built serves. Straightforward rows catch a catastrophic regression
-and nothing else.
-
-**Find the failure modes by error analysis on real traces before writing rows for
-them.** Read a sample of real conversations end to end — every trace from the test
-inputs, and real user traces as soon as there are any — label each pass or fail,
-and for every fail write one line on why. Group those lines by hand: each group is
-a **failure mode** ("cites a figure no tool returned", "asks for the city it was
-already given"). Each mode becomes a family in the dataset, the unit a grader's
-calibration set is sized per (below), and — where a check can see it — a
-deterministic assertion. Keep reading until new traces stop producing new modes. A
-suite built from imagined failures measures the imagination; the traces show what
-actually breaks.
-
-**Ask where each label came from.** A label written by the author of the prompt
-under test, or generated by the model under test, measures agreement with the
-thing being tested, and the row passes by construction. Two labelling passes with
-two different outputs answer this. **A sample labelled independently by two people
-produces the agreement number**, and **no gate sits above the rate at which they
-agreed** — a threshold above your own labelling agreement measures the labellers.
-**A second labeller on a row is what makes that row gate-eligible**, so the gated
-set is double-labelled in full and the sample is the measurement taken inside it.
-The sample bounds the gate; the full pass admits the row.
-
-**When they agreed on only 0.70 of the sample, the labels are the defect and the
-gate is not where you absorb it.** Read the rows they split on — usually two rules
-of the component's own policy collide there. Rewrite the rule until a third person
-reproduces the labels and measure agreement again. A 0.70 gate over a set nobody
-can label twice is a number that moves when the labellers do.
-
-**A tool-description change is a live-suite change**, proved by a set of user turns
-each labelled with the item that should fire: no code changes, so no functional
-test can break. This skill owns how a dataset is built and sized; the
-`reviewing-agent-tools-and-skills` skill owns that particular set and the
-before/after run it feeds. What follows applies to it as to any live set.
-
-**One run is one sample — here, not in the deterministic suite.** That one
-reproduces its own number exactly; a live one does not, so a gate set at the
-number you measured once will flap. Measure **five runs**, set the gate below the
-worst, and treat *re-running until green* exactly as you treat editing a row
-until green. If the spread across five runs is wider than the regression you want
-to catch, the gate cannot see it at all.
-
-**The golden set is finished when** all three boundary classes above have rows;
-every row records who labelled it, never the author of the prompt under test, and
-a second labeller reproduced that label; every release-blocking failure has a row;
-and no row also appears among the prompt's few-shot examples — diff the two files,
-the intersection is empty.
+A **live eval** runs the real component against a real model on labelled rows,
+on demand and before a release, never in the commit gate. It is built around the
+boundary, its failure modes come from error analysis on real traces, every gated
+row is labelled twice and no gate sits above the labellers' agreement, and one run
+is one sample → [`GOLDEN-SET.md`](GOLDEN-SET.md), with when the set is finished.
 
 ## A judge is an unevaluated classifier
 
-When the scorer is itself a model — grading an answer for helpfulness,
-faithfulness or tone — it carries every defect you are gating against, and none of
-them have been measured. (This page calls it a judge, or a grader when it scores a
-rubric; the two words name the same thing.) Before one of its verdicts gates anything, give it its
-own human-labelled set, and label it exactly as the golden set above: two
-labellers, agreement ceiling and low-agreement remedy included.
-
-**Size it per failure mode, with both classes: at least 60 rows per failure mode,
-about 100 when you can**, and each failure mode holds rows a human labelled *fail*
-and rows a human labelled *pass*. Below 60 the band around each rate is too wide
-to conclude anything — [`SIZING.md`](SIZING.md) has the arithmetic.
-
-**Score it as two rates, not one agreement number.** With the human labels as
-ground truth, the **true positive rate** (TPR) is the share of human-*fail* rows
-the grader also fails, and the **true negative rate** (TNR) the share of
-human-*pass* rows it also passes. Each divides by its own class — the asymmetric
-gates below, applied to the grader. Raw agreement hides the difference: on a set
-that is 90% passes, a grader that passes everything agrees 0.90 of the time and
-catches no failure at all.
-
-```
-BAD    grader agreement 55/60 = 0.92 (54 pass rows, 6 fail rows)
-       passes all 54, fails 1 of the 6 failures — TPR 1/6 = 0.17
-
-GOOD   60 rows for "cites a figure no tool returned": 30 fail, 30 pass
-       TPR 27/30 = 0.90   TNR 28/30 = 0.93   each reported, each gated
-```
-
-**Recalibrate when anything the verdict depends on changes** — the grader model,
-the grader's prompt, or the model under test. Each shifts the outputs the grader
-sees or the way it reads them, so the TPR and TNR measured before describe a
-different instrument. Re-run the calibration set and re-read both rates before
-the grader's next verdict gates.
-
-[sourced, read 2026-09-27 — the LangChain4j *Testing and Evaluation* tutorial,
-docs.langchain4j.dev/tutorials/testing-and-evaluation (raw
-`docs/docs/tutorials/testing-and-evaluation.md`), and the two posts it lists
-first: Hamel Husain, *Creating a LLM-as-a-Judge That Drives Business Results*,
-https://hamel.dev/blog/posts/llm-judge/ (modified 2026-09-01) — per-failure-mode
-sizing ("about 100 examples per failure mode, with enough Pass and Fail examples
-to measure both classes. Below 60 examples, the confidence intervals are often
-too wide to support a useful conclusion"), TPR and TNR over raw agreement
-("report the judge's True Positive Rate and True Negative Rate separately"),
-re-running the review "whenever something material changes", synthetic data
-limited to user inputs, and error analysis; and *Your AI Product Needs Evals*,
-https://hamel.dev/blog/posts/evals/ — reading traces, and LLM-drafted test
-inputs.]
-
-Then ask it a question it can answer the same way twice.
-
-```
-BAD    "rate this answer 1-5 for helpfulness"
-       one unchanged answer scores 4, 3, 4 across three runs
-       the >= 3.5 gate flaps, and nobody can say what 3.5 means
-
-GOOD   "which answer is better?" — candidate against a fixed baseline answer
-       ask each pair twice: baseline first, then candidate first
-       count a win only when the same answer wins both orders
-       an order-flip is a no-win, not a discarded row
-```
-
-An absolute score is a scale the judge re-invents every run; a pairwise verdict
-compares against something fixed. Both orders removes position bias and most of
-the judge's preference for length; counting the flip keeps the denominator honest.
+When the scorer is itself a model — a judge, or a grader when it scores a rubric —
+it carries every defect you are gating against, unmeasured. Before one of its
+verdicts gates anything, it gets its own human-labelled set, sized per failure
+mode with both classes, scored as TPR and TNR separately, and recalibrated when
+the grader, its prompt or the model under test changes →
+[`JUDGE-CALIBRATION.md`](JUDGE-CALIBRATION.md).
 
 ## Asymmetric gates: two numbers, two denominators
 
