@@ -282,7 +282,8 @@ the ordinary build.
   `injection`, `ambiguous`), and 1 `multi-turn` row when the domain holds state
   (the list is `src/test/resources/evals/stateful-domains.json`). A domain below the
   floor is named with each shortfall, e.g. "1 happy path of the 2 required". It is
-  reported, never gated: a gap is work to do, not a regression.
+  reported, never gated: a gap is work to do, not a regression (whether it should gate once
+  every domain meets it is open in #47).
 - **Uncovered artifacts**: every artifact of the repository that no row depends on —
   a new tool or skill with no scenario shows up here.
 - **Unknown dependencies**: a `dependsOn` entry naming no artifact. A typo there
