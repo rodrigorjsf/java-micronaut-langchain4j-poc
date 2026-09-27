@@ -145,8 +145,9 @@ body's entry table** — one level deep, since a reference named only inside ano
 path the model reaches late, partially or never.
 
 It loads two ways, and one body serves both. Under LangChain4j's `Skills`, every file in the skill
-directory except `SKILL.md` and anything under `scripts/` is loaded up front as a `SkillResource`
-keyed by its path relative to the skill root, joined with `/`; the model fetches one with
+directory is loaded up front as a `SkillResource` keyed by its path relative to the skill root,
+joined with `/` — except `SKILL.md`, anything under `scripts/`, and blank or non-UTF-8 files, so a
+pointer to one of those points at nothing. The model fetches a resource with
 `read_skill_resource(skill_name, relative_path)`, which is registered only when some skill has a
 resource. Under the Agent Skills standard's file-based agents, the model reads the same path from
 disk. So write every pointer as the relative path from the skill root, forward slashes.
@@ -156,8 +157,7 @@ disk. So write every pointer as the relative path from the skill root, forward s
 costs a round trip listing what exists. The default parameter description also publishes the first
 resource path of *any* loaded skill in every turn's tool schema. Name each file for what it holds
 (`references/disputes.md`, never `ref2.md`), put nothing in a path you would not put in the prompt,
-and treat a rename as a body edit that the grep below must cover. Under `Skills`, files under
-`scripts/`, blank files and non-UTF-8 files are never resources: a pointer to one points at nothing.
+and treat a rename as a body edit that the grep below must cover.
 [sourced, read 2026-09-27 — docs.langchain4j.dev/tutorials/skills; `FileSystemSkillLoader` and
 `ReadResource*` at langchain4j tag 1.20.1; agentskills.io/specification, *File references*;
 platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices, *one level deep*]
@@ -219,8 +219,8 @@ test, and the one metric that only arrives after ship.
 
 ## Hold the draft to writing-great-skills
 
-This page decides what the document says; `writing-great-skills`, read by name, is the structure it
-is held to. Four of its checks catch what the table below does not:
+This page decides what the document says; `writing-great-skills` is the structure it is held to.
+Where that skill is installed, read it; where it is not, these four of its checks carry the pass:
 
 - **The description carries triggers, not identity** — one trigger per branch, plus any hand-off.
 - **A leading word** the model already holds, like *lesson* here, replaces a rule restated thrice.
@@ -247,5 +247,5 @@ tell you anything yet. Done is every row's right-hand column.
 | 11 | Look for the labelled set | the repo | it is committed beside the skill and gated in CI |
 | 12 | Capture one post-activation request | one turn you send | a distinctive sentence of the body is in it — if it is absent the mount dropped the body, and rows 3-8 graded text the model never received; fix that before reading them. Rows 1-2 and 9-11 hold regardless |
 | 13 | Run the vocabulary count | turns written by someone who has not read your descriptions | the description's content words are the ones those turns used, at the rate above — turns you write yourself reuse its vocabulary and pass by construction, which is a rigged green |
-| 14 | Walk each row of the entry table to the resource it names | the skill directory | every reference is linked from the body's entry table, one level deep, by the exact relative path from the skill root; no path sits under `scripts/`; each file holds only what its path needs, and what every path needs stays in the body |
-| 15 | Run the draft through `writing-great-skills` | that skill, read by name | the description has no identity sentence, a leading word replaces each restated rule, every sentence survives the no-op test, and every step ends on a checkable criterion |
+| 14 | Walk each row of the entry table to the reference it names | the skill directory | each resource is reached from the entry table, one level deep, by a path that loads; it holds only what its path needs, and what every path needs stays in the body |
+| 15 | Hold the draft to `writing-great-skills` | — | each of the four checks in that section holds, read against the draft rather than recalled |
