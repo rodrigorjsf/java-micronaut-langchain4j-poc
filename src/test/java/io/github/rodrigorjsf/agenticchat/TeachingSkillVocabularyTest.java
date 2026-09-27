@@ -43,7 +43,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@code ASI02 (…)}, {@code | ASI02 | …}) or before it ({@code Tool Misuse and Exploitation
  * (ASI02)}). A capitalised word in either position is read as a title and must be the
  * canonical one, and nothing capitalised may extend it on either side; lower-case prose
- * ({@code ASI07 in full}) is not a title.
+ * ({@code ASI07 in full}) is not a title. A lower-case or detached variant is therefore not caught; see #61.
  *
  * <p><b>LangChain4j knobs.</b> A skill that stays framework-generic still names the
  * LangChain4j setting in one clause, so a reader can find it. Each name is resolved by
