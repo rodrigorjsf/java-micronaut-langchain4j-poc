@@ -253,6 +253,7 @@ public final class EvalReportRenderer {
         }
         row(html, "Latency", result.latency().toMillis() + " ms");
         row(html, "Tokens", result.inputTokens() + " in / " + result.outputTokens() + " out");
+        // No trace link: the suite runs on RecordingAgentTracer, so no exported trace id exists. See #64.
         html.append("</table>\n");
     }
 
