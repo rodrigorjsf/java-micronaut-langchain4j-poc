@@ -78,8 +78,6 @@ public final class EvalReportRenderer {
         long outputTokens = repetitions.stream().mapToLong(ScenarioResult::outputTokens).sum();
         var cost = repetitions.stream().map(ScenarioResult::cost).reduce(Cost.NONE, Cost::plus);
         var verdicts = repetitions.stream().flatMap(result -> result.rubric().stream()).toList();
-        long rubricPassed = verdicts.stream().filter(v -> v.verdict() == RubricVerdict.Verdict.PASS).count();
-        long rubricUngraded = verdicts.stream().filter(v -> v.verdict() == RubricVerdict.Verdict.UNGRADED).count();
         String gateFailures = scenarios.stream().filter(ScenarioRuns::failsGate)
                 .map(runs -> escape(runs.scenario().id())).collect(Collectors.joining(", "));
         String flaky = scenarios.stream().filter(runs -> runs.status() == Status.FLAKY)
@@ -96,16 +94,25 @@ public final class EvalReportRenderer {
                 .append("<li><strong>Skipped repetitions</strong> (rate limited, counted neither way): ")
                 .append(skipped).append("</li>\n")
                 .append("<li><strong>Rubric</strong> (").append(UNCALIBRATED).append("): ")
-                .append(verdicts.isEmpty() ? "no criterion graded" : rubricPassed + " of " + verdicts.size()
-                        + " criterion verdicts passed" + (rubricUngraded == 0 ? "" : ", " + rubricUngraded + " ungraded"))
+                .append(rubricSummary(verdicts))
                 .append("</li>\n")
                 .append("<li><strong>Tokens</strong> (as <code>/api/chat</code> reported them) ").append(inputTokens).append(" in / ")
                 .append(outputTokens).append(" out</li>\n")
-                .append("<li><strong>Estimated cost</strong> (every model call the tracer saw, judge and sub-agents included) $")
+                .append("<li><strong>Estimated cost</strong> (every model call the tracer saw, judge, sub-agents and grader included) $")
                 .append(cost.usd().setScale(6, RoundingMode.HALF_UP).toPlainString())
                 .append(cost.unpricedCalls() == 0 ? "" : " (" + cost.unpricedCalls()
                         + " model calls unpriced, not included)")
                 .append("</li>\n</ul>\n");
+    }
+
+    private static String rubricSummary(List<RubricVerdict> verdicts) {
+        if (verdicts.isEmpty()) {
+            return "no criterion graded";
+        }
+        long passed = verdicts.stream().filter(v -> v.verdict() == RubricVerdict.Verdict.PASS).count();
+        long ungraded = verdicts.stream().filter(v -> v.verdict() == RubricVerdict.Verdict.UNGRADED).count();
+        return passed + " of " + verdicts.size() + " criterion verdicts passed"
+                + (ungraded == 0 ? "" : ", " + ungraded + " ungraded");
     }
 
     private static void scenario(StringBuilder html, ScenarioRuns runs) {

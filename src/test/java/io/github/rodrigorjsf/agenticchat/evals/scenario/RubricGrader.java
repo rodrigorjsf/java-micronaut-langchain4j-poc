@@ -34,6 +34,9 @@ public final class RubricGrader {
             Reply with a JSON object and nothing else:
             {"pass": true or false, "critique": "one sentence saying why"}""";
 
+    /** How much of an unreadable reply the report echoes, so a chatty grader cannot bloat it. */
+    private static final int MAX_ECHOED_REPLY = 200;
+
     private final ObjectMapper json = new ObjectMapper();
     private final ChatModel model;
 
@@ -64,7 +67,9 @@ public final class RubricGrader {
                     .responseFormat(ResponseFormat.JSON)
                     .build()).aiMessage().text();
         } catch (RuntimeException e) {
-            return RubricVerdict.ungraded(criterion, "the grader failed: " + e.getMessage());
+            // The type only: a provider exception's message can carry URLs and response bodies,
+            // and the report is a file people share.
+            return RubricVerdict.ungraded(criterion, "the grader failed: " + e.getClass().getSimpleName());
         }
         return read(criterion, reply);
     }
@@ -89,6 +94,13 @@ public final class RubricGrader {
         } catch (Exception e) {
             // falls through: an unreadable reply is reported, not thrown
         }
-        return RubricVerdict.ungraded(criterion, "the grader did not answer a verdict: " + reply);
+        return RubricVerdict.ungraded(criterion, "the grader did not answer a verdict: " + excerpt(reply));
+    }
+
+    private static String excerpt(String reply) {
+        if (reply == null) {
+            return "(empty)";
+        }
+        return reply.length() <= MAX_ECHOED_REPLY ? reply : reply.substring(0, MAX_ECHOED_REPLY) + "…";
     }
 }

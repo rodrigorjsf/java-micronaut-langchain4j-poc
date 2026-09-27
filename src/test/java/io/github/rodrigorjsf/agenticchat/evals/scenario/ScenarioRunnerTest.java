@@ -88,14 +88,7 @@ class ScenarioRunnerTest {
     @DisplayName("a trajectory that activates the skill and calls get_weather passes, and the report data is captured")
     void theScriptedTrajectoryPasses() {
         models.model("judge").fallbackTo(IN_SCOPE);
-        var agent = models.model("agent");
-        agent.reply(request -> AiMessage.from(ToolExecutionRequest.builder()
-                .id("call-1").name("activate_skill")
-                .arguments("{\"skill_name\":\"geo-and-weather\"}").build()));
-        agent.reply(request -> AiMessage.from(ToolExecutionRequest.builder()
-                .id("call-2").name("get_weather")
-                .arguments("{\"latitude\":\"-23.55\",\"longitude\":\"-46.63\",\"forecastDays\":\"2\"}").build()));
-        agent.replyWith("Sim, amanhã deve chover em São Paulo: 12,4 mm previstos.");
+        scriptTheRightTrajectory();
 
         var result = runner.run(weather);
 
@@ -282,15 +275,8 @@ class ScenarioRunnerTest {
     @DisplayName("each repetition is its own run: one right and one wrong trajectory make a flaky scenario")
     void eachRepetitionIsItsOwnRun() {
         models.model("judge").fallbackTo(IN_SCOPE);
-        var agent = models.model("agent");
-        agent.reply(request -> AiMessage.from(ToolExecutionRequest.builder()
-                .id("call-1").name("activate_skill")
-                .arguments("{\"skill_name\":\"geo-and-weather\"}").build()));
-        agent.reply(request -> AiMessage.from(ToolExecutionRequest.builder()
-                .id("call-2").name("get_weather")
-                .arguments("{\"latitude\":\"-23.55\",\"longitude\":\"-46.63\",\"forecastDays\":\"2\"}").build()));
-        agent.replyWith("Sim, amanhã deve chover em São Paulo: 12,4 mm previstos.");
-        agent.replyWith("Acho que vai chover amanhã em São Paulo.");
+        scriptTheRightTrajectory();
+        models.model("agent").replyWith("Acho que vai chover amanhã em São Paulo.");
         var pauses = new java.util.concurrent.atomic.AtomicInteger();
 
         var runs = runner.repeat(weather, 2, pauses::incrementAndGet);

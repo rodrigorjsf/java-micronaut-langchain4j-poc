@@ -168,8 +168,8 @@ agentic:
       # application itself never calls it; it is built here so the eval resolves it
       # through the same registry, listeners and cost accounting as every other role.
       # It must be a model other than `agent`: a model grading its own answers favours
-      # them, so ChatModelRegistry refuses to start when the two are the same. Its
-      # verdicts are uncalibrated and never gate the eval.
+      # them, so ChatModelRegistry refuses to build when the two are the same (the eval
+      # fails before its first scenario). Its verdicts are uncalibrated and never gate.
       grader:
         provider: OPENAI
         model-name: gpt-4o-mini

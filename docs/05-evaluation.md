@@ -168,13 +168,14 @@ Two rules keep that honest:
 - **The Grader is not the agent.** `grader` is a model role in the same registry as
   `judge` and `agent` (`agentic.llm.models.grader`, shipped as OpenAI `gpt-4o-mini`
   while the agent is Gemini). A model grading its own answers favours them, so
-  `ChatModelRegistry` refuses to start when `grader` and `agent` name the same
-  provider and model. The application never calls the grader; it is built at startup
-  like every role, so a bad key fails the deployment, and the eval resolves it from
-  the registry.
+  `ChatModelRegistry` refuses to build when `grader` and `agent` name the same
+  provider and model, so the eval fails before its first scenario with a message
+  naming both. The application never calls the grader; the eval resolves it from the
+  registry like any other role. (The registry is built on first use, not when the
+  server starts — see #51.)
 - **Uncalibrated means report-only.** Nobody has measured this Grader against human
   labels yet, so its verdict is an opinion, not a measurement. Until a calibration set
-  exists (TPR and TNR per criterion, see the `agentic-evals` skill), a failing rubric
+  exists (TPR and TNR per criterion, see the `agentic-evals` skill; tracked in #33), a failing rubric
   can never fail the eval. `ScenarioRunnerTest` proves it in the ordinary build: a
   scripted grader fails the committed critical row's rubric, and the row still passes
   and the gate stays green.
