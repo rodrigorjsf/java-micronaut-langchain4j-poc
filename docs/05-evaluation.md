@@ -235,7 +235,7 @@ with the current one and fails, naming the change, when any of three things move
 | Changed | Why the old numbers no longer hold |
 |---|---|
 | the `grader` role's provider or model | a different model disagrees with people differently |
-| the Grader's prompt: its instructions or any train row | a new prompt is a new grader |
+| the Grader's prompt: its instructions, its question template or any train row | a new prompt is a new grader |
 | the `agent` role's provider or model | the answers it grades are no longer like the ones that were labelled |
 
 Dev and test rows are not part of the prompt, so adding them does not trigger it.

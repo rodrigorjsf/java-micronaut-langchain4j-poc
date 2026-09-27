@@ -28,7 +28,7 @@ class GraderCalibrationFreshnessTest {
             var current = CalibrationRecord.Fingerprint.current(ctx.getBean(ChatModelRegistry.class),
                     GraderCalibrationSet.loadCommitted());
 
-            assertThat(current.graderModel()).as("read from the shipped grader role").isEqualTo("OPENAI/gpt-4o-mini");
+            assertThat(current.graderModel()).as("read from the configured grader role, as PROVIDER/model").matches("[A-Z_]+/.+");
             assertThat(CalibrationRecord.recalibrationReasons(CalibrationRecord.loadCommitted(), current))
                     .as("recalibrate the grader: run ./mvnw test -Pevals -Dtest=GraderCalibrationEval and commit "
                             + "src/test/resources" + CalibrationRecord.COMMITTED)

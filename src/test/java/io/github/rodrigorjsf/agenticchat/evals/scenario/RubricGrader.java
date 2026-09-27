@@ -15,6 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -73,12 +74,16 @@ public final class RubricGrader {
     }
 
     /**
-     * A digest of everything the Grader is told besides the answer it grades: its instructions and
-     * every train example. A calibration measured under one fingerprint says nothing about a grader
+     * A digest of everything the Grader is told besides the answer it grades: its instructions, the
+     * template of the question it is asked, the response format and every train example. A calibration measured under one fingerprint says nothing about a grader
      * prompted under another. Dev and test rows are not part of the prompt, so they do not move it.
      */
     public static String promptFingerprint(GraderCalibrationSet calibration) {
-        var text = new StringBuilder(INSTRUCTIONS);
+        // The question template and the response format count too: with no train row, they are
+        // the only other things that change what the Grader is asked.
+        var text = new StringBuilder(INSTRUCTIONS)
+                .append('\u0000').append(prompt("{criterion}", List.of("{turn}"), "{answer}"))
+                .append('\u0000').append(ResponseFormat.JSON.type());
         trainExamples(calibration).forEach((criterion, examples) -> {
             for (var example : examples) {
                 fewShot(criterion, example).forEach(message -> text.append('\u0000').append(message));
@@ -100,7 +105,9 @@ public final class RubricGrader {
                 byCriterion.put(criterion.criterion(), train);
             }
         }
-        return Map.copyOf(byCriterion);
+        // Insertion order, never Map.copyOf: its iteration order is salted per JVM, and the
+        // fingerprint iterates this map, so two runs would disagree about an unchanged prompt.
+        return Collections.unmodifiableMap(byCriterion);
     }
 
     public List<RubricVerdict> grade(List<String> criteria, List<String> turns, String answer) {
