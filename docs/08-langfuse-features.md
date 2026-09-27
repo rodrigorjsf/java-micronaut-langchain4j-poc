@@ -1005,7 +1005,7 @@ than like a bug.
 Parenting in this application is never passed by hand. `OtelAgentTracer.start` calls
 `span.makeCurrent()` and hands the resulting `Scope` to the `Observation`; every observation
 started while that scope is open becomes its child, purely by the OpenTelemetry context. It
-works because LangChain4j 1.18.1 calls every listener, tool executor and guardrail on the
+works because LangChain4j 1.18.1 (re-check on 1.20.1: #56) calls every listener, tool executor and guardrail on the
 **caller's thread** — verified for this codebase, and stated in `AgentTracer`'s own interface
 comment. `AgentTracerTest.childObservationNestsUnderItsParent` pins the mechanism, and
 `TurnObservationTest` asserts that everything a turn does hangs under the root so the trace is

@@ -142,7 +142,7 @@ identical `span`s is a list; the same trace with `agent`, `chain`, `tool`, `retr
 
 ## The seams
 
-Nothing in the pipeline knows it is observed. LangChain4j 1.18.1 publishes a listener for
+Nothing in the pipeline knows it is observed. LangChain4j 1.18.1 (re-check on 1.20.1: #56) publishes a listener for
 every layer, and each fires on the caller's thread — so an observation nests under the turn
 by virtue of the OpenTelemetry context alone, with no plumbing.
 
