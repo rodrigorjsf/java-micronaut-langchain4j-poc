@@ -1,7 +1,8 @@
 # Sizing a dataset
 
-Two tables. The first says which gate values are reachable at all; the second
-says how small a regression the suite could see even in principle.
+Three tables. The first says which gate values are reachable at all; the second
+says how small a regression the suite could see even in principle; the third
+sizes a model grader's calibration set, where each rate has its own denominator.
 
 ## How many near-miss rows the gate needs
 
@@ -57,6 +58,24 @@ Two clarifications the arithmetic hides:
 - **Comparing two runs needs more room than reading one.** Two independent
   scores each carrying a band overlap until the gap is roughly 1.4× the band, so
   a change that clears the single-run figure above may still be noise.
+
+## Sizing a grader's calibration set
+
+A grader is scored as two rates, and **each rate divides by its own class**: TPR
+by the rows a human labelled *fail*, TNR by the rows a human labelled *pass*. So
+the band that matters is the one at each class's size, not at the whole set's.
+
+| One failure mode | TPR divides by | TNR divides by | Band on each, at 0.90 |
+|---|---|---|---|
+| 60 rows, 30 fail / 30 pass | 30 | 30 | ±10.7 points |
+| 100 rows, 50 fail / 50 pass | 50 | 50 | ±8.3 points |
+| 60 rows, 6 fail / 54 pass | 6 | 54 | TPR ±24.0, TNR ±8.0 — the TPR says nothing |
+
+The 60-row floor is the point below which the band is too wide to conclude
+anything, and it assumes both classes are well filled; a 60-row set with six
+failures has a six-row TPR. Fill the rarer class first — failures usually, found
+through error analysis rather than random sampling — and size each failure mode
+separately, because a grader that is good at one mode is often blind to another.
 
 The cheapest way past all of this is to stop treating the score as the signal,
 which is why the `evasion` and `complaint` families in [`SKILL.md`](SKILL.md) are

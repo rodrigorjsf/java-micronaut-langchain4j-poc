@@ -535,6 +535,9 @@ and someone has to show nothing regressed.
   developer away from being marked ignored.
 - An LLM judge is scoring another model's output and nobody has measured the judge
   against a human on the rows people argue about.
+- A grader reports one agreement number on a set that is mostly passes, so a grader
+  that passes everything looks 0.90 accurate while catching no failure — or it was
+  calibrated before the model under test changed.
 
 | Neighbour | Way | The discriminator |
 |---|---|---|
