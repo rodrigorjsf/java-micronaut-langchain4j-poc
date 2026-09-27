@@ -158,7 +158,7 @@ chapter that measures it.
 | [`agentic-tool-boundary`](../.claude/skills/agentic-tool-boundary/SKILL.md) | the four rules the class at the tool door enforces, so a tool owns only its arguments and its meaning | the model |
 | [`progressive-tool-disclosure`](../.claude/skills/progressive-tool-disclosure/SKILL.md) | keeping a large tool set affordable — names in the standing prompt, schemas on activation | the model |
 | [`llm-triage-gate`](../.claude/skills/llm-triage-gate/SKILL.md) | a cheap classifier in front of an expensive agent, and the pre-filters and cache that spare even the classifier | the model |
-| [`prompt-injection-layers`](../.claude/skills/prompt-injection-layers/SKILL.md) | four probabilistic detection layers, each shrinking the next one's job, and a containment layer that holds when they all miss | the model |
+| [`prompt-injection-layers`](../.claude/skills/prompt-injection-layers/SKILL.md) | four probabilistic detection layers, each shrinking the next one's job, and a containment layer that limits what a miss can make the agent do | the model |
 | [`retrieval-that-earns-its-place`](../.claude/skills/retrieval-that-earns-its-place/SKILL.md) | whether an agent that already has tools should retrieve at all, what goes in the corpus, and when it runs | the model |
 | [`llm-cost-observability`](../.claude/skills/llm-cost-observability/SKILL.md) | making spend decomposable by role, and a cache-hit claim provable | the model |
 
