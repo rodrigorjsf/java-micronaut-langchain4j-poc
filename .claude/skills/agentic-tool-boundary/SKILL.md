@@ -82,6 +82,34 @@ model retry the same call or invent an answer. Each outcome states what happened
 Note that two of the four say *do not retry*. Without that, a model burns its
 whole round-trip budget on a source that is down.
 
+**Set the handlers explicitly, because the defaults depend on the call mode.**
+In LangChain4j 1.20.x an AI Service method that returns `CompletableFuture`,
+`CompletionStage` or `Flow.Publisher` runs asynchronously, and two tool defaults
+flip relative to the synchronous path `[sourced]`:
+
+| | Synchronous / `TokenStream` | `CompletableFuture` / `Flow.Publisher` |
+|---|---|---|
+| Several tool calls in one response | run **sequentially** | run **concurrently** |
+| Tool **execution** error | sent back to the model | **fails the invocation** |
+| Tool **argument-parse** error | **fails the invocation** | sent back to the model |
+
+So switching a method to async, with no other change, turns the "upstream error"
+row above into a 5xx for the user, and makes every tool that shares state race
+its siblings. An explicitly configured `toolExecutionErrorHandler` and
+`toolArgumentsErrorHandler` are used by every mode — set both, returning the
+shaped text from the table, and the failure stays a value on either path. For
+tools that are not safe to run at once, pass
+`executeToolsConcurrently(Executors.newSingleThreadExecutor())`.
+
+Sources, read 2026-09-27: LangChain4j 1.20.0 release notes
+(https://github.com/langchain4j/langchain4j/releases/tag/1.20.0) — "multiple tool
+calls run concurrently, a tool *execution* error fails the invocation rather than
+being sent to the LLM, and a tool *argument-parse* error is sent to the LLM rather
+than failing"; and the "Non-blocking and Reactive" tutorial, section "Defaults
+that differ from the synchronous modes"
+(https://docs.langchain4j.dev/tutorials/non-blocking) — "an explicitly configured
+handler is used by every mode".
+
 ## 4. Retries are bounded and idempotent-only
 
 Retry idempotent reads, on timeouts and 5xx only. Never on 4xx, never on 429.

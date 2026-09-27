@@ -93,9 +93,23 @@ enumerated forms the document lists, never the pattern it describes.
 **Model listeners are swallowed.** An exception in a `ChatModelListener` is a
 silent hole in the accounting, not an error. Catch and log inside the listener.
 
-**GA and beta modules move together.** `langchain4j-bom:1.18.1` manages the
-stable modules at `1.18.1` and the beta ones at `1.18.1-beta28`. Never pin one
-half by hand.
+**GA and beta modules move together.** `langchain4j-bom:1.20.1` manages the
+stable modules at `1.20.1` and the beta ones at `1.20.1-beta30`. Never pin one
+half by hand. Skip `1.19.1`: its release page reads "This release was published
+by mistake. Do not use it."
+
+**Async AI Services (1.20.0+) reverse two tool defaults.** A method returning
+`CompletableFuture`/`CompletionStage` or `Flow.Publisher` runs several tool calls
+from one response **concurrently**, and a tool **execution** error **fails the
+invocation** instead of reaching the model — a recoverable tool error becomes a
+5xx. (An argument-parse error flips the other way: sent to the model.) An
+explicitly configured `toolExecutionErrorHandler`/`toolArgumentsErrorHandler` is
+used by every mode, so keep both set before adopting async, and pass
+`executeToolsConcurrently(Executors.newSingleThreadExecutor())` for tools that
+are not thread-safe. This application is synchronous today. Sources: LangChain4j
+1.20.0 release notes (https://github.com/langchain4j/langchain4j/releases/tag/1.20.0)
+and "Non-blocking and Reactive", section "Defaults that differ from the synchronous
+modes" (https://docs.langchain4j.dev/tutorials/non-blocking), both read 2026-09-27.
 
 ## The tool layer
 
