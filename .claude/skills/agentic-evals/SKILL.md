@@ -43,13 +43,14 @@ got 0.87` costs a re-run with logging turned on before anyone can start work.
 
 An agent can reach a right-looking answer the wrong way — from memory instead of
 the tool, after a forbidden tool, or on the fourth retry. A **trajectory
-assertion** checks how the turn got there. The check itself is deterministic; the
-turn it reads is scripted (a stub model, in this suite) or live (a scenario run
-against the real model, in the live suite below). In LangChain4j an AI Service method that returns `Result<T>` exposes
-`toolExecutions()`: one `ToolExecution` per call, with `request().name()`,
-`request().arguments()`, `result()` and `hasFailed()`. A guardrail's verdict is
-asserted the same way through `GuardrailAssertions.assertThat(result)` from the
-`langchain4j-test` module — `.hasResult(Result.FATAL)`,
+assertion** checks how the turn got there. The check itself is deterministic;
+the turn it reads is scripted (a stub model, in this suite) or live (a scenario
+run against the real model, in the live suite below). In LangChain4j an AI
+Service method that returns `Result<T>` exposes `toolExecutions()`: one
+`ToolExecution` per call, with `request().name()`, `request().arguments()`,
+`result()` and `hasFailed()`. A guardrail's verdict is asserted the same way
+through `GuardrailAssertions.assertThat(result)` from the `langchain4j-test`
+module — `.hasResult(GuardrailResult.Result.FATAL)`,
 `.hasSingleFailureWithMessage(...)`, and for an output guardrail
 `.hasSingleFailureWithMessageAndReprompt(...)` — with no model call at all.
 
@@ -246,7 +247,8 @@ the intersection is empty.
 
 When the scorer is itself a model — grading an answer for helpfulness,
 faithfulness or tone — it carries every defect you are gating against, and none of
-them have been measured. Before one of its verdicts gates anything, give it its
+them have been measured. (This page calls it a judge, or a grader when it scores a
+rubric; the two words name the same thing.) Before one of its verdicts gates anything, give it its
 own human-labelled set, and label it exactly as the golden set above: two
 labellers, agreement ceiling and low-agreement remedy included.
 
@@ -277,6 +279,20 @@ sees or the way it reads them, so the TPR and TNR measured before describe a
 different instrument. Re-run the calibration set and re-read both rates before
 the grader's next verdict gates.
 
+[sourced, read 2026-09-27 — the LangChain4j *Testing and Evaluation* tutorial,
+docs.langchain4j.dev/tutorials/testing-and-evaluation (raw
+`docs/docs/tutorials/testing-and-evaluation.md`), and the two posts it lists
+first: Hamel Husain, *Creating a LLM-as-a-Judge That Drives Business Results*,
+https://hamel.dev/blog/posts/llm-judge/ (modified 2026-09-01) — per-failure-mode
+sizing ("about 100 examples per failure mode, with enough Pass and Fail examples
+to measure both classes. Below 60 examples, the confidence intervals are often
+too wide to support a useful conclusion"), TPR and TNR over raw agreement
+("report the judge's True Positive Rate and True Negative Rate separately"),
+re-running the review "whenever something material changes", synthetic data
+limited to user inputs, and error analysis; and *Your AI Product Needs Evals*,
+https://hamel.dev/blog/posts/evals/ — reading traces, and LLM-drafted test
+inputs.]
+
 Then ask it a question it can answer the same way twice.
 
 ```
@@ -293,19 +309,6 @@ GOOD   "which answer is better?" — candidate against a fixed baseline answer
 An absolute score is a scale the judge re-invents every run; a pairwise verdict
 compares against something fixed. Both orders removes position bias and most of
 the judge's preference for length; counting the flip keeps the denominator honest.
-
-[sourced, read 2026-09-27 — the LangChain4j *Testing and Evaluation* tutorial,
-docs.langchain4j.dev/tutorials/testing-and-evaluation (raw
-`docs/docs/tutorials/testing-and-evaluation.md`), and the two posts it lists
-first: Hamel Husain, *Creating a LLM-as-a-Judge That Drives Business Results*,
-https://hamel.dev/blog/posts/llm-judge/ (modified 2026-09-01) — per-failure-mode
-sizing ("about 100 examples per failure mode, with enough Pass and Fail examples
-to measure both classes. Below 60 examples, the confidence intervals are often too
-wide"), TPR and TNR over raw agreement ("report the judge's True Positive Rate and
-True Negative Rate separately"), re-running the review "whenever something
-material changes", synthetic data limited to user inputs, and error analysis; and
-*Your AI Product Needs Evals*, https://hamel.dev/blog/posts/evals/ — reading
-traces, and LLM-drafted test inputs.]
 
 ## Asymmetric gates: two numbers, two denominators
 

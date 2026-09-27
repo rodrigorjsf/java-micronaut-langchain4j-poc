@@ -69,10 +69,12 @@ the band that matters is the one at each class's size, not at the whole set's.
 |---|---|---|---|
 | 60 rows, 30 fail / 30 pass | 30 | 30 | ±10.7 points |
 | 100 rows, 50 fail / 50 pass | 50 | 50 | ±8.3 points |
-| 60 rows, 6 fail / 54 pass | 6 | 54 | TPR ±24.0, TNR ±8.0 — the TPR says nothing |
+| 60 rows, 6 fail / 54 pass | 6 | 54 | TPR ±24.0 (the formula breaks down this small; read it as "unknown"), TNR ±8.0 |
 
-The 60-row floor is the point below which the band is too wide to conclude
-anything, and it assumes both classes are well filled; a 60-row set with six
+The 60-row floor is a minimum, not a comfortable measurement: at 30 rows per
+class each rate still carries the ±10.7 band the table above calls a collapse
+detector, which is why about 100 is the target. The floor assumes both classes are
+well filled; a 60-row set with six
 failures has a six-row TPR. Fill the rarer class first — failures usually, found
 through error analysis rather than random sampling — and size each failure mode
 separately, because a grader that is good at one mode is often blind to another.
