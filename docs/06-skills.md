@@ -158,7 +158,7 @@ chapter that measures it.
 | [`agentic-tool-boundary`](../.claude/skills/agentic-tool-boundary/SKILL.md) | the four rules the class at the tool door enforces, so a tool owns only its arguments and its meaning | the model |
 | [`progressive-tool-disclosure`](../.claude/skills/progressive-tool-disclosure/SKILL.md) | keeping a large tool set affordable — names in the standing prompt, schemas on activation | the model |
 | [`llm-triage-gate`](../.claude/skills/llm-triage-gate/SKILL.md) | a cheap classifier in front of an expensive agent, and the pre-filters and cache that spare even the classifier | the model |
-| [`prompt-injection-layers`](../.claude/skills/prompt-injection-layers/SKILL.md) | four ordered layers of injection defence, each shrinking the next one's job | the model |
+| [`prompt-injection-layers`](../.claude/skills/prompt-injection-layers/SKILL.md) | four probabilistic detection layers, each shrinking the next one's job, and a containment layer that holds when they all miss | the model |
 | [`retrieval-that-earns-its-place`](../.claude/skills/retrieval-that-earns-its-place/SKILL.md) | whether an agent that already has tools should retrieve at all, what goes in the corpus, and when it runs | the model |
 | [`llm-cost-observability`](../.claude/skills/llm-cost-observability/SKILL.md) | making spend decomposable by role, and a cache-hit claim provable | the model |
 
@@ -190,6 +190,7 @@ parameters would let the model name a destination.
 | `conversation-memory-and-compaction` | handed by | **the failure value versus the message carrying it.** This page owns the outcome type a tool returns instead of an exception; what then happens to that message in history is memory's |
 | `subagent-context-isolation` | handed by | **what is being retried.** A bounded transport retry inside one call is this page's; re-spawning a child agent is not |
 | `prompt-to-corpus-migration` | handed by | **where standing text belongs.** Guidance on choosing between always-mounted tools does not move to a corpus — it belongs in the tool descriptions, which is this page's ground |
+| `prompt-injection-layers` | handed by | **why versus how.** That page's containment layer says text a tool returned may never pick a side-effecting tool's destination; enforcing it at the door, and pausing for a person when it cannot decide, is this page's |
 
 ### `progressive-tool-disclosure`
 
@@ -248,6 +249,9 @@ has started refusing real users.
   see [chapter 3](03-security.md).)
 - A rule is about to be narrowed to fix one complaint, with nothing that says which
   attacks the narrowing loses.
+- A tool that writes, sends or pays could take its recipient, account or amount
+  from text another tool returned — the case no detector can be trusted with, and
+  the one its containment layer answers.
 
 | Neighbour | Way | The discriminator |
 |---|---|---|
@@ -256,6 +260,7 @@ has started refusing real users.
 | `subagent-context-isolation` | handed by | **whose text is untrusted.** A child agent's return value is untrusted text arriving at a parent; how the wrapper around it is written is this page's |
 | `agentic-evals` | handed by | **the control versus the measurement.** This page owns the detector and what a misfire is; the labelled corpus that proves a narrowing lost nothing is evals' |
 | `agentic-codebase-audit` | handed by | **the guardrail seam's doctrine** — the audit records that something runs inbound and nothing runs outbound; this page says why that is the wrong shape |
+| `agentic-tool-boundary` | hands to | **the rule versus its mechanics.** This page says untrusted text may never choose a side-effecting tool's destination, and that a person decides when a policy cannot; the catalogue, the redirect hops and the pause-and-resume approval are the tool door's |
 
 ### `retrieval-that-earns-its-place`
 
@@ -750,7 +755,7 @@ and the answerer are the same service object.
 |---|---|---|---|---|
 | 1 | `agentic-codebase-audit` | **by name** | the repository, seam by seam | a fact sheet per seam and a ranked, capped plan of absences. Each seam names the skill that owns its doctrine — the audit records, it does not argue |
 | 2 | `agentic-service-composition` | the model | the composition seam's facts | the role matrix with its **Never** column, one service object per role, and the attachment point for every guardrail, listener and tool provider |
-| 2a | `prompt-injection-layers` | the model | the guardrail seam's facts | the four-layer order — and it hands the *attachment* question straight to step 2, which is why a configured guardrail can never have run |
+| 2a | `prompt-injection-layers` | the model | the guardrail seam's facts | the layer order, detection then containment — and it hands the *attachment* question straight to step 2, which is why a configured guardrail can never have run |
 | 2b | `llm-cost-observability` | the model | the cost seam's facts | role-tagged token, cost, latency and error metrics, and a provable cache-hit claim; *why* a cache misses goes to step 2 |
 | 2c | `conversation-memory-and-compaction` | the model | the memory seam's facts | a window-or-budget decision and a compaction pass that never separates a tool result from the message that requested it |
 | 3 | `llm-triage-gate` | the model | step 2's decision that a role belongs in front | the pre-filters that answer without a model call, the model choice for the slot, and the fallback when it cannot answer in time. It names no further skill; the chain ends here |
