@@ -2,14 +2,23 @@ package io.github.rodrigorjsf.agenticchat.evals.scenario;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.request.ResponseFormat;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * The last layer of checks: the {@code grader} model scores each rubric criterion of a scenario,
@@ -22,6 +31,10 @@ import java.util.List;
  *
  * <p>One call per criterion rather than one per rubric, so each verdict is about one thing and a
  * long rubric cannot blur them together.
+ *
+ * <p>Built {@link #withFewShot with a calibration set}, the Grader is shown that criterion's
+ * human-labelled train rows as worked examples before the answer it grades. Only train rows: the
+ * dev and test rows exist to measure it, and a row it has seen cannot.
  */
 public final class RubricGrader {
 
@@ -39,10 +52,55 @@ public final class RubricGrader {
 
     private final ObjectMapper json = new ObjectMapper();
     private final ChatModel model;
+    private final Map<String, List<GraderCalibrationSet.Example>> examplesByCriterion;
 
-    /** @param model the registry's {@code grader} role, never the agent's model */
+    /** A zero-shot grader. @param model the registry's {@code grader} role, never the agent's model */
     public RubricGrader(ChatModel model) {
+        this(model, Map.of());
+    }
+
+    private RubricGrader(ChatModel model, Map<String, List<GraderCalibrationSet.Example>> examplesByCriterion) {
         this.model = model;
+        this.examplesByCriterion = examplesByCriterion;
+    }
+
+    /**
+     * A grader shown, for each criterion, the {@link GraderCalibrationSet.Split#TRAIN train} rows the
+     * calibration set labels for it. A criterion with no train rows is graded zero-shot.
+     */
+    public static RubricGrader withFewShot(ChatModel model, GraderCalibrationSet calibration) {
+        return new RubricGrader(model, trainExamples(calibration));
+    }
+
+    /**
+     * A digest of everything the Grader is told besides the answer it grades: its instructions and
+     * every train example. A calibration measured under one fingerprint says nothing about a grader
+     * prompted under another. Dev and test rows are not part of the prompt, so they do not move it.
+     */
+    public static String promptFingerprint(GraderCalibrationSet calibration) {
+        var text = new StringBuilder(INSTRUCTIONS);
+        trainExamples(calibration).forEach((criterion, examples) -> {
+            for (var example : examples) {
+                fewShot(criterion, example).forEach(message -> text.append('\u0000').append(message));
+            }
+        });
+        try {
+            var digest = MessageDigest.getInstance("SHA-256").digest(text.toString().getBytes(StandardCharsets.UTF_8));
+            return "sha256:" + HexFormat.of().formatHex(digest);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("every JVM ships SHA-256", e);
+        }
+    }
+
+    private static Map<String, List<GraderCalibrationSet.Example>> trainExamples(GraderCalibrationSet calibration) {
+        var byCriterion = new LinkedHashMap<String, List<GraderCalibrationSet.Example>>();
+        for (var criterion : calibration.criteria()) {
+            var train = criterion.in(GraderCalibrationSet.Split.TRAIN);
+            if (!train.isEmpty()) {
+                byCriterion.put(criterion.criterion(), train);
+            }
+        }
+        return Map.copyOf(byCriterion);
     }
 
     public List<RubricVerdict> grade(List<String> criteria, List<String> turns, String answer) {
@@ -60,10 +118,16 @@ public final class RubricGrader {
         if (answer == null) {
             return RubricVerdict.ungraded(criterion, "there is no answer to grade");
         }
+        var messages = new ArrayList<ChatMessage>();
+        messages.add(SystemMessage.from(INSTRUCTIONS));
+        for (var example : examplesByCriterion.getOrDefault(criterion, List.of())) {
+            messages.addAll(fewShot(criterion, example));
+        }
+        messages.add(UserMessage.from(prompt(criterion, turns, answer)));
         String reply;
         try {
             reply = model.chat(ChatRequest.builder()
-                    .messages(SystemMessage.from(INSTRUCTIONS), UserMessage.from(prompt(criterion, turns, answer)))
+                    .messages(messages)
                     .responseFormat(ResponseFormat.JSON)
                     .build()).aiMessage().text();
         } catch (RuntimeException e) {
@@ -72,6 +136,15 @@ public final class RubricGrader {
             return RubricVerdict.ungraded(criterion, "the grader failed: " + e.getClass().getSimpleName());
         }
         return read(criterion, reply);
+    }
+
+    /** A labelled row as one earlier exchange: the question the Grader is asked, and the human's verdict. */
+    private static List<ChatMessage> fewShot(String criterion, GraderCalibrationSet.Example example) {
+        var verdict = JsonNodeFactory.instance.objectNode()
+                .put("pass", example.pass())
+                .put("critique", example.critique());
+        return List.of(UserMessage.from(prompt(criterion, example.turns(), example.answer())),
+                AiMessage.from(verdict.toString()));
     }
 
     private static String prompt(String criterion, List<String> turns, String answer) {

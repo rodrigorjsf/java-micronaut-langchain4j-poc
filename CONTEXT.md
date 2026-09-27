@@ -214,6 +214,13 @@ changes daily.
 triages turns. It runs after every check and is the only layer that is itself a
 model; until it is calibrated its verdicts are reported, never counted as checks.
 
+**Calibration set** — answers a person labelled PASS or FAIL against one rubric
+criterion, split into train (the Grader's few-shot examples), dev and test. The
+Grader is measured on dev and test by **TPR** (of the human PASS rows, the share it
+passes) and **TNR** (of the human FAIL rows, the share it fails), never by one
+accuracy, and recalibrated whenever the grader model, its prompt or the agent model
+changes.
+
 ---
 
 ## Bounded contexts, and what may depend on what

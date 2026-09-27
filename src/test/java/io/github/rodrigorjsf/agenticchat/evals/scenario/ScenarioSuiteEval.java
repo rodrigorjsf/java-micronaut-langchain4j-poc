@@ -98,14 +98,16 @@ class ScenarioSuiteEval {
 
     /**
      * The rubric is scored by the registry's {@code grader} role, which the registry refuses to
-     * start with when it is the agent's model.
+     * start with when it is the agent's model. It is shown the calibration set's train rows as
+     * few-shot examples — the same prompt {@code GraderCalibrationEval} measures.
      */
     private static ScenarioRunner runnerFor(EmbeddedServer server) {
         var context = server.getApplicationContext();
         return new ScenarioRunner(URI.create("http://localhost:" + server.getPort()),
                 context.getBean(RecordingAgentTracer.class),
                 context.getBean(LinkPolicy.class),
-                new RubricGrader(context.getBean(ChatModelRegistry.class).forRole("grader")));
+                RubricGrader.withFewShot(context.getBean(ChatModelRegistry.class).forRole("grader"),
+                        GraderCalibrationSet.loadCommitted()));
     }
 
     /**
