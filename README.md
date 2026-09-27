@@ -1,6 +1,6 @@
 # Agentic chat, built to be read
 
-A working agentic chat backend — **Micronaut 5.1.0, Java 25, LangChain4j 1.18.1**
+A working agentic chat backend — **Micronaut 5.1.0, Java 25, LangChain4j 1.20.1**
 — written as a study of how one is actually assembled, with the reasoning kept
 next to the code.
 

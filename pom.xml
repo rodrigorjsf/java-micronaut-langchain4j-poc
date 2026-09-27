@@ -25,10 +25,12 @@
 
     <!--
       Overrides the value inherited from micronaut-parent 5.1.0 (1.18.0).
-      langchain4j-bom:1.18.1 manages BOTH the stable modules (1.18.1) and the beta modules
-      (1.18.1-beta28) through its own internal properties, so no module below needs a version.
+      langchain4j-bom:1.20.1 manages BOTH the stable modules (1.20.1) and the beta modules
+      (1.20.1-beta30) through its own internal properties, so no module below needs a version.
+      Never 1.19.1: its release page says it "was published by mistake. Do not use it."
+      (https://github.com/langchain4j/langchain4j/releases/tag/1.19.1, read 2026-09-27).
     -->
-    <langchain4j.version>1.18.1</langchain4j.version>
+    <langchain4j.version>1.20.1</langchain4j.version>
 
     <archunit.version>1.4.1</archunit.version>
 
@@ -183,7 +185,7 @@
       <groupId>dev.langchain4j</groupId>
       <artifactId>langchain4j-google-ai-gemini</artifactId>
     </dependency>
-    <!-- beta modules: versions come from langchain4j-bom (1.18.1-beta28) -->
+    <!-- beta modules: versions come from langchain4j-bom (1.20.1-beta30) -->
     <dependency>
       <groupId>dev.langchain4j</groupId>
       <artifactId>langchain4j-skills</artifactId>

@@ -39,6 +39,10 @@ release cadence:
 at 1.18.1-beta28 through its own internal properties, so no LangChain4j
 dependency in this POM carries a version.
 
+*Update 2026-09-27 (#38):* the same one-property override moved the project to
+`1.20.1` (beta modules `1.20.1-beta30`), skipping the mistakenly published
+`1.19.1`. The decision is unchanged; `pom.xml` holds the current value.
+
 ## Consequences
 
 **Gained.** Every wiring decision is visible, greppable and testable. LangChain4j
