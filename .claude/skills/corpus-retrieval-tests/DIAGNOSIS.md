@@ -5,8 +5,9 @@ should retrieve and does not fails at one of the four layers [`SKILL.md`](SKILL.
 names — **the corpus, the chunk boundary, the vocabulary, or the
 threshold-or-router** — four causes with four different fixes and four different
 owners, indistinguishable from the failing assertion alone. *Layer* means those four
-and nothing else, here as there. The rules live in [`SKILL.md`](SKILL.md); this is
-the procedure.
+and nothing else, here as there. The layers are defined in [`SKILL.md`](SKILL.md);
+this page holds the verdicts, the procedure, and the two row edits that kill a
+retrieval set quietly.
 
 **Run the probes in order.** Each one is cheap, each one prints something you can
 paste into the commit or the issue, and each one removes a layer from suspicion.
@@ -18,6 +19,22 @@ The worked question below is the one `writing-retrievable-knowledge` works
 through, in the same invented domain — a public library's assistant, whose corpus is the
 library's own rules. The user typed: *"can I keep this book longer or do I have to
 bring it back"*, and the row expects `renewals.md`.
+
+## The six verdicts, and whose fix each one is
+
+Only one of the four is fixed by editing the document. Two further verdicts are not
+layers at all — the fact was never migrated, and the row itself is wrong — which is
+why the table has six rows. Diagnose before you touch anything; each verdict
+ends in a hand-off, not in a fix:
+
+| Verdict | The observation that produces it | Whose ground the fix is |
+|---|---|---|
+| the fact is not in the corpus at all | it is not in the source documents | `writing-retrievable-knowledge` — write it |
+| …and it is still in the prompt | it is in the standing text, never migrated | `prompt-to-corpus-migration` — this is its step 1, not a test failure. A model cannot load that skill: ask the user to run it, which they invoke by name |
+| the chunk boundary orphaned it | it is there, and the produced chunk holding it cannot stand alone | `writing-retrievable-knowledge` |
+| the vocabulary is the team's, not the user's | the chunk is whole, and is not in the top ranks even with the gate open | `writing-retrievable-knowledge` |
+| the threshold or the router discarded it | it ranks first with the gate open, and the shipped path returns nothing | `retrieval-that-earns-its-place` |
+| the row is what is wrong | you would have written the row differently before seeing the failure | `agentic-evals` |
 
 ## Probe 0 — is the row right?
 
@@ -153,3 +170,22 @@ that matched and the score it matched at, then read the sentence that matched.
 
 Whatever the verdict, the question becomes a permanent negative row before the fix
 lands.
+
+## Rows are not edited to make them pass
+
+`agentic-evals` owns this principle and its discriminator — *would you have
+labelled it this way before seeing the failure* — and the requirement that a row
+change lands in its own commit with its reason. Do not re-argue it. Two edits are
+specific to a retrieval set and are where one dies quietly:
+
+**Widening `expected_source` after seeing what came back.** "It returned B, and B
+is also fine" is a change to what the corpus promises, made in the one moment you
+are least able to judge it. Sometimes it is right — two documents genuinely both
+answer. It goes in its own commit with the reason, or the field degrades into
+*whatever the retriever returned last time*, and the suite certifies nothing while
+still printing a number.
+
+**Raising top-k in the test only.** A row that passes at rank 4 in a suite whose
+application ships a top-k of three tests a system nobody runs. If the answer needs four
+chunks, that is a configuration change for `retrieval-that-earns-its-place`, made
+in the application, and every other row re-measured against it.
