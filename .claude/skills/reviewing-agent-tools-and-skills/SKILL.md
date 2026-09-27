@@ -17,6 +17,16 @@ check that runs against one item sitting alone belongs to a **single-item review
 `authoring-agent-skills`'s *Reviewing a skill document* for a skill. Every deferral below goes to
 one of those two.
 
+| You are here because | Start at |
+|---|---|
+| a description, a name or the exposed set is about to change | *A description change is a behaviour change* |
+| you are starting a sweep | *Order of operations*, then [`PASSES.md`](PASSES.md) |
+| every item needs a free-tier score | *The rubric*, then [`RUBRIC.md`](RUBRIC.md) once an item misses full marks |
+| the free tier bought a routing run | [`ROUTING-SET.md`](ROUTING-SET.md) |
+| two tools compete for the same turns, or one has zero calls | [`MERGE-AND-ZERO-CALL.md`](MERGE-AND-ZERO-CALL.md) |
+| two skill descriptions overlap, or merges have landed and bodies need sweeping | [`SKILL-OVERLAP-AND-BODIES.md`](SKILL-OVERLAP-AND-BODIES.md) |
+| the sweep is finishing | *What the sweep produces* |
+
 ## A description change is a behaviour change — and so is a rename
 
 Editing a description ships new behaviour with no code diff to review. Illustrative: widening a
@@ -84,12 +94,12 @@ carrying that label — a row that does not sum to zero is a run you cannot comp
 |---|---|---|
 | 1. Inventory | two log queries, one descriptor dump, one activation and one captured request per skill | each item's name, description text, call or activation count over the window, its **primary subject** — the noun it is actually about, in three words — and, per skill, the share of activations followed by no call to any tool it discloses |
 | 2. Drift | a `diff` | a description, or a routing-set turn, that changed since the last sweep without a change of yours |
-| 3. Overlap → *The merge test*, *Two skills whose descriptions overlap* | reading, bounded by subject; 40 sampled turns and a domain reader per merge test | two items competing for the same turns |
+| 3. Overlap → [`MERGE-AND-ZERO-CALL.md`](MERGE-AND-ZERO-CALL.md), [`SKILL-OVERLAP-AND-BODIES.md`](SKILL-OVERLAP-AND-BODIES.md) | reading, bounded by subject; 40 sampled turns and a domain reader per merge test | two items competing for the same turns |
 | 4. Contract consistency | reading the shipped schema, bounded by subject | neighbours that disagree about a concept they share |
 | 5. Correction rate, **tools only** | one log query — only if every call carries the id of the user turn it belongs to | tools whose first call gets abandoned more often than the rest |
-| 6. Routing run → *The routing set* | a model call per single-label turn, per candidate — and two or more, plus a stub fixture, per sequence turn | reach and exclusivity, measured instead of argued |
+| 6. Routing run → [`ROUTING-SET.md`](ROUTING-SET.md) | a model call per single-label turn, per candidate — and two or more, plus a stub fixture, per sequence turn | reach and exclusivity, measured instead of argued |
 | 7. Blind A/B → *Blind A/B* | the routing run again, once per candidate | which of two rewrites is actually better |
-| 8. Body sweep → *Skill bodies* | reading, one grep | a body naming a tool this sweep just merged away or retired |
+| 8. Body sweep → [`SKILL-OVERLAP-AND-BODIES.md`](SKILL-OVERLAP-AND-BODIES.md) | reading, one grep | a body naming a tool this sweep just merged away or retired |
 
 **Passes 2–5 and 8 spend no model calls, and pass 1 spends one round trip per skill and none per
 tool**, and that is all *free* means here. It is not free of time: pass 3's merge test spends a
@@ -99,107 +109,11 @@ are bought only for what the free tier flagged: thirty turns per item across for
 1200-turn set, and most of those forty were fine before you started. Pass 8 runs last, after every
 merge and retirement has landed, because it cleans up after them.
 
-**Pass 1 in full.** Inventory what the framework sends, not what the source says: a parameter
-description blanked because a build step dropped it, and a skill whose tools never attached so
-activating it changes nothing, both read perfectly in source. **One dump shows the first and cannot
-show the second** — the visible tool set is rebuilt on every round trip from the marker the
-activation left (`progressive-tool-disclosure`), so a dump taken with nothing activated never held
-those tools at all. Proving attachment costs one activation per skill plus the request captured on
-the turn after it, read against that skill's declared list — `authoring-agent-skills` owns
-that comparison and tells its three failures apart; load it by name. Then write each
-primary subject down. All pairs in a forty-item layer is 780 comparisons, and the index is the only
-thing cutting passes 3 and 4 to a handful — which it does only when its groups are neither one
-group nor forty:
-
-```
-BAD   search_incidents → "searching for things"      the verb: one group of forty, nothing bounded
-BAD   list_incident_comments → "incident comments"   too fine: forty groups of one, same result
-GOOD  search_incidents, list_incident_comments, close_incident  → "incidents"
-      export_audit_log, list_access_grants                      → "audit trail"
-```
-
-The subject is the noun the **user's question** is about, not the verb the item performs and not
-the system it calls. Three words is the cap because the fourth is nearly always a qualifier that
-splits a group in two, and a group of one compares against nothing.
-
-**Size the window before you count anything: long enough to hold the longest legitimate gap between
-calls of the rarest item you intend to keep.** A quarterly compliance export counted over seven days
-reads as dead, and every seasonal item walks into the zero-call fork on the strength of an
-arithmetic artifact — the fork's own worst mistake, manufactured upstream of it. It does not follow
-that longer is safer: past your log retention the early half of the window is empty rather than
-quiet, and a window spanning a description edit blends two texts into one count. Record the window
-and any edit inside it in the run header; when those two collide, re-cut the window, not the item.
-
-**Pass 2 in full.** Keep every description the layer exposes, and the labelled routing set beside
-it, in checked-in snapshot files, and diff both at the start of each sweep. Text you do not
-author — anything mounted from a third party — changes under you between releases and arrives as
-prompt text the model obeys, so a description that gained a sentence you did not write stops the
-sweep: the control for **ASI04 Agentic Supply Chain Vulnerabilities**. The routing set earns the
-same discipline, and this is what **frozen** means: it grows and gets relabelled only by a labelled
-commit naming which turns changed and why, and never between a before run and an after run. Frozen
-is a property of the comparison window, not a ban on new turns — a set edited quietly mid-gate makes
-both numbers meaningless.
-
-**On a first sweep there is nothing to diff**, and the honest output is *baseline established*,
-not *no drift* — the same confusion as a 0 standing in for an unmeasured row, one level up.
-Writing the two snapshot files is pass 2's whole deliverable that run.
-
-**Pass 4 in full.** Judging one tool's own arguments, result budget and error text is a
-single-item review — `agentic-tool-boundary`'s five questions — and this sweep does not repeat it.
-What only the population shows is neighbours disagreeing: one concept spelled `state: "resolved"`
-here, `status: "CLOSED"` next door and `incident_state: "done"` in a third tool, so a value read
-out of one result is an argument error in the next call; a parameter documented with an example in
-one entry and blank in its neighbour; two entries that truncate, one announcing it and one not.
-That last is worse than a lone silent truncation: a model that has learned *these results say when
-they were cut* reads a missing notice as completeness.
-
-**Compare each item against the items sharing its primary subject, not against the layer** — pass
-1's index bounds this pass exactly as it bounds pass 3, on the same arithmetic. A chain crossing
-subjects is not caught by reading schemas anyway: that is what pass 6's sequence cases exercise,
-where the invented argument shows up as behaviour instead of as a spelling you happened to notice.
-
-**Pass 5 in full — and it is about tools.** The skill half of First-call correction is pass 1's
-second query, not this one; pass 5's precondition does not travel to skills. One query per tool: calls of it that were followed by a *different* item being
-called for the same user goal. That rate indicts this item's description — it attracted a turn it
-could not serve. **A retry of the same item with corrected arguments is not this row.** That is an
-argument-contract defect belonging to a single-item review (`agentic-tool-boundary` again), and
-scoring the two together sends you off to rewrite a description that was right. The same query is
-also the cheapest source of new routing-set turns (`ROUTING-SET.md`).
-
-**Most layers cannot run it — for tools.** "The same user goal" is not a field. It exists only when every tool
-call carries the id of the user turn that started it, propagated down the whole call chain, so two
-calls can be shown to serve one goal. A role tag on the model call is a different object — which
-model made the call, not which turn it serves — so a layer with full cost attribution can still be
-missing this. Without it the **tool** First-call correction row has no denominator, scores *not yet measurable*, and
-the finding is against your instrumentation rather than the item: name the missing field in the run
-header as work, or the next sweep rediscovers it and defers it again. Scored 0 instead it reads
-*this item attracts turns it cannot serve*, and you rewrite a description nobody has measured.
-
-**A layer that has not launched has no window.** Passes 1, 2 and 4 need no traffic — pass 1 minus
-its call counts, attachment check included, since activating a skill needs a running layer and not
-a user — and so does pass 3's detection, since subjects and shared trigger phrases are in the text.
-What defers whole is everything reading traffic: pass 3's merge test, both correction queries, and
-the zero-call fork. Traffic and First-call correction score *not yet measurable*, never 0, so the free tier is
-two rows here rather than four.
-
-**Pre-launch the free tier buys no verdict at all, however it scores.** The two rows you are missing
-are the two that see a description no real turn matches; what is left certifies only that neighbours
-do not collide and that the schemas agree. So the routing run is not bought here by a low score — it
-is the only measurement there is, and it runs once across the layer before launch, sized and read
-per `ROUTING-SET.md`: bounded by the real phrasing you could find rather than by turns per item, and
-scored per subject group, because whether a boundary between neighbours holds is answerable before
-launch and whether an item's own traffic arrives is not.
-
-**The run is read per group; its cells still name items, and that is how a group result becomes two
-scored rows per item.** A group whose off-diagonal cells all sit inside the floor scores Reach and
-Exclusivity 2 for every item in it. A cell that moved names a pair rather than a group: the item
-that took the turns loses Exclusivity, the item whose labelled turns went to it loses Reach, and
-both leave with a row at 0 or 1 — no group-level pass hides either. Then read the band per item over
-the four rows you have, exactly as on a launched layer, and write the count into the verdict:
-*reviewed, no change (pre-launch, 4 rows)* is a weaker claim than the six-row version and only the
-count says so. Symmetric theft — each taking turns labelled for the other — is the merge test's
-input rather than an edit, and it is the one pre-launch result that reaches a structural verdict
-without a second run.
+→ [`PASSES.md`](PASSES.md) — passes 1, 2, 4 and 5 in full: inventorying what the
+framework sends rather than what the source says, the primary-subject index, sizing
+the window, snapshot diffs and what *frozen* means, neighbours that disagree on a
+shared concept, why most layers cannot run the tool correction query, and the
+pre-launch variant, where the routing run is the only measurement there is.
 
 ## The rubric
 
@@ -247,7 +161,7 @@ which is which.
 
 **An item that lost a row reaches the routing run before it reaches a band.** The rows you could not
 score are the ones that see a description no real turn matches, and that is what the run measures
-directly. The pre-launch rule above is this rule with two rows gone instead of one.
+directly. The pre-launch rule in [`PASSES.md`](PASSES.md) is this rule with two rows gone instead of one.
 
 → `RUBRIC.md` — the bands, read off the rows rather than off a total, and the verdict each one
 buys; paid-tier anchors, calibration, worked scoring, the noise floor, and how to run the blind A/B.
@@ -255,37 +169,11 @@ Open it the moment an item misses full marks.
 
 ## The routing set
 
-A **routing set** is a list of recorded user turns, each labelled with the item that should have
-fired.
-
-**Build it from your logs.** Invented turns are worthless here: you write them with the
-description in your head, so they reuse its vocabulary and it routes them by construction. The
-turns that break routing are in the user's words — "where's my stuff", "the thing I ordered last
-week" — and you will not invent those.
-
-Three include-rules, each defending a score the set would otherwise inflate:
-
-- **Turns that belong to a neighbour, labelled with the neighbour**, or the set measures reach and
-  is blind to theft.
-- **Turns nothing in the layer should take, labelled *none***, or the cheapest way to raise every
-  reach score is to widen every description — and the paid tier becomes gameable by precisely the
-  defect it exists to catch. **Two different things wear that label.** One is a goal the layer
-  decided not to serve, where recurring volume changes nothing. The other is a goal you labelled
-  *none* for want of an item to label it with, where recurring volume is the *capability gap*
-  verdict below — and widening a description to absorb it converts an honest *none* into a false
-  hit and games the row you just protected. The answer there is a new item, not new words.
-- **Turns whose label is an ordered pair**, or the multi-step failure stays invisible: the model
-  picks the right first item and then stalls, or skips it and calls the second with an argument it
-  invented. One label per turn can never see either.
-
-**Budget the ordered pairs separately.** Telling a stall from a pass means letting the model take
-a second step: hand the first call's result back as a stubbed fixture and see whether it
-continues. Score a sequence turn from the single call you already made and every stall is recorded
-as a pass — you never gave the model the chance to fail. Two or more calls and one stub per
-sequence turn, and the three sequence outcomes stay three counts, never one rate.
-
-→ `ROUTING-SET.md` — sourcing, sizing, boundary turns, writing a sequence case, reading the
-confusion table, and the pre-launch variant. Open it before the first run.
+A **routing set** is a list of recorded user turns, each labelled with the item that
+should have fired — built from logs, never invented, and holding three kinds of turn
+besides the obvious: a neighbour's, labelled with the neighbour; turns nothing should
+take, labelled *none*; and ordered pairs, budgeted separately →
+[`ROUTING-SET.md`](ROUTING-SET.md). Open it before the first run.
 
 ## Blind A/B
 
@@ -302,145 +190,32 @@ obvious. Run none of it from memory.
 
 ## The merge test — two tools that answer the same question
 
-Pull 20 turns that fired tool A and 20 that fired tool B, strip the tool names, and hand the 40 to
-someone who knows the domain. **If they cannot say from the turn alone which one should have
-fired, the model cannot either** — it has been guessing all along, consistently, in whichever
-direction the descriptions lean. Then ask what separates them: **a value the turn always supplies,
-or a decision the model would be guessing at?**
-
-```
-BAD   search_active_incidents()   search_resolved_incidents()
-GOOD  search_incidents(state: "active" | "resolved" | "all")
-```
-
-A turn about incidents always says which kind, so the split buys nothing and puts a second item into
-every incident routing decision. When the answer is *a decision* instead, the pair is not a merge
-candidate at all: **the merged tool takes the union of the parameters, never a mode flag**, and a
-flag choosing which of the two old behaviours you wanted is that decision wearing a parameter.
-*Why* a tool that hides a decision gets split is `agentic-tool-boundary`'s *Split a tool when it
-hides a decision*; finding the hidden decision while the tool is still on paper is
-`authoring-agent-tools` §4. The sweep's own part is smaller — the merge stops here, and the fix is
-two sharper descriptions.
-
-| Disposition | When | What you do |
-|---|---|---|
-| **Merge** | they differ only by a value the question supplies | one item, one enumerated parameter, its description written against the union rather than edited — which is why the survivor scores *rewritten, not edited* and the half that goes scores *merge into `<named item>`* |
-| **Subordinate** | one is a special case of the other | withdraw the special case **in two steps**, as under *The zero-call fork* — deleting it outright ships an unmeasured routing change under cover of a removal; move its case into the general item's description as an example |
-| **Re-cut** | the split is on the wrong axis — by data source, say, when users think in questions | redraw both boundaries on the question, then re-run the set as a new pair |
-
-Leaving the overlap is the worst option and the default one. The model's choice goes effectively
-random per turn, so one user question yields two latencies and two result shapes, one of them
-quietly worse — and each individual trace looks fine, so nobody opens a bug.
+Strip the names from twenty turns of each tool and ask a domain reader which one
+each turn belonged to; if they cannot tell, neither can the model. Then ask whether
+a value the turn always supplies or a decision separates the two — merge,
+subordinate or re-cut, never leave the overlap →
+[`MERGE-AND-ZERO-CALL.md`](MERGE-AND-ZERO-CALL.md).
 
 ## The zero-call fork — where a Traffic 0 goes
 
-Zero calls in a window sized per pass 1 is a finding, not a verdict — and against a window too short
-for the item it is not even that. Tell the causes apart with the **routing set**, not the telemetry:
-write the turn the item exists for, and see where it routes.
-
-| What you see | Verdict |
-|---|---|
-| It routes here, and no real turn in the window resembles it | Retire it |
-| It routes to a neighbour instead | A routing defect in a retirement costume: fix the description and re-run before deciding anything. Deleting now buries the bug and leaves the neighbour answering a question it was not built for |
-| It routes here, and the turn is rare but load-bearing — the compliance export, the incident path | Keep the capability, **move it behind an activation** |
-
-The middle row is the one people get wrong. A tool at zero calls looks dead and is often the most
-valuable item in the sweep: something users keep asking for, behind text that never fires.
-
-**Moving an item behind an activation** means putting the tool inside a skill, so its schema
-reaches the model only on the turns that activate that skill instead of standing in every routing
-decision it will almost never win. That is a disclosure change with its own costs and its own
-failure mode — `progressive-tool-disclosure` owns both; this sweep only decides which items
-deserve it. It is still a routing change for every survivor, so it goes through the gate.
-
-**Retire in two steps.** Stop exposing it — a routing change, through the gate like any other —
-then delete the implementation a window later, once nothing has called it, so a surprise in the
-routing run and a surprise in the code can never be the same incident. And **removing one item is
-a description change for every survivor**, because its traffic goes somewhere: re-run the routing
-set once it stops being exposed, not only after the code is deleted, or you shipped an unmeasured
-routing change under cover of a removal.
-
-Retiring and merging both shrink what a hijacked turn can reach: the control for **ASI02 Tool
-Misuse and Exploitation**. Every tool you keep is one somebody has to keep reviewing, and a tool
-nobody calls is reviewed by nobody.
+Zero calls is a finding, not a verdict. Write the turn the item exists for and see
+where the routing set sends it: retire it, fix a neighbour's routing defect, or keep
+it behind an activation — and retire in two steps →
+[`MERGE-AND-ZERO-CALL.md`](MERGE-AND-ZERO-CALL.md).
 
 ## Two skills whose descriptions overlap
 
-A skill's description is the only thing standing between a turn and the tools inside it. Two
-skills claiming the same trigger split those turns the same way two overlapping tools do —
-effectively at random, per turn — and one layer up the split costs more, because losing the turn
-means the whole tool group behind the loser is never disclosed on it. The failure arrives
-disguised: the bug report says "the returns tools are broken", the tools are fine and were simply
-never handed to the model on the turns that needed them, and teams debug them for days.
-
-Detection is free, because pass 1 already wrote the subjects down. A shared phrase goes to
-whichever skill owns the **outcome** the user asked for, never to the one that says the noun more
-often, and the loser records the hand-off:
-
-```
-shared phrase   "problem with my delivery"
-owner           returns — the outcome asked for is a refund, not a location
-loser's clause  order-tracking: "…For an item that already arrived, use returns."
-```
-
-That clause costs about ten tokens and settles the tie deterministically instead of leaving it to
-sampling; `authoring-agent-skills` has the shape to write it in. Neither description is wrong read
-alone, which is why only a sweep finds this.
-
-**The tool dispositions do not carry over.** "One item, one enumerated parameter" means nothing
-for two skills, and every disposition here moves tools between disclosure sets — a routing change
-per tool, not one for the pair:
-
-| Disposition | When | What you do |
-|---|---|---|
-| **Merge** | same primary subject | one description, one body, the **union of both declared tool sets** — every tool in it now reaches the model on the survivor's turns and on no others, so the gate runs on the union and the frozen set carries turns labelled for **both** originals |
-| **Assign the phrase** | different subjects, one shared trigger phrase | the clause above, written into the loser; both descriptions are queued edits, gated and shipped one at a time |
-| **Absorb** | one skill's ground is a special case of the other's | move its tools into the general skill, then retire the skill in two steps — gated as a disclosure change for every tool moved |
-| **Re-cut** | both are drawn on the wrong axis — by team or backend, when users ask by outcome | redraw both on the outcome and gate them as a new pair |
-
-**Every disposition here leaves two verdicts, and the survivor is the one that gets forgotten.** The
-half that disappears is easy to remember. The half that stays ships an unscored change: a merge or
-an absorption grows its declared tool set, so its disclosure moved for every tool it took on. An
-absorption's survivor leaves as *edit queued behind the gate* whether or not a word of its
-description changed; a merge's survivor leaves as *rewritten, not edited*, its description written
-against the union rather than edited. Score it, or the gate runs on a tool set nobody wrote down.
-
-**A skill-labelled turn certifies only that the skill fired.** Whether the survivor's body actually
-hands over the tools it absorbed is invisible to it, so a merge or an absorption is proven by
-**sequence turns** running through the absorbed tools. Without them you shipped a merge whose
-second half nobody watched.
-
-Verify on traffic, not by rereading: a skill still under-firing over the window after the phrase
-has been assigned never had an overlap problem — take it back to the zero-call fork.
+A shared trigger goes to the skill that owns the **outcome** the user asked for, and
+the loser records a hand-off clause; the tool dispositions do not carry over, and
+the repair itself is `authoring-agent-skills`' →
+[`SKILL-OVERLAP-AND-BODIES.md`](SKILL-OVERLAP-AND-BODIES.md).
 
 ## Skill bodies
 
-A body is what the model reads *after* it activates, and a set with one label per turn certifies
-routing to a skill while seeing nothing inside it.
-
-**Grep every body in the catalogue against this sweep's removal list** — every name it merged
-away, retired or renamed, tool and skill alike. `authoring-agent-skills` already has each skill
-checking its own body against its own declared set, and running that again is not this pass. This
-one runs in a different direction, for two reasons only a sweep produces: **a boundary clause
-names a *skill*, and no declared tool set contains skill names**, so the per-skill grep is
-structurally blind to a clause handing ground to a skill you just merged away — there is no set
-for that name to fail to resolve in; and **the bodies that break are in skills this sweep never
-opened**, whose files are untouched and whose owners have no diff to react to, so the per-skill
-check will not be re-run on the one occasion it would have fired.
-
-The double-ownership case is `authoring-agent-skills`'s finding until the sweep touches it, and
-then it is yours: two skills declared the same tool, you retired one of them, the tool's
-implementation went with the skill that carried it, and the survivor's recipes now name a tool
-that is gone — in a change whose ticket never mentioned that skill.
-
-**Scoring one body's entry points, bounds and failure clauses is a single-item review**, which
-this sweep excludes: a shorter list of your own would stamp *complete* on a body that
-`authoring-agent-skills`'s checklist rejects. So a body leaves the sweep with *body clean* or *body
-edit queued*, the queued one naming the identifier that has to go. Whether it is *finished* is its
-owner's call against that checklist, and the queue is what puts it in front of them.
-
-A body edit does not move routing and does not spend the gate; what proves it landed is the
-sequence cases, the only thing here that watches the model after it activates.
+Pass 8 runs last and greps every body in the catalogue for a name this sweep merged
+away, retired or renamed; a body leaves the sweep as *body clean* or *body edit
+queued* →
+[`SKILL-OVERLAP-AND-BODIES.md`](SKILL-OVERLAP-AND-BODIES.md).
 
 ## What the sweep produces
 
