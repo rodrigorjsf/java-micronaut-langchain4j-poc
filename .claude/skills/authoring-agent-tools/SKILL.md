@@ -13,6 +13,14 @@ What a finished tool looks like is a boundary question — this is the pass
 that there is no tool. A fourth question, *what decision would this tool hide
 from the model?*, waits for §4 and a shape to ask it of.
 
+| You are here because | Start at |
+|---|---|
+| someone asked for a tool that does not exist yet, or asked as an implementation | *1. What does the user actually say?*, then questions 2 and 3 in order |
+| the interview is answered and you are choosing parameters | *From the answers to the parameter set* |
+| the parameters are settled and the text is next | *Write the description from the open sentences*, then the error taxonomy and the result shape |
+| one proposed tool may really be two | *4. What decision would this tool hide from the model?* |
+| the contract is written and the tool is about to be built or shipped | *The tests that gate the ship*, then *Before it ships* |
+
 ## 1. What does the user actually say?
 
 Collect the **sentence list**: real sentences in the words a person types, from

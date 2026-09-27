@@ -9,6 +9,14 @@ An agent with tools already has a way to get facts. Retrieval has to justify
 itself against that, and the two questions it must answer are **what is in the
 corpus** and **when does it run**.
 
+| You are here because | Start at |
+|---|---|
+| adding RAG to an agent that already has tools, or choosing a corpus | *The corpus: what tools cannot answer* |
+| tuning a similarity threshold, or proving it works | *A similarity threshold may not separate* |
+| retrieved context is polluting answers | *Routing: use a signal you already paid for*, then *Do not store retrieved content in chat memory* |
+| someone proposes a retrieval technique | *Techniques worth refusing* |
+| the content is sitting in a prompt today | *Content already sitting in a prompt* |
+
 ## The corpus: what tools cannot answer
 
 **Do not retrieve facts your tools serve.** A corpus of world facts goes stale,

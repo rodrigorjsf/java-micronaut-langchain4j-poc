@@ -9,6 +9,14 @@ Every tool schema in the system prompt is paid on **every turn, for the life of
 every conversation**. That standing cost is the problem; the mechanisms below all
 attack it the same way — show names now, bodies later.
 
+| You are here because | Start at |
+|---|---|
+| an agent has ten or more tools, or tool schemas dominate the system prompt | *The token math, first*, then *The threshold: ten tools* |
+| tool selection accuracy drops as tools are added | *The threshold: ten tools* |
+| deciding which tools go behind skills and which stay searchable | *Group tools into skills*, then *Skills and tool search coexist — as a partition* |
+| a tool that should be there is not, and nothing says why | *The failure mode: disclosure state is invisible* |
+| disclosure is in place and turns got slower or worse | *When it backfires* |
+
 ## The token math, first
 
 A tool schema with a description and two documented parameters runs roughly

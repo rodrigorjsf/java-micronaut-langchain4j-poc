@@ -12,6 +12,15 @@ its cost the one you multiply by traffic.
 Two disciplines follow from that, and they pull in the same direction: **do not
 call the model when you do not have to**, and **do not trust what it returns**.
 
+| You are here because | Start at |
+|---|---|
+| every request pays for a full agent turn whether it needed one or not | *Not calling the model* |
+| you are choosing a model for the classifier | *Choosing the model: measure, do not assume* |
+| structured classifier output feeds later prompts | *Every field earns its place*, then *Classifier output is untrusted input* |
+| the classifier times out | *Fail open, and say why* |
+| you are designing the in-scope/out-of-scope boundary | *Writing the scope prompt* |
+| the gate ships and you need to know it is working | *What to measure in production* |
+
 ## Not calling the model
 
 ```

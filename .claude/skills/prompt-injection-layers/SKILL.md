@@ -20,6 +20,16 @@ OUTPUT  4 canary + exfiltration channels
 LOOP    5 contain      untrusted text never chooses a consequential action
 ```
 
+| You are here because | Start at |
+|---|---|
+| a regex blocklist is the only defence | *Detection is probabilistic; plan for the miss*, then layers 1 to 3 |
+| a detector is producing false positives | *Three false-positive controls, and they are the whole game* |
+| you are adding an output guardrail | *4. Output side: a canary, and the two exfiltration channels* |
+| the agent reads tool results, fetched pages or retrieved documents | [`TOOL-RESULT-INJECTION.md`](TOOL-RESULT-INJECTION.md) |
+| text a tool returned could become an argument of a tool that writes, sends or pays | *5. Containment: untrusted text never chooses a consequential action* |
+| deciding what a rejected request should be told | *What the user is told* |
+| a new rule is about to go live | *Rolling out a rule* |
+
 ## Detection is probabilistic; plan for the miss
 
 Layers 1–4 lower the rate at which an attack gets through. None of them sets it to
@@ -161,40 +171,10 @@ one successful extraction keeps leaking for the rest of the session.
 
 ## Injection arrives in tool results too
 
-The user is one author of the text the model reads. Every tool result, fetched
-page, retrieved chunk and sub-agent return is another — a stranger's, read with
-the same attention. OWASP calls this **indirect** prompt injection: it "occur[s]
-when an LLM accepts input from external sources, such as websites or files"
-[sourced — *LLM01:2025*, "Indirect Prompt Injections", read 2026-09-27, URL
-above]. Its scenario #2: a summarised web page carries hidden instructions to
-insert an image whose URL exfiltrates the conversation — closed by layer 4's host
-allow-list, never seen by an input-side rule.
-
-**An input guardrail does not see it.** It runs once, on the user's turn, before
-the tool loop; a tool result arrives inside the loop. Screen results where a
-tool's output becomes a message — the executor, the tool door — and route
-**every** tool through that point: a tool wired in by a second mechanism
-(declared statically beside a dynamic provider, say) is one the screen never
-sees. Where that hook lives is agentic-service-composition's question.
-
-**A result needs its own rule set, not the user's.** Keep the rules about
-*instructions* — chat-template delimiters, a fence labelled with a privileged
-role, `data:` URIs, override and probe phrases, invisible characters, base64 that
-decodes to text. Drop the rules about *sentences*. Compact JSON has no
-whitespace, so an "unbroken 400-character token" rule fires on any result over
-400 characters: a twelve-month interest-rate series of 457 characters was
-reported to the model as an injection attempt [sourced — this repository's
-tool-result scorer, whose comment records the measurement]. Length already has a
-bound at the tool door.
-
-**Neutralise the payload; keep the message.** Replace a flagged result's text
-with a short neutral error the model can act on, and keep the result message —
-its call id and its metadata. A tool call with no answer is a list providers
-reject; why a stored history must keep that pair is
-conversation-memory-and-compaction's.
-
-**And assume the screen will miss.** It is layers 1–3 run on a different author,
-and exactly as probabilistic. That is why layer 5 exists.
+Every tool result, fetched page, retrieved chunk and sub-agent return is text a
+stranger wrote, read with the same attention as the user's — **indirect** prompt
+injection, which an input guardrail running once on the user's turn never sees →
+[`TOOL-RESULT-INJECTION.md`](TOOL-RESULT-INJECTION.md).
 
 ## 5. Containment: untrusted text never chooses a consequential action
 

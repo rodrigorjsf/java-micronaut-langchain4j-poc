@@ -8,6 +8,15 @@ description: Use when wiring the services of an agent runtime, when a single ser
 The unit of composition is the **role**: a named job — classify, answer,
 summarise, embed — owning a model handle, a prompt, a memory and a tool set.
 
+| You are here because | Start at |
+|---|---|
+| one service both classifies and answers | *1. One service per role* |
+| a model name appears in application code | *2. One registry owns `role → model`* |
+| deciding where a guardrail, listener or tool provider attaches, or one never runs | *3. Attach at the layer the framework actually calls* |
+| a provider's prompt cache is not hitting | *4. The standing prompt is byte-stable* |
+| something expensive is built on first use | *5. Warm eagerly, and gate readiness* |
+| a runtime already ships and you are reviewing it | *Reviewing an existing runtime* |
+
 ## 1. One service per role
 
 **One service object per role.** Capability sets do not compose — a merged service

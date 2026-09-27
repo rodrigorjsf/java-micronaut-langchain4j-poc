@@ -9,6 +9,13 @@ An agentic request makes several model calls of very different value: a cheap
 classifier, an expensive agent, a summariser, a guardrail. Measured as one total,
 none of the decisions that produced them can be defended.
 
+| You are here because | Start at |
+|---|---|
+| the model bill is one number nobody can decompose | *Tag every metric with a role* |
+| someone is claiming a prompt-caching win | *Measure cached tokens, or stop claiming the cache*, then *Bill cache reads and cache writes at their own rates* |
+| pricing lives in code | *Prices belong in configuration*, then *Use decimal arithmetic* |
+| you are instrumenting an agent with more than one model call per request | *Tag every metric with a role*, then *The listener must never throw* and *One surface, not two* |
+
 ## Tag every metric with a role
 
 Address models by **role** — `judge`, `agent`, `summarizer` — never by model id,
