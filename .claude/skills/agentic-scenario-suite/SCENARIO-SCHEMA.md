@@ -14,7 +14,7 @@ shows only what changed.
 
 ```json
 {
-  "id": "weather-happy-forecast-tomorrow",
+  "id": "weather-happy-rain-example",
   "domains": ["weather"],
   "kind": "happy",
   "source": "synthetic",
@@ -70,10 +70,10 @@ happy path with a typo.
 
 ## The coverage floor
 
-Per domain: **≥ 2 happy**, **≥ 3 named bad paths** (three *different* kinds when
-the domain allows it), and **1 multi-turn** row when the domain holds state. The
-floor is a minimum for coverage, not a sample size for a gate — how many rows a
-gate needs is `agentic-evals`'s question.
+The numbers are in step 4 of [`SKILL.md`](SKILL.md). Two readings of them: the
+three bad paths should be three *different* named kinds when the domain allows
+it, and the floor is a minimum for coverage, not a sample size for a gate — how
+many rows a gate needs is `agentic-evals`'s question.
 
 ## Where each expectation comes from
 
@@ -99,12 +99,12 @@ report it as a gap in the artifact and leave the row out.
 
 ## Complementing and adjusting
 
+The rule is rule 4 of [`SKILL.md`](SKILL.md); the mechanics are these.
+
 - **Load before you write.** Read every committed row first; plan additions
   against what is there.
-- **Add beside, in stable order.** New rows go after the existing rows of their
-  domain file.
-- **Adjust as a proposal.** A row whose expectation an artifact now contradicts is
-  shown as its own hunk with the contradicting sentence; its `id` does not change.
-- **A failing row is diagnosed before it is edited.** Editing the row to match the
-  new behaviour is right only when the behaviour change was intended; otherwise
-  the row just caught a regression.
+- **Add after the existing rows of the domain file**, so the diff is pure
+  additions.
+- **Adjust as its own hunk**, quoting the artifact sentence that contradicts the
+  row. Change a row to match new behaviour only when the behaviour change was
+  intended; otherwise the row just caught a regression.
