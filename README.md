@@ -113,7 +113,7 @@ question from the two above is
 | Reach for | When |
 |---|---|
 | a triage gate in front of the agent | requests arrive that the agent should not answer, and the agent turn is much more expensive than a classifier |
-| progressive disclosure through skills | more than ~15 tools, or tool selection accuracy dropping as tools are added |
+| progressive disclosure through skills | ten or more tools, or tool selection accuracy dropping as tools are added |
 | a sub-agent workflow | a subtask produces output the main conversation will never reference again |
 | retrieval | there are questions no tool can answer — usually about the assistant itself |
 | a voice document in the prompt, not behind a skill | the rule applies to *every* answer. Routing buys nothing when the answer is always, and it fails silently when the model does not notice the turn qualifies |

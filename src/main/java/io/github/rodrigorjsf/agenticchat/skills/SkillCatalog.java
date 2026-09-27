@@ -44,10 +44,10 @@ import java.util.stream.Collectors;
  * {@code ToolGuardProvider} can screen what it returns.
  *
  * <p><b>Why not tool search.</b> LangChain4j also ships a {@code ToolSearchStrategy}
- * that hides tools until the model searches for them. It is a real alternative, but
- * the two do not compose: a dynamic {@code ToolProvider} — which is what
- * {@code Skills} returns once any skill owns tools — bypasses the tool-search filter
- * entirely. Skills win here because the grouping is meaningful to a human as well
+ * that hides tools until the model searches for them. The two coexist as a partition:
+ * a dynamic {@code ToolProvider} — which is what {@code Skills} returns once any
+ * skill owns tools — bypasses the tool-search filter, so skill-scoped tools are never
+ * searchable while regular tools stay searchable. Skills win here because the grouping is meaningful to a human as well
  * (a skill is a documented capability, not a search result) and because the
  * instructions and the tools are disclosed together, so the model never holds a tool
  * without the guidance for using it.

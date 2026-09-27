@@ -40,6 +40,11 @@ applies the search adjustment before refreshing dynamic providers, and the
 refresh adds to both the effective and available tool sets. Enabling both would
 silently disable one.
 
+> **Disputed (2026-09-27, see #54):** the conclusion above is false. The two
+> coexist as a partition, and neither is disabled: skill-scoped tools are never
+> searchable, while regular tools stay searchable. See the
+> `progressive-tool-disclosure` skill.
+
 **A skill is meaningful to a human, a search hit is not.** `SKILL.md` is
 documentation, review-able in a pull request, and portable to any harness that
 speaks the same format. A ranking function is none of those things.
