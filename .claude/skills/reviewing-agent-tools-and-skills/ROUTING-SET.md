@@ -1,7 +1,39 @@
 # Building the routing set
 
-Open this before the first run. `SKILL.md` says what the set is for and how it
-is change-controlled; this file is how you build one that can fail.
+Open this before the first run. `SKILL.md` says how the set is change-controlled
+(pass 2, in [`PASSES.md`](PASSES.md)); this file is what the set is and how you
+build one that can fail.
+
+## What a routing set is
+
+A **routing set** is a list of recorded user turns, each labelled with the item that should have
+fired.
+
+**Build it from your logs.** Invented turns are worthless here: you write them with the
+description in your head, so they reuse its vocabulary and it routes them by construction. The
+turns that break routing are in the user's words — "where's my stuff", "the thing I ordered last
+week" — and you will not invent those.
+
+Three include-rules, each defending a score the set would otherwise inflate:
+
+- **Turns that belong to a neighbour, labelled with the neighbour**, or the set measures reach and
+  is blind to theft.
+- **Turns nothing in the layer should take, labelled *none***, or the cheapest way to raise every
+  reach score is to widen every description — and the paid tier becomes gameable by precisely the
+  defect it exists to catch. **Two different things wear that label.** One is a goal the layer
+  decided not to serve, where recurring volume changes nothing. The other is a goal you labelled
+  *none* for want of an item to label it with, where recurring volume is the *capability gap*
+  verdict of `SKILL.md`, *What the sweep produces* — and widening a description to absorb it converts an honest *none* into a false
+  hit and games the row you just protected. The answer there is a new item, not new words.
+- **Turns whose label is an ordered pair**, or the multi-step failure stays invisible: the model
+  picks the right first item and then stalls, or skips it and calls the second with an argument it
+  invented. One label per turn can never see either.
+
+**Budget the ordered pairs separately.** Telling a stall from a pass means letting the model take
+a second step: hand the first call's result back as a stubbed fixture and see whether it
+continues. Score a sequence turn from the single call you already made and every stall is recorded
+as a pass — you never gave the model the chance to fail. Two or more calls and one stub per
+sequence turn, and the three sequence outcomes stay three counts, never one rate.
 
 ## Where the turns come from
 

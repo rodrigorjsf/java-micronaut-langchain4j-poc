@@ -5,28 +5,16 @@
 The OWASP GenAI Security Project published the *OWASP Top 10 for Agentic
 Applications*, version 2026, on **9 December 2025**:
 <https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/>.
-The ten identifiers **ASI01–ASI10 and their order are confirmed**: two
-independent secondary sources — the Modulos governance guide and the DeepTeam
-framework reference, both read on 15 August 2026 — enumerate the same ten items
-in the same order, and the resource page above carries the date.
+The titles below are the document's own entry headings (pp. 9–36 of the PDF,
+version 2026, December 2025) [sourced — https://genai.owasp.org/download/52117,
+read 2026-09-27]. Use them verbatim and use no other wording: an item spelled
+three ways reads as three items, and a reader searching one spelling misses the
+other two. The document's at-a-glance page and appendices shorten a few of them
+with `&`; the entry headings are the titles, so they win.
 
-**Key your table on the identifier, never on the title.** Those same two sources
-disagree on the wording of four of the ten:
-
-| Item | One source has | The other has |
-|---|---|---|
-| **ASI02** | Tool Misuse | Tool Misuse & Exploitation |
-| **ASI03** | Identity & Privilege Abuse | Agent Identity & Privilege Abuse |
-| **ASI04** | Agentic Supply Chain Vulnerabilities | Agentic Supply Chain Compromise |
-| **ASI08** | Cascading Failures | Cascading Agent Failures |
-
-That is the observed disagreement, not the whole of it: the primary document is
-a gated download that was **not read here**, so each title used below is
-whichever of the two wordings above reads more plainly — unverified against the
-document, and the other six may differ in sources nobody checked. Quote the
-identifier and describe the item in your own words. A reader holding the
-document will have different words for the same thing, and an audit that argues
-about a title has stopped auditing.
+**Still key your table on the identifier.** A reader holding a secondary source
+will have different words for the same item, and an audit that argues about a
+title has stopped auditing.
 
 **The seam mapping, the "covered when" column and the triggers are this skill's
 own, not OWASP's.** The published document maps its items to OWASP's own threats
@@ -37,10 +25,10 @@ and mitigations taxonomy, which is a different exercise from this one.
 | Item | Seam holding the control | Covered when — and the probe that measures it |
 |---|---|---|
 | **ASI01 Agent Goal Hijack** | guardrails, input side | every path carrying text the user did not type is checked before it reaches the next prompt (**5.1**), and a check that cannot answer produces a chosen, recorded outcome rather than an unlogged pass (**5.3**) |
-| **ASI02 Tool Misuse & Exploitation** | tool boundary | no parameter names a destination (**3.3**), a forbidden argument is rejected at the boundary rather than by the downstream system (**3.8**), and each tool carries its own authority rather than the union of all of them (**3.6**) |
-| **ASI03 Identity & Privilege Abuse** | tool boundary | a call runs with the caller's authority rather than one shared service identity, so it cannot reach data the caller could not (**3.6**) |
+| **ASI02 Tool Misuse and Exploitation** | tool boundary | no parameter names a destination (**3.3**), a forbidden argument is rejected at the boundary rather than by the downstream system (**3.8**), and each tool carries its own authority rather than the union of all of them (**3.6**) |
+| **ASI03 Identity and Privilege Abuse** | tool boundary | a call runs with the caller's authority rather than one shared service identity, so it cannot reach data the caller could not (**3.6**) |
 | **ASI04 Agentic Supply Chain Vulnerabilities** | discovery | every tool, server and skill definition the model can reach resolves at startup (**4.1**) and is pinned to a version or a digest (**4.4**), so a changed definition cannot take effect silently |
-| **ASI05 Unexpected Code Execution** | tool boundary | no tool accepts code, a shell command, a query language or a template; where one must, it runs somewhere its blast radius ends (both halves, **3.3**) |
+| **ASI05 Unexpected Code Execution (RCE)** | tool boundary | no tool accepts code, a shell command, a query language or a template; where one must, it runs somewhere its blast radius ends (both halves, **3.3**) |
 | **ASI06 Memory & Context Poisoning** | memory | code decides what enters durable memory, not whatever text arrived (**6.3**) |
 | **ASI07 Insecure Inter-Agent Communication** | sub-agents | a message from another agent is authenticated, and its content is handled as data (**9.4**) |
 | **ASI08 Cascading Failures** | sub-agents | a hop budget and a per-run step and spend ceiling (**9.1**), and a retry budget with something that opens instead of retrying into a failing dependency (**1.4**) |

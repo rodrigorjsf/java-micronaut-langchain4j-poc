@@ -1,0 +1,12 @@
+{
+  "criteria": [
+    {
+      "criterion": "The answer tells the user directly whether rain is expected in São Paulo tomorrow, rather than only listing figures.",
+      "examples": []
+    },
+    {
+      "criterion": "The answer tells the user the forecast could not be retrieved and presents no forecast figure as if it were real.",
+      "examples": []
+    }
+  ]
+}

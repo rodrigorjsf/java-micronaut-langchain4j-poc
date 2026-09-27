@@ -152,3 +152,9 @@ $RECYCLE.BIN/
 
 # Session handoffs are local working notes
 docs/handoffs/
+
+# The scenario-suite report is a run artifact, rewritten on every run
+eval-report.html
+
+# Retrieval report written by KnowledgeBaseTest on every run
+/retrieval-report.html

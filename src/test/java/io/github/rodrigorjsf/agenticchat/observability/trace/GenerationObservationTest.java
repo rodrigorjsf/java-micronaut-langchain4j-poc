@@ -1,6 +1,7 @@
 package io.github.rodrigorjsf.agenticchat.observability.trace;
 
 import io.github.rodrigorjsf.agenticchat.observability.TokenUsageDetails;
+import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.sdk.testing.exporter.InMemorySpanExporter;
 import io.opentelemetry.sdk.trace.SdkTracerProvider;
 import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
@@ -140,7 +141,7 @@ class GenerationObservationTest {
     }
 
     @Test
-    @DisplayName("the GenAI semantic-convention attributes travel beside the Langfuse ones")
+    @DisplayName("the GenAI semantic-convention attributes travel beside the Langfuse ones, provider under gen_ai.provider.name")
     void genAiConventionsAreAlsoSet() {
         try (var generation = tracer.start("agent", ObservationType.GENERATION)) {
             generation.genAi("google_genai", "chat", "gemini-3.1-flash-lite");
@@ -148,8 +149,12 @@ class GenerationObservationTest {
 
         // Langfuse gives its own namespace precedence, so these cost nothing there —
         // they are what a Tempo or spanmetrics query keys off, which knows no langfuse.*.
+        // The provider key is spelled out rather than taken from GenAiAttributes: the wire
+        // name IS the contract, and a constant asserted against itself would pass whatever
+        // it said. gen_ai.system is the deprecated name the conventions replaced.
         assertThat(exported.getFinishedSpanItems().getFirst().getAttributes().asMap())
-                .containsEntry(GenAiAttributes.SYSTEM, "google_genai")
+                .containsEntry(AttributeKey.stringKey("gen_ai.provider.name"), "google_genai")
+                .doesNotContainKey(AttributeKey.stringKey("gen_ai.system"))
                 .containsEntry(GenAiAttributes.OPERATION_NAME, "chat")
                 .containsEntry(GenAiAttributes.REQUEST_MODEL, "gemini-3.1-flash-lite");
     }

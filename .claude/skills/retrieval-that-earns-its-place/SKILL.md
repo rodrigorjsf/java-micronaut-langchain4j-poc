@@ -1,6 +1,6 @@
 ---
 name: retrieval-that-earns-its-place
-description: Decide whether and when an agent should retrieve, and prove the threshold works. Use when adding RAG to an agent that already has tools, when choosing a corpus, when tuning a similarity threshold, or when retrieved context is polluting answers.
+description: Use when deciding whether and when an agent should retrieve, when adding RAG to an agent that already has tools, when choosing a corpus, when tuning a similarity threshold or proving it works, or when retrieved context is polluting answers.
 ---
 
 # Retrieval that earns its place
@@ -8,6 +8,14 @@ description: Decide whether and when an agent should retrieve, and prove the thr
 An agent with tools already has a way to get facts. Retrieval has to justify
 itself against that, and the two questions it must answer are **what is in the
 corpus** and **when does it run**.
+
+| You are here because | Start at |
+|---|---|
+| adding RAG to an agent that already has tools, or choosing a corpus | *The corpus: what tools cannot answer* |
+| tuning a similarity threshold, or proving it works | *A similarity threshold may not separate* |
+| retrieved context is polluting answers | *Routing: use a signal you already paid for*, then *Do not store retrieved content in chat memory* |
+| someone proposes a retrieval technique | *Techniques worth refusing* |
+| the content is sitting in a prompt today | *Content already sitting in a prompt* |
 
 ## The corpus: what tools cannot answer
 
@@ -105,7 +113,9 @@ conversation. That inflates every stored item and replays the same prose into
 every later prompt of the session.
 
 Retrieval is cheap enough to redo per turn. Storing it is not. Find the flag and
-turn it off.
+turn it off. In LangChain4j 1.20.x it is `storeRetrievedContentInChatMemory(false)`
+on the AI Service builder; the default, `true`, stores the augmented user message
+[sourced — `AiServices` javadoc, https://github.com/langchain4j/langchain4j/blob/1.20.1/langchain4j/src/main/java/dev/langchain4j/service/AiServices.java, read 2026-09-27].
 
 ## Warm the model at startup
 

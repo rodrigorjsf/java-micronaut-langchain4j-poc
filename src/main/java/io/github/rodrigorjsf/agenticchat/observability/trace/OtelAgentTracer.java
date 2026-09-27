@@ -154,8 +154,8 @@ public class OtelAgentTracer implements AgentTracer {
         }
 
         @Override
-        public Observation genAi(String system, String operationName, String requestModel) {
-            write(GenAiAttributes.SYSTEM.getKey(), system);
+        public Observation genAi(String providerName, String operationName, String requestModel) {
+            write(GenAiAttributes.PROVIDER_NAME.getKey(), providerName);
             write(GenAiAttributes.OPERATION_NAME.getKey(), operationName);
             return write(GenAiAttributes.REQUEST_MODEL.getKey(), requestModel);
         }

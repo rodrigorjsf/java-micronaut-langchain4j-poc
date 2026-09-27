@@ -71,10 +71,11 @@ public class ChatModelRegistry {
                              GenAiMetrics genAiMetrics) {
         this.configByRole = roles.stream()
                 .collect(Collectors.toUnmodifiableMap(ModelRoleProperties::name, Function.identity()));
+        roles.forEach(ModelRoleValidator::validate);
+        ModelRoleValidator.validateAcrossRoles(configByRole);
 
         var models = new LinkedHashMap<String, ChatModel>();
         for (ModelRoleProperties role : roles) {
-            ModelRoleValidator.validate(role);
             var perRole = new ArrayList<>(listeners);
             perRole.add(new TokenCostListener(role.name(), meters, costs, genAiMetrics));
             // Per role for the same reason the cost listener is: the observation is named

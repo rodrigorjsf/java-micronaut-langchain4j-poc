@@ -1,6 +1,6 @@
 ---
 name: authoring-agent-tools
-description: Decide whether "we need a tool for X" needs a tool at all, and turn the ones that do into a contract before any of it is built. Use when someone asks for a tool that does not exist yet, when deciding what parameters a proposed tool takes, when a tool request arrives as an implementation rather than a requirement, or when working out whether one proposed tool is really two. For a tool that already exists, use agentic-tool-boundary; for grouping several behind one activation, authoring-agent-skills.
+description: Use when someone asks for a tool that does not exist yet ("we need a tool for X"), when deciding what parameters a proposed tool takes, when a tool request arrives as an implementation rather than a requirement, or when working out whether one proposed tool is really two. For a tool that already exists, use agentic-tool-boundary; for grouping several behind one activation, authoring-agent-skills.
 ---
 
 # Authoring an agent tool
@@ -12,6 +12,15 @@ What a finished tool looks like is a boundary question — this is the pass
 *before* it, an **interview** whose answers are the contract, or whose answer is
 that there is no tool. A fourth question, *what decision would this tool hide
 from the model?*, waits for §4 and a shape to ask it of.
+
+| You are here because | Start at |
+|---|---|
+| someone asked for a tool that does not exist yet, or asked as an implementation | *1. What does the user actually say?*, then questions 2 and 3 in order |
+| the interview is answered and you are choosing parameters | *From the answers to the parameter set* |
+| the tool changes anything outside the process | [`WRITES-AND-FLAGS.md`](WRITES-AND-FLAGS.md) |
+| the parameters are settled and the text is next | *Write the description from the open sentences*, then the error taxonomy and the result shape ([`RESULT-BUDGET.md`](RESULT-BUDGET.md)) |
+| one proposed tool may really be two | *4. What decision would this tool hide from the model?*, then [`SPLIT-TRIGGERS.md`](SPLIT-TRIGGERS.md) |
+| the contract is written and the tool is about to be built or shipped | *The tests that gate the ship*, then *Before it ships* |
 
 ## 1. What does the user actually say?
 
@@ -86,7 +95,7 @@ a *second identical call* costs: `get_order_status` served from cache after its
 `as_of` window has passed hands back a stamp that is no longer true, so it caches
 for that window and not past it.
 
-Choosing the tier deliberately closes **Tool Misuse & Exploitation (ASI02)** of
+Choosing the tier deliberately closes **Tool Misuse and Exploitation (ASI02)** of
 the OWASP Top 10 for Agentic Applications 2026: the ranked risk is not that a
 model calls a tool, it is that a tool exists which can do more than the question
 needed. The two-call contract closes **Human-Agent Trust Exploitation (ASI09)**.
@@ -111,7 +120,7 @@ set; a parameter absent from the schema can never be handed a hostile value, and
 so can never be tested for refusing one.
 
 The answer belongs to one customer, so `customerId` is not a parameter and no
-argument exists to smuggle an account number through, which removes **Identity & Privilege Abuse (ASI03)** rather than filtering for it.
+argument exists to smuggle an account number through, which removes **Identity and Privilege Abuse (ASI03)** rather than filtering for it.
 **Invented**: nothing in the conversation or session supplies it, so the model
 guesses — a fabrication with a function call around it. Either the user is asked,
 or it is not a parameter.
@@ -227,8 +236,8 @@ Three are deterministic and sit beside the code.
 **Routing is the fourth, and not a unit test** — it runs the model, so the pass
 threshold and the flaky-case rule are `agentic-evals` territory, which you can
 invoke. Sourcing, sizing and scoring the set are `reviewing-agent-tools-and-skills`,
-which is human-invoked only: read its `ROUTING-SET.md` directly, or ask the user to
-run it. This pass owes it four kinds of case, in that file's names: **Own**, sourced from
+which is human-invoked only: ask the user to run it, which they invoke by name.
+This pass owes it four kinds of case, in that skill's names: **Own**, sourced from
 the sealed third the description was never written from; **Boundary**, a sentence
 belonging to the nearest sibling by name and labelled with that sibling, which
 fails the day someone edits its description into your territory; **Orphan**, a

@@ -144,7 +144,7 @@ stayed green.
 
 ### Models
 
-**Role** — how the code addresses a model: `judge`, `agent`. No class names a
+**Role** — how the code addresses a model: `judge`, `agent`, `grader`. No class names a
 model id; roles are resolved by `ChatModelRegistry` from configuration. This is
 what makes per-role cost and latency separately measurable, and what makes
 swapping a model a deployment decision.
@@ -194,15 +194,32 @@ calls), the answer, and optionally a rubric. A scenario belongs to one domain, o
 to several when the turn crosses them, and declares the artifacts it depends on so
 that a change to one of them names the scenarios to revisit. Its kind is a happy
 path or a bad path; injection, out-of-scope and multi-turn memory are kinds of
-scenario, not domains.
+scenario, not domains. Five kinds are the **named bad paths** that count toward a
+domain's coverage floor (at least 2 happy paths, 3 named bad paths, and one
+multi-turn scenario when the domain holds state): missing information, a request
+outside the territory, an upstream failure, an injection inside a domain request,
+and an ambiguous request.
+
+**Artifact** — anything whose change can change what the model answers, as a
+scenario's `dependsOn` names it: a skill, a tool, a system-prompt section, a
+tool-catalogue key, a sub-agent. An artifact no scenario depends on is
+**uncovered**; **diff mode** runs the scenarios whose artifacts changed since a git
+ref.
 
 **Grounding** — the check that a value in the answer appears in a tool result
 captured during the same run. It is how a scenario asserts on live data whose value
 changes daily.
 
 **Grader** — the model that scores a scenario's rubric. Not the **Judge**, which
-triages turns. It is the last layer of checks and the only one that is itself a
-model.
+triages turns. It runs after every check and is the only layer that is itself a
+model; until it is calibrated its verdicts are reported, never counted as checks.
+
+**Calibration set** — answers a person labelled PASS or FAIL against one rubric
+criterion, split into train (the Grader's few-shot examples), dev and test. The
+Grader is measured on dev and test by **TPR** (of the human PASS rows, the share it
+passes) and **TNR** (of the human FAIL rows, the share it fails), never by one
+accuracy, and recalibrated whenever the grader model, its prompt or the agent model
+changes.
 
 ---
 

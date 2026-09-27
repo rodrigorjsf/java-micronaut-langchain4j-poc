@@ -1,6 +1,6 @@
 ---
 name: conversation-memory-and-compaction
-description: Decide what a turn carries forward and what it may forget. Use when conversation history grows unbounded, when choosing between a message window and a token budget, when writing or reviewing a compaction or summarisation pass, when a long conversation silently changes what the agent can do, or when putting a cache in front of a conversation store.
+description: Use when conversation history grows unbounded, when choosing between a message window and a token budget, when writing or reviewing a compaction or summarisation pass, when a long conversation silently changes what the agent can do, or when putting a cache in front of a conversation store.
 ---
 
 # Conversation memory
@@ -15,6 +15,15 @@ answered 10–20% worse than at the edges, and accuracy on one multi-fact benchm
 a conversation everything is in scope until dropped, across conversations nothing is until promoted
 — so **promote only on an explicit act**, never a summariser's inference, and keep the turn it came
 from, or a wrong "the user prefers X" is permanent and invisible.
+
+| You are here because | Start at |
+|---|---|
+| history grows unbounded, or you are choosing a message window or a token budget | *Window or token budget* |
+| a long conversation silently changes what the agent can do | *What a turn must remember: the invariant* |
+| you are writing or reviewing a compaction or summarisation pass | *Compaction you should not build*, then *The cheap pass runs before any model pass* and [`COMPACTION-PASS.md`](COMPACTION-PASS.md) |
+| a summary is about to be stored or replayed | *The summary is text you did not write* |
+| a cache is going in front of the conversation store | *A cache in front of the durable store*, then [`STORAGE-TIER.md`](STORAGE-TIER.md) |
+| a memory layer already ships and you are reviewing it | *Reviewing an existing memory layer* |
 
 ## Window or token budget — the difference is reproducibility
 

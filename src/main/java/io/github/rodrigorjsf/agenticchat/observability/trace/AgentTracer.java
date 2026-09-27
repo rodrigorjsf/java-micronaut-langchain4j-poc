@@ -12,7 +12,7 @@ import java.util.Optional;
  *
  * <p>An observation started while another is open becomes its child. That nesting is
  * the span hierarchy, and it comes from the OpenTelemetry context rather than from
- * anything passed by hand — verified for this codebase: LangChain4j 1.18.1 calls every
+ * anything passed by hand — verified for this codebase: LangChain4j 1.18.1 (re-check on 1.20.1: #56) calls every
  * listener, tool executor and guardrail on the caller's thread.
  */
 public interface AgentTracer {

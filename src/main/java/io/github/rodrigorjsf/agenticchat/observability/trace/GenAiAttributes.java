@@ -49,7 +49,17 @@ public final class GenAiAttributes {
     private GenAiAttributes() {
     }
 
-    public static final AttributeKey<String> SYSTEM = AttributeKey.stringKey("gen_ai.system");
+    /**
+     * Which provider served the call — the name the GenAI conventions REQUIRE on inference
+     * spans. It replaced {@code gen_ai.system}, which the registry now marks deprecated.
+     * Langfuse's source at v4.16.0 and v3.80.0 maps neither key for spans from this
+     * instrumentation scope, and the new key was measured arriving as unmapped metadata on
+     * 4.46.0 and 3.80.0 — so the rename costs Langfuse nothing and makes the spans agree with
+     * {@code GenAiMetrics}, which already used this name.
+     * Semantic conventions: open-telemetry/semantic-conventions-genai,
+     * {@code docs/gen-ai/gen-ai-spans.md}, status Development, read 2026-09-27.
+     */
+    public static final AttributeKey<String> PROVIDER_NAME = AttributeKey.stringKey("gen_ai.provider.name");
     public static final AttributeKey<String> OPERATION_NAME = AttributeKey.stringKey("gen_ai.operation.name");
     public static final AttributeKey<String> REQUEST_MODEL = AttributeKey.stringKey("gen_ai.request.model");
     public static final AttributeKey<String> RESPONSE_MODEL = AttributeKey.stringKey("gen_ai.response.model");
@@ -57,7 +67,10 @@ public final class GenAiAttributes {
             AttributeKey.stringKey("gen_ai.response.finish_reasons");
     public static final AttributeKey<String> TOOL_NAME = AttributeKey.stringKey("gen_ai.tool.name");
 
-    /** Every prompt token, cache reads included — NOT Langfuse's exclusive {@code input} bucket. */
+    /**
+     * Every prompt token, cache reads included — NOT Langfuse's exclusive {@code input} bucket.
+     * The cache-read share is not yet emitted under its own conventions key; see #59.
+     */
     public static final AttributeKey<Long> USAGE_INPUT_TOKENS =
             AttributeKey.longKey("gen_ai.usage.input_tokens");
 

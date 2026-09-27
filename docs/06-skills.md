@@ -26,9 +26,9 @@ in both tables below.
 | **the model** | the harness matches the turn against the `description` and loads the body | you do not ask for it; you describe the problem, and a description written for that sentence pulls the skill in |
 | **by name** | the frontmatter carries `disable-model-invocation: true`, so nothing fires it automatically | a person runs it deliberately — these are sweeps and audits, work with a start and an artefact, not advice mid-turn |
 
-Five skills carry `disable-model-invocation: true`. The by-name ones are the passes
+Six skills carry `disable-model-invocation: true`. The by-name ones are the passes
 that produce a document: an audit, a sweep, a migration plan, a committed query
-set, a tool-search rollout. A skill that would only ever be right on a turn nobody types is better as a
+set, a tool-search rollout, a scenario dataset. A skill that would only ever be right on a turn nobody types is better as a
 procedure someone invokes than as a description paid for on every turn of every
 conversation.
 
@@ -56,7 +56,7 @@ Each entry below carries three things beside its scenarios:
 - **which skills it hands work to** — where its own text stops and says so;
 - **which hand work to it** — the mirror, read from the neighbour's file;
 - **the discriminator** — the noun, or the question, that decides which of the two
-  owns a piece of ground. *"Under fifteen tools or over"* is a discriminator.
+  owns a piece of ground. *"Under ten tools or over"* is a discriminator.
   *"Related"* is not.
 
 One group of edges is an order rather than a preference. **Three of them form a
@@ -110,6 +110,7 @@ flowchart TB
         GL["gauntlet-loop"]
         SA["subagent-context-isolation"]
         EV["agentic-evals"]
+        SS["agentic-scenario-suite<br/><i>by name</i>"]
     end
 
     RT -->|"corpus justified"| PM
@@ -120,8 +121,8 @@ flowchart TB
     CT -->|"rows, gates, thresholds"| EV
 
     AT -->|"contract"| BND
-    BND -->|"past ~15 tools"| PD
-    PD -->|"under ~15"| BND
+    BND -->|"10+ tools"| PD
+    PD -->|"under 10"| BND
     BND -->|"rules spanning the set"| AS
     AS -->|"score before shipping"| RV
     RV -->|"single-item defect"| BND
@@ -137,13 +138,14 @@ flowchart TB
 
     GL -->|"the split"| SA
     GL -->|"does the judge track anything?"| EV
+    SS -->|"sizing, gates, grader calibration"| EV
     SA -->|"roles in one process"| SC
 
     class AU,RT entry
     class PM,WK,CT corpus
     class AT,BND,PD,AS,RV,TSR tools
     class SC,PI,CO,MEM,TG runtime
-    class GL,SA,EV bar
+    class GL,SA,EV,SS bar
 ```
 
 ## Skills that describe a piece of this design
@@ -156,7 +158,7 @@ chapter that measures it.
 | [`agentic-tool-boundary`](../.claude/skills/agentic-tool-boundary/SKILL.md) | the four rules the class at the tool door enforces, so a tool owns only its arguments and its meaning | the model |
 | [`progressive-tool-disclosure`](../.claude/skills/progressive-tool-disclosure/SKILL.md) | keeping a large tool set affordable — names in the standing prompt, schemas on activation | the model |
 | [`llm-triage-gate`](../.claude/skills/llm-triage-gate/SKILL.md) | a cheap classifier in front of an expensive agent, and the pre-filters and cache that spare even the classifier | the model |
-| [`prompt-injection-layers`](../.claude/skills/prompt-injection-layers/SKILL.md) | four ordered layers of injection defence, each shrinking the next one's job | the model |
+| [`prompt-injection-layers`](../.claude/skills/prompt-injection-layers/SKILL.md) | four probabilistic detection layers, each shrinking the next one's job, and a containment layer that limits what a miss can make the agent do | the model |
 | [`retrieval-that-earns-its-place`](../.claude/skills/retrieval-that-earns-its-place/SKILL.md) | whether an agent that already has tools should retrieve at all, what goes in the corpus, and when it runs | the model |
 | [`llm-cost-observability`](../.claude/skills/llm-cost-observability/SKILL.md) | making spend decomposable by role, and a cache-hit claim provable | the model |
 
@@ -173,16 +175,22 @@ parameters would let the model name a destination.
 - An upstream call throws, and the exception's message — carrying the upstream URL,
   the response body, possibly a credential — is on its way into the prompt, the
   history and the provider's logs.
+- A catalogued host answers `302` to `169.254.169.254`, and the HTTP client
+  follows it before any code sees the redirect — the catalogue decided the first
+  request and nothing decided the second.
+- The first tool that writes, sends or deletes is proposed, and nothing stops the
+  loop between the model choosing that call and the call running.
 
 | Neighbour | Way | The discriminator |
 |---|---|---|
-| `progressive-tool-disclosure` | both ways | **how many tools the model is choosing from.** Under about fifteen a wrong pick is one description's fault and belongs here; past fifteen it is the length of the list, and belongs there. Both descriptions carry the clause |
+| `progressive-tool-disclosure` | both ways | **how many tools the model is choosing from.** Under ten a wrong pick is one description's fault and belongs here; from ten up it is the length of the list, and belongs there. Both descriptions carry the clause |
 | `authoring-agent-tools` | handed by | **does the tool exist yet?** Not yet is the interview; already shipped is this page |
 | `reviewing-agent-tools-and-skills` | handed by | **one item, or the whole layer?** A defect you can see reading one tool alone is this page's single-item review; one visible only against its neighbours is the sweep's |
 | `agentic-codebase-audit` | handed by | **fact or doctrine.** The audit records what a validated argument looks like today; this page says what it should have been |
 | `conversation-memory-and-compaction` | handed by | **the failure value versus the message carrying it.** This page owns the outcome type a tool returns instead of an exception; what then happens to that message in history is memory's |
 | `subagent-context-isolation` | handed by | **what is being retried.** A bounded transport retry inside one call is this page's; re-spawning a child agent is not |
 | `prompt-to-corpus-migration` | handed by | **where standing text belongs.** Guidance on choosing between always-mounted tools does not move to a corpus — it belongs in the tool descriptions, which is this page's ground |
+| `prompt-injection-layers` | handed by | **why versus how.** That page's containment layer says text a tool returned may never pick a side-effecting tool's destination; enforcing it at the door, and pausing for a person when it cannot decide, is this page's |
 
 ### `progressive-tool-disclosure`
 
@@ -193,14 +201,14 @@ count grew and selection accuracy fell with it.
   conversation, unchanged from the first turn to the last — see
   [chapter 2](02-context-engineering.md) and
   [ADR 0005](adr/0005-progressive-tool-disclosure-through-skills.md).
-- Someone proposes tool *search* instead of skills and the two are being treated as
-  complementary.
+- Someone proposes tool *search* instead of skills, and nobody has yet decided
+  which tools stay searchable and which go behind a skill.
 - The catalogue doubled and the model started reaching for the wrong tool; the
   answer is a level of indirection, not a better description on each of them.
 
 | Neighbour | Way | The discriminator |
 |---|---|---|
-| `agentic-tool-boundary` | both ways | **the count again, from the other side.** Under about fifteen tools this page has nothing to sell: the fix is one description, not a mechanism |
+| `agentic-tool-boundary` | both ways | **the count again, from the other side.** Under ten tools this page has nothing to sell: the fix is one description, not a mechanism |
 | `authoring-agent-skills` | handed by | **whether to group, or what the grouping document says.** This page decides that tools should sit behind an activation; that page writes the text |
 | `reviewing-agent-tools-and-skills` | handed by | **economics versus inventory.** The cost of disclosure is this page's; which items are exposed on a given turn is the sweep's, and a dump taken with nothing activated never held the deferred half |
 | `agentic-service-composition` | handed by | **the ~80-token schema figure.** Composition borrows it to price a merged service that inherits schemas it never calls; the figure itself is this page's |
@@ -241,6 +249,9 @@ has started refusing real users.
   see [chapter 3](03-security.md).)
 - A rule is about to be narrowed to fix one complaint, with nothing that says which
   attacks the narrowing loses.
+- A tool that writes, sends or pays could take its recipient, account or amount
+  from text another tool returned — the case no detector can be trusted with, and
+  the one its containment layer answers.
 
 | Neighbour | Way | The discriminator |
 |---|---|---|
@@ -249,6 +260,7 @@ has started refusing real users.
 | `subagent-context-isolation` | handed by | **whose text is untrusted.** A child agent's return value is untrusted text arriving at a parent; how the wrapper around it is written is this page's |
 | `agentic-evals` | handed by | **the control versus the measurement.** This page owns the detector and what a misfire is; the labelled corpus that proves a narrowing lost nothing is evals' |
 | `agentic-codebase-audit` | handed by | **the guardrail seam's doctrine** — the audit records that something runs inbound and nothing runs outbound; this page says why that is the wrong shape |
+| `agentic-tool-boundary` | hands to | **the rule versus its mechanics.** This page says untrusted text may never choose a side-effecting tool's destination, and that a person decides when a policy cannot; the catalogue, the redirect hops and the pause-and-resume approval are the tool door's |
 
 ### `retrieval-that-earns-its-place`
 
@@ -307,6 +319,7 @@ assemble and drive the runtime.
 | [`writing-retrievable-knowledge`](../.claude/skills/writing-retrievable-knowledge/SKILL.md) | writing a document so that one retrieved chunk of it answers the user alone | the model |
 | [`corpus-retrieval-tests`](../.claude/skills/corpus-retrieval-tests/SKILL.md) | the committed query set that proves a corpus answers, and the diagnosis when one row stops | **by name** |
 | [`agentic-evals`](../.claude/skills/agentic-evals/SKILL.md) | proving a prompt, classifier or guardrail change safe — what gates a build and what only reports | the model |
+| [`agentic-scenario-suite`](../.claude/skills/agentic-scenario-suite/SKILL.md) | the committed end-to-end scenario dataset: every artifact that changes an answer inventoried, every domain at its coverage floor, and the rows an artifact change puts at risk | **by name** |
 | [`agentic-service-composition`](../.claude/skills/agentic-service-composition/SKILL.md) | wiring a runtime out of one service per role, and attaching guardrails where they actually run | the model |
 | [`conversation-memory-and-compaction`](../.claude/skills/conversation-memory-and-compaction/SKILL.md) | deciding what a turn carries forward and what it may forget | the model |
 | [`subagent-context-isolation`](../.claude/skills/subagent-context-isolation/SKILL.md) | spending a sub-agent only where the context it throws away is worth the extra calls | the model |
@@ -343,6 +356,11 @@ or when a skill fires on the wrong turns.
   other by name, so which one fires is effectively random.
 - A skill is model-invoked but no turn anyone types matches its description: paid
   on every turn, activated on none.
+- One body carries paths that only some turns take, so every turn pays for all of
+  them. The page teaches resources as
+  the third tier: references cut by scope, each linked from the body's entry table,
+  loaded through `read_skill_resource` or a file read. It also holds the draft to
+  `writing-great-skills` before it ships.
 
 | Neighbour | Way | The discriminator |
 |---|---|---|
@@ -399,7 +417,7 @@ the census column recording how each tool reaches the model rests on the second.
 
 | Neighbour | Way | The discriminator |
 |---|---|---|
-| `progressive-tool-disclosure` | handed by | **whether versus how.** The token math, skills against search, and the roughly-fifteen threshold decide that this mechanism is the right one; this page assumes that decision was made and runs it. A reader who has not made it is sent back, and the first of the four exits here says so |
+| `progressive-tool-disclosure` | handed by | **whether versus how.** The token math, which tools stay searchable beside skills, and the ten-tool threshold decide that this mechanism is the right one; this page assumes that decision was made and runs it. A reader who has not made it is sent back, and the first of the four exits here says so |
 | `agentic-tool-boundary` | both ways | **the description's second job.** House style, bounded results and a failure returned as a value are that page's and do not change. What changes is that a description must now be *retrieved* before it can *route* — a job the boundary never had to give it, and the reason a description can be flawless and still never reach the model |
 | `reviewing-agent-tools-and-skills` | both ways | **rewriting for retrieval versus sweeping for routing.** A rename moves traffic and is measured there; this pass rewrites names and descriptions so search can find them, and hands the routing question back. *Search returned it and the model chose another* is that page's finding, not this one's |
 | `authoring-agent-tools` | hands to | **a description that cannot be written.** When no phrasing separates two tools, the honest finding is one tool where the layer has two, and that is a request for the interview rather than a wording problem |
@@ -488,8 +506,8 @@ neighbours are by-name; it is not.
 passes — which a corpus that returns its nearest chunk for *every* input also does.
 
 - The suite's negative rows are all **far** negatives and the near-miss half does
-  not exist. This repository is the illustration: the two committed rows in
-  [`KnowledgeBaseTest.java`](../src/test/java/io/github/rodrigorjsf/agenticchat/rag/KnowledgeBaseTest.java)
+  not exist. This repository is the illustration: the two committed negative rows in
+  [`retrieval-queries.json`](../src/test/resources/evals/retrieval-queries.json)
   — a cake recipe and *"escreva um script em python para ler um csv"* — are plainly
   out of domain, score **0.7058** and **0.6826** under the shipped
   `agentic.rag.min-score: 0.72`, and prove only the floor. A third out-of-domain
@@ -522,6 +540,9 @@ and someone has to show nothing regressed.
   developer away from being marked ignored.
 - An LLM judge is scoring another model's output and nobody has measured the judge
   against a human on the rows people argue about.
+- A grader reports one agreement number on a set that is mostly passes, so a grader
+  that passes everything looks 0.90 accurate while catching no failure — or it was
+  calibrated before the model under test changed.
 
 | Neighbour | Way | The discriminator |
 |---|---|---|
@@ -531,7 +552,33 @@ and someone has to show nothing regressed.
 | `reviewing-agent-tools-and-skills` | hands to | **the routing turn set**, which that sweep owns end to end |
 | `conversation-memory-and-compaction` | hands to | **the invariant versus the assertion.** That page owns *compaction preserves the state that gates behaviour*; this page owns the test that keeps it true through the next edit |
 | `agentic-service-composition` | both ways | the same split at the cache floor — *the standing prompt is byte-identical across turns* is composition's invariant and this page's assertion — and composition hands back the other direction, because answering an in-scope turn is behaviour, so it is an eval case rather than a wiring rule |
-| `corpus-retrieval-tests`, `authoring-agent-tools`, `agentic-codebase-audit` | handed by | **row counts, thresholds and the flaky-case rule**, deferred here from three different sets |
+| `corpus-retrieval-tests`, `authoring-agent-tools`, `agentic-codebase-audit`, `agentic-scenario-suite` | handed by | **row counts, thresholds and the flaky-case rule**, deferred here from four different sets — and, from the scenario suite, grader calibration before a rubric may gate |
+
+### `agentic-scenario-suite`
+
+**Invoked by name.** Reach for it when a system prompt, a tool description, a skill
+or a sub-agent changed and nothing tells you which conversations that change puts
+at risk — every unit test stays green because none sends a user sentence through
+the whole turn.
+
+- A new tool or skill is about to ship and no scenario depends on it; the report
+  would list it as an uncovered artifact.
+- A domain has one happy path and no bad paths: nobody has asked what happens when
+  the user leaves out the city, or the upstream times out.
+- Scenario inputs are written in the team's vocabulary, not in the sentences users
+  type — the skill asks for exported real traffic first, paraphrased and
+  anonymised before it is committed.
+
+It drafts only user inputs with a model; every expectation is read off an artifact,
+every row records its `source`, and every change reaches a human as a diff. Its
+[worked example](../.claude/skills/agentic-scenario-suite/WORKED-EXAMPLE.md) maps it
+onto this repository's runner; the runner itself is taught in
+[chapter 5](05-evaluation.md#end-to-end-scenarios).
+
+| Neighbour | Way | The discriminator |
+|---|---|---|
+| `agentic-evals` | hands to | **rows here, measurement there.** Row counts for a gate, thresholds, repetitions and calibrating a grader before its rubric may gate are evals'; this page writes the rows |
+| `corpus-retrieval-tests` | hands to | **what the agent answers versus what the corpus retrieves.** A question about retrieval goes there — and that page is by-name, so **ask the user to run it** |
 
 ### `agentic-service-composition`
 
@@ -590,6 +637,9 @@ a child receives is being written.
   which means nothing was discarded and the sub-agent was a prompt section with a
   round trip in front of it.
 - A fan-out has no call budget, and one of the children can spawn children.
+- The steps are known in advance, yet a child agent was given the job of choosing
+  them — a predefined code path in the application would do it without the
+  agent's token overhead, which the skill cites from published measurements.
 
 | Neighbour | Way | The discriminator |
 |---|---|---|
@@ -677,7 +727,7 @@ looking at the upstream API's query string when they wrote it.
 |---|---|---|---|---|
 | 1 | `authoring-agent-tools` | the model | the request as stated | a sentence list in the words users type, and a contract — or the finding that there is no tool, because the content is stale-but-static and belongs to retrieval, or because two proposed tools answer the same sentences |
 | 2 | `agentic-tool-boundary` | the model | that contract | the argument shape (a catalogue key and a path, never a URL), the projection keep-list, and the value a failed call returns instead of an exception |
-| 3 | `progressive-tool-disclosure` | the model | the resulting tool count | *only past about fifteen*: names in the standing prompt, schemas on activation. Under fifteen this step does not run, and the chain returns to step 2 |
+| 3 | `progressive-tool-disclosure` | the model | the resulting tool count | *only from ten tools up*: names in the standing prompt, schemas on activation. Under ten this step does not run, and the chain returns to step 2 |
 | 4 | `authoring-agent-skills` | the model | the group, plus the rules from step 2 that span the whole set rather than one call | a description that routes and a body that teaches, ordered by when the model needs each part |
 | 5 | `reviewing-agent-tools-and-skills` | **by name** | the new description *and* every neighbouring one | a scored turn set and a verdict per item — and a split request that goes back to step 1 |
 
@@ -693,9 +743,10 @@ says so in its own body.
 *body clean* or *body deferred*. A deferred body is not a failure, it is a finding
 handed back to step 4.
 
-**Step 3 has a second exit.** Past fifteen tools the answer is skills *or* search,
-and they do not compose — a dynamic tool provider, which is how a skill hands its
-tools over, is refreshed after the search filter has already run. When search wins,
+**Step 3 has a second exit.** From ten tools up, skills and search coexist as a
+partition — a dynamic tool provider, which is how a skill hands its tools over, is
+refreshed after the search filter has run, so skill-scoped tools are never
+searchable and regular tools stay searchable. When search is chosen for a layer,
 the chain does not continue here: `tool-search-rollout` is its own by-name pass,
 and a person types it. It re-enters this chain twice, at step 1 when no phrasing
 separates two tools, and at step 5 with the descriptions it rewrote.
@@ -710,7 +761,7 @@ and the answerer are the same service object.
 |---|---|---|---|---|
 | 1 | `agentic-codebase-audit` | **by name** | the repository, seam by seam | a fact sheet per seam and a ranked, capped plan of absences. Each seam names the skill that owns its doctrine — the audit records, it does not argue |
 | 2 | `agentic-service-composition` | the model | the composition seam's facts | the role matrix with its **Never** column, one service object per role, and the attachment point for every guardrail, listener and tool provider |
-| 2a | `prompt-injection-layers` | the model | the guardrail seam's facts | the four-layer order — and it hands the *attachment* question straight to step 2, which is why a configured guardrail can never have run |
+| 2a | `prompt-injection-layers` | the model | the guardrail seam's facts | the layer order, detection then containment — and it hands the *attachment* question straight to step 2, which is why a configured guardrail can never have run |
 | 2b | `llm-cost-observability` | the model | the cost seam's facts | role-tagged token, cost, latency and error metrics, and a provable cache-hit claim; *why* a cache misses goes to step 2 |
 | 2c | `conversation-memory-and-compaction` | the model | the memory seam's facts | a window-or-budget decision and a compaction pass that never separates a tool result from the message that requested it |
 | 3 | `llm-triage-gate` | the model | step 2's decision that a role belongs in front | the pre-filters that answer without a model call, the model choice for the slot, and the fallback when it cannot answer in time. It names no further skill; the chain ends here |
@@ -771,7 +822,7 @@ reader — or a row outlives the directory it names and sends someone to a path 
 is not there. Neither breaks a build.
 
 ```bash
-./scripts/check-skill-docs.py    # skill directories vs the rows here, both ways
+./scripts/check-skill-docs.py    # skill directories vs the rows here, both ways; no skill points into another
 ```
 
 Set equality in both directions, and exit 1 on either failure. It is the same
@@ -785,6 +836,14 @@ their skills as bare backticked text rather than as links: a hand-off cell that
 could satisfy the check would let a skill mentioned by its neighbour and never given
 a row of its own pass, which is precisely the case the check exists to catch. Two
 rows for one skill fails the same way one row for none does.
+
+**A skill never points into another skill's files.** A pointer to a sibling's
+reference file dangles the day its owner renames or splits it, and when the sibling
+is invoked by name the model reading the pointer can never invoke it. So a skill
+hands off to a sibling by the sibling's name, and the sibling routes to its own
+files. The same script fails on a link climbing out of a skill (`](../`), a
+`.claude/skills/<other>/` path, a backticked file name that exists only in
+another skill's directory, or one qualified with another skill's name.
 
 ---
 

@@ -1,0 +1,13 @@
+{
+ "description": "Committed retrieval query set for the knowledge corpus under src/main/resources/knowledge/. A positive row must retrieve its expected_source through the shipped retriever at the shipped threshold; a negative row must retrieve nothing. Schema owned by the corpus-retrieval-tests skill. The shipped path has no router, so every row calls the ContentRetriever bean directly (routing_input n/a).",
+ "queries": [
+  {"id": "pos-sobre-capacidades", "question": "o que voce consegue fazer?", "label": "positive", "expected_source": "sobre-o-assistente.md", "provenance": "KnowledgeBaseTest @CsvSource, moved 2026-09-26"},
+  {"id": "pos-sobre-limitacoes", "question": "quais sao suas limitacoes?", "label": "positive", "expected_source": "sobre-o-assistente.md", "provenance": "KnowledgeBaseTest @CsvSource, moved 2026-09-26"},
+  {"id": "pos-dados-ibge", "question": "o que significa o codigo IBGE de um municipio?", "label": "positive", "expected_source": "dados-publicos-brasileiros.md", "provenance": "KnowledgeBaseTest @CsvSource, moved 2026-09-26"},
+  {"id": "pos-dados-cep-sem-rua", "question": "por que o CEP veio sem rua e sem bairro?", "label": "positive", "expected_source": "dados-publicos-brasileiros.md", "provenance": "KnowledgeBaseTest @CsvSource, moved 2026-09-26"},
+  {"id": "pos-previsao-codigo-95", "question": "o que quer dizer o codigo 95 na previsao?", "label": "positive", "expected_source": "como-ler-a-previsao.md", "provenance": "KnowledgeBaseTest @CsvSource, moved 2026-09-26"},
+  {"id": "pos-previsao-fuso", "question": "a previsao esta em qual fuso horario?", "label": "positive", "expected_source": "como-ler-a-previsao.md", "provenance": "KnowledgeBaseTest @CsvSource, moved 2026-09-26"},
+  {"id": "neg-receita-bolo", "question": "qual e a receita de bolo de cenoura com cobertura de chocolate", "label": "negative", "expected_source": null, "provenance": "KnowledgeBaseTest @ValueSource, moved 2026-09-26; far negative"},
+  {"id": "neg-script-python", "question": "escreva um script em python para ler um csv", "label": "negative", "expected_source": null, "provenance": "KnowledgeBaseTest @ValueSource, moved 2026-09-26; far negative"}
+ ]
+}

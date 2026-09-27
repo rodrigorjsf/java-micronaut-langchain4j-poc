@@ -63,7 +63,10 @@ the tool description, the argument name, the argument description, `maxResults`,
 cleaning rule. Nothing fails, the layer just retrieves differently. That is the
 second and stronger reason the six settings ship as literal strings in your own
 configuration rather than as inherited defaults: it is not only so the gate can
-read them, it is so an upgrade cannot move them without a diff. What it cannot
+read them, it is so an upgrade cannot move them without a diff. (Under the
+library's semantic strategy `minScore` is the exception — it has no setter, so
+the literal lives in your own `ToolSearchStrategy`; see *What semantic search
+actually does*.) What it cannot
 protect is the scoring itself, and the standing check below is what runs after a
 bump to tell you whether it moved.
 
@@ -112,7 +115,9 @@ this keyword strategy that means **give it a name hit**, which is worth two and
 lifts it clear of the description-only crowd rather than leaving it tied with
 them. (A semantic strategy embeds one text per tool — its name and its description
 together — so there is no name-versus-description weighting to exploit, and the
-remedy there is distinctness plus a real `minScore` floor rather than a name.)
+remedy there is distinctness plus a real score floor rather than a name — a floor
+the library strategy does not let you set, see *What semantic search actually
+does*.)
 
 Five consequences, all derivable from those four lines, and all of which change
 what you write in a description.
@@ -174,12 +179,54 @@ candidate set, or of the search tool's own specification. Those do vary by
 caller, in a layer specifically built to make them vary, and `SCOPED-TOOLS.md`
 carries the key rule for them. Read it before adding one.
 
-Its `minScore` default is `0.0`, which means **nothing is filtered out by score
-at all**: `maxResults` is doing every bit of the work, and the five returned
-tools are simply the five nearest, however far away they are. A query about
-something the layer cannot do returns five tools with the same confidence as a
-query about something it can. Setting a real floor is the first tuning you do,
-and you can only set it once you have scores from your own query set to look at.
+Its score floor is `0.0`, which means **nothing is filtered out by score at
+all**: the store it searches reports relevance as `(cosine + 1) / 2` `[sourced — 1.18.1 sources jar,
+RelevanceScore.fromCosineSimilarity]`, which never
+drops below zero, so `maxResults` is doing every bit of the work, and the five
+returned tools are simply the five nearest, however far away they are. A query
+about something the layer cannot do returns five tools with the same confidence
+as a query about something it can. Setting a real floor is the first tuning you
+do, and you can only set it once you have scores from your own query set to look
+at.
+
+**And you cannot set it on this class.** `VectorToolSearchStrategy.Builder` has
+**no `minScore` setter** `[verified — javap on langchain4j 1.18.1]` `[sourced —
+source at tag 1.20.1]`. The strategy keeps a private `minScore` field and the builder a private
+`minScore` slot, but no public method writes either, so the floor is the
+`DEFAULT_MIN_SCORE` of `0.0` for every instance. The builder's public setters
+are `embeddingModel`, `maxResults`, `toolName`, `toolDescription`,
+`toolArgumentName`, `toolArgumentDescription`, `throwToolArgumentsExceptions`,
+`cacheEmbeddings` and `toolResultMessageTextProvider` — nothing else. Subclassing
+does not reach it either: `search()` reads the private field, and the only
+`protected` hook is `format(ToolSpecification)`, which shapes the text embedded
+per tool and nothing about the cut. Wrapping it does not help, because
+`ToolSearchResult` carries tool names and a message, not scores — the numbers a
+floor needs are gone by the time a decorator sees the answer.
+
+**A semantic floor is a custom `ToolSearchStrategy`.** Implement the two SPI
+methods yourself: return your own search-tool specification from
+`getToolSearchTools`, and in `search` embed the query and each of
+`searchableTools()`, score them, drop every tool below **your** floor, then cut
+at `maxResults`. It is about as much code as the library class, and it is the
+seam *The SPI is `@Experimental`* already asks for — the floor, the text you
+embed per tool and the scoring live in your types, testable without an embedding
+provider, and the adapter is the one file an upgrade touches:
+
+```java
+final class FlooredVectorToolSearch implements ToolSearchStrategy {
+    // your own EmbeddingModel (wrap it in a per-tool cache, as the library does),
+    // your own floor on the (cosine + 1) / 2 scale, your own maxResults and tool spec
+    public List<ToolSpecification> getToolSearchTools(InvocationContext ctx) { return List.of(searchTool); }
+    public ToolSearchResult search(ToolSearchRequest request) {
+        // embed query + each searchableTools() entry, score, keep score >= floor,
+        // sort descending, take maxResults, return new ToolSearchResult(names, text)
+    }
+}
+```
+
+Throughout this file, **`minScore` names the score floor, wherever it lives**: a
+builder setting under keyword, a constant in your own strategy under semantic.
+Every instruction below to set or raise it means that object.
 
 Literal word overlap stops mattering here, which removes the plural rule, the
 substring rule and the synonym problem in one move — and introduces a different
@@ -229,7 +276,7 @@ Six settings, defaults as shipped:
 | argument name | `terms` | `query` |
 | argument description | `A list of individual search terms (single words) used to find relevant tools` | `Natural language query describing desired tool` |
 | `maxResults` | `5` | `5` |
-| `minScore` | `1` | `0.0` |
+| `minScore` | `1` | `0.0`, fixed — the builder has no setter; a floor means your own strategy |
 
 **The search tool's own description is the one that is never free.** Every other
 description in the layer is now deferred cost — paid only when a search returns
@@ -261,14 +308,14 @@ names and descriptions; leave `maxResults` set by the floor below rather than by
 the rank distribution.
 
 Its **floor** comes from somewhere else entirely: the disclosure-lifetime
-observation in `SKILL.md`, Step 2. Where a search's results survive to the model
+observation in `DECIDE.md`. Where a search's results survive to the model
 calls after it, a task can search twice and accumulate, and `maxResults` only has
 to cover one step. Where they do not, every tool a step needs must return from a
 *single* search, and the floor is the largest number of tools any one step of a
 real task uses — a number you take from the query set's multi-step rows, not from
 the framework's `5`. **Where the lifetime could not be measured at all**, that
 same largest-single-step count *is* the answer rather than a floor under one: it
-is `SKILL.md`, Step 2's default, and it goes to the gate labelled as one.
+is `DECIDE.md`'s default, and it goes to the gate labelled as one.
 
 **Say in the description that the tool may be called again.** A model that
 searches once, receives `maxResults` specifications and proceeds has done
@@ -524,10 +571,14 @@ make widening cost something.
 
 Both negative classes are written against a score, so **under a semantic
 strategy they need a real `minScore` before they can be read at all.** The
-default of `0.0` filters nothing: every query returns the five nearest tools, so
-a `none` row is failed by construction and a neighbour row's margin is a
-similarity gap rather than an integer difference. Set the floor first, from the
+library's fixed `0.0` filters nothing: every query returns the five nearest
+tools, so a `none` row is failed by construction and a neighbour row's margin is
+a similarity gap rather than an integer difference. Set the floor first — in the
+custom strategy, since `VectorToolSearchStrategy` offers no setter — from the
 scores your own positive rows produce, then run the negative classes against it.
+Reading those scores needs the same custom strategy: the library's
+`ToolSearchResult` returns names only. So build it first with the floor at `0.0`
+and record every score, read the positive rows, then set the floor from them.
 That is "the first tuning you do" from *What semantic search actually does*,
 arriving with the rows that make it decidable.
 
@@ -616,7 +667,7 @@ check asks **the providers the application actually assembles** what they answer
 row by row, and fails when a tool the census recorded as `static` or `provider`
 now arrives through one answering dynamic. A test double cannot catch this: it
 answers whatever it was constructed to answer, which is the census's opinion
-wearing a green tick. This is the same assertion `SKILL.md`, Step 5 makes once
+wearing a green tick. This is the same assertion `EXECUTE-AND-VERIFY.md`, Step 5 makes once
 at the end of the pass; here it becomes the thing that keeps making it.
 
 Then the new-tool experience is the point of the whole thing: **adding a tool
@@ -662,7 +713,7 @@ in the repository that goes red when retrieval quietly moved.
 
 ## What the record shows once it ships
 
-The query set is a sample of one team's vocabulary, and `SKILL.md`, Step 5 says
+The query set is a sample of one team's vocabulary, and `EXECUTE-AND-VERIFY.md`, Step 5 says
 what a green verification therefore leaves unproven. The mechanism that corrects
 it after launch is a record of what search was actually asked for and what it
 actually returned, it costs a handful of fields, and it ships in the same change
@@ -724,7 +775,7 @@ is the one search-shaped record to put on top of it.
 | Symptom | Cause to check first | Move |
 |---|---|---|
 | One tool never returns for any real phrasing | its description shares no literal substring with how users speak | rewrite from brief 3's rows, name first |
-| Search returns five tools and the right one is sixth | `minScore` too low, so noise fills the window | raise `minScore`; shorten the query the model sends |
+| Search returns five tools and the right one is sixth | `minScore` too low, so noise fills the window | raise `minScore` (under semantic: in your own strategy — the library builder has no setter); shorten the query the model sends |
 | Nothing returns for a reasonable question | the query term is longer than the word in the description (`payments` vs `payment`), or the model sent a sentence | carry the plural; rewrite the argument description |
 | The search call throws | the argument was not a JSON array of strings | say so in the argument description; turn on `throwToolArgumentsExceptions` while debugging so the failure is typed |
 | The model answers without ever searching | the search tool's own description does not say when to call it | it is the only routing signal for the whole layer — write it as routing, and name the domain |

@@ -157,9 +157,72 @@ public class StubApiController {
                 """;
     }
 
+    /**
+     * Open-Meteo's forecast route, trimmed to the fields a rain question reads. The
+     * scenario-suite test grounds its scripted answer on {@code 12.4}.
+     */
+    @Get("/open-meteo/v1/forecast")
+    public String openMeteoForecast() {
+        return """
+                {"latitude":-23.55,"longitude":-46.63,"timezone":"America/Sao_Paulo",
+                "daily":{"time":["2026-09-26","2026-09-27"],
+                "precipitation_sum":[0.0,12.4],"temperature_2m_max":[24.1,19.8]}}
+                """;
+    }
+
+    // ------------------------------------------------------------------
+    // Redirect routes for the redirect-hop tests.
+    //
+    // An open redirect on purpose: a catalogued host that answers 302 to wherever
+    // the test says is exactly the shape an attacker needs — a compromised or
+    // misconfigured upstream bouncing the tool client to 169.254.169.254.
+    // ------------------------------------------------------------------
+
+    /** Counts arrivals, so a test can prove a refused hop was never requested. */
+    public static final AtomicInteger LANDED_CALLS = new AtomicInteger();
+
+    @Get("/redirect")
+    public HttpResponse<String> redirect(@QueryValue String to) {
+        return HttpResponse.<String>status(HttpStatus.FOUND).header("Location", to);
+    }
+
+    @Get("/landed")
+    public String landed() {
+        LANDED_CALLS.incrementAndGet();
+        return "{\"landed\":true}";
+    }
+
     @Get("/slow")
     public String slow() throws InterruptedException {
         Thread.sleep(3_000);
         return "{\"late\":true}";
+    }
+
+    // ------------------------------------------------------------------
+    // Failure routes for upstream-failure scenarios.
+    //
+    // A scenario points a whole catalogue key's base-url here, and the tool then
+    // appends its own path ("/v1/forecast?..."), so each route swallows whatever
+    // path and query follow it and fails the same way for every one.
+    // ------------------------------------------------------------------
+
+    @Get("/fail/server-error/{+path}")
+    public HttpResponse<String> failWithServerError(String path) {
+        return HttpResponse.serverError("upstream failure injected by the scenario suite");
+    }
+
+    /** Longer than the one-second timeout the timeout shape gives its catalogue key. */
+    @Get("/fail/timeout/{+path}")
+    public String failWithTimeout(String path) throws InterruptedException {
+        return slow();
+    }
+
+    /**
+     * One MiB of valid JSON: above the largest {@code max-response-bytes} in the catalogue
+     * (512 KiB), so any key pointed here is truncated at its own ceiling.
+     */
+    @Get("/fail/oversized/{+path}")
+    public String failWithOversizedBody(String path) {
+        return "{\"padding\":\"" + "x".repeat(1 << 20) + "\"}";
     }
 }

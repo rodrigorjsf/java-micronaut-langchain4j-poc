@@ -22,6 +22,17 @@ micronaut:
       # Per-endpoint transport limits are the version that would make this derived
       # rather than chosen; see docs/03-security.md.
       max-content-length: 3145728
+    services:
+      # ToolHttpClient's own client (@Client(id = "tool-apis")); every request it makes
+      # is an absolute catalogue URL, so it needs no url here.
+      tool-apis:
+        # Redirects are followed by ToolHttpClient, hop by hop, and only to a host and
+        # port the tool catalogue names. Left at Micronaut's default (true), a catalogued
+        # host answering 302 to http://169.254.169.254 is followed before any code here
+        # sees it. Scoped to this client on purpose: on the shared default client it
+        # would also make a Langfuse score POST answered with a 3xx "succeed" unwritten.
+        # ToolHttpClientTest#aRedirectToTheMetadataAddressIsNotFollowed pins it.
+        follow-redirects: false
   server:
     port: 8080
 
@@ -163,6 +174,20 @@ agentic:
         thinking-level: low
         timeout: PT60S
         max-retries: 2
+
+      # Scores the optional rubric of an end-to-end scenario (ScenarioSuiteEval). The
+      # application itself never calls it; it is built here so the eval resolves it
+      # through the same registry, listeners and cost accounting as every other role.
+      # It must be a model other than `agent`: a model grading its own answers favours
+      # them, so ChatModelRegistry refuses to build when the two are the same (the eval
+      # fails before its first scenario). Its verdicts are uncalibrated and never gate.
+      grader:
+        provider: OPENAI
+        model-name: gpt-4o-mini
+        temperature: 0.0
+        max-output-tokens: 256
+        timeout: PT30S
+        max-retries: 1
 
     # -------------------------------------------------------------------------
     # USD per million tokens. In configuration, not in code: prices change without

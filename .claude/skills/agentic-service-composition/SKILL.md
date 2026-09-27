@@ -1,12 +1,21 @@
 ---
 name: agentic-service-composition
-description: Wire an agent runtime out of one service per role. Use when a single service both classifies and answers, when a model name appears in application code, when deciding where a guardrail, listener or tool provider attaches — or when one never seems to run, when a provider's prompt cache is not hitting, or when something expensive is built on first use. For whether a cheap classifier should run in front at all, use llm-triage-gate.
+description: Use when wiring the services of an agent runtime, when a single service both classifies and answers, when a model name appears in application code, when deciding where a guardrail, listener or tool provider attaches — or when one never seems to run, when a provider's prompt cache is not hitting, or when something expensive is built on first use. For whether a cheap classifier should run in front at all, use llm-triage-gate.
 ---
 
 # Composing an agent runtime
 
 The unit of composition is the **role**: a named job — classify, answer,
 summarise, embed — owning a model handle, a prompt, a memory and a tool set.
+
+| You are here because | Start at |
+|---|---|
+| one service both classifies and answers | *1. One service per role* |
+| a model name appears in application code | *2. One registry owns `role → model`* |
+| deciding where a guardrail, listener or tool provider attaches, or one never runs | *3. Attach at the layer the framework actually calls* |
+| a provider's prompt cache is not hitting | *4. The standing prompt is byte-stable* |
+| something expensive is built on first use | *5. Warm eagerly, and gate readiness* |
+| a runtime already ships and you are reviewing it | *Reviewing an existing runtime* |
 
 ## 1. One service per role
 
@@ -92,7 +101,9 @@ attached one layer up, inspecting nothing. Three ways a control silently does no
   `executeWithContext`; only one is ever called. Read the call site.
 - **The short-circuit path.** A hallucinated tool name resolves to no executor, so
   every decorator is skipped for exactly the input an attacker steers — and the
-  default handler throws, turning a model typo into a 500.
+  default handler throws, turning a model typo into a 500. In LangChain4j 1.20.x
+  that default is `hallucinatedToolNameStrategy` = `THROW_EXCEPTION`; set it to
+  return text the model can correct from [sourced — https://github.com/langchain4j/langchain4j/blob/1.20.1/langchain4j/src/main/java/dev/langchain4j/service/tool/HallucinatedToolNameStrategy.java, read 2026-09-27].
 - **The provider that cannot disclose.** Resolved at startup or at the invocation layer,
   it returns one fixed tool set — activation changes nothing the model sees, no test fails.
 

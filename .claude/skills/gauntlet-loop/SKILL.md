@@ -1,6 +1,6 @@
 ---
 name: gauntlet-loop
-description: Drive work toward a standard the agent cannot grade itself into. Use when someone asks for something excellent, perfect, production-grade or "AAA" ("até ficar perfeito", "em loop até passar"), when a build should run until it is good rather than until it is done, when quality is being self-reported, when two independent attempts exist and one must be chosen, or when a review loop keeps returning the same grade — or more findings — round after round. For running one in a specific harness — which tool fans out, where state survives a session, how to resume — use that harness's runner skill if one exists. For what a child agent's brief may carry and what its answer may be trusted for, use subagent-context-isolation; for measuring whether a judge's verdicts track anything, agentic-evals.
+description: Use when someone asks for something excellent, perfect, production-grade or "AAA" ("até ficar perfeito", "em loop até passar"), when a build should run until it is good rather than until it is done, when quality is being self-reported, when two independent attempts exist and one must be chosen, or when a review loop keeps returning the same grade — or more findings — round after round. For running one in a specific harness — which tool fans out, where state survives a session, how to resume — use that harness's runner skill if one exists. For what a child agent's brief may carry and what its answer may be trusted for, use subagent-context-isolation; for measuring whether a judge's verdicts track anything, agentic-evals.
 ---
 
 # The gauntlet loop
@@ -17,9 +17,9 @@ The human sets the destination and the boundaries. The loop runs the feedback cy
 |---|---|
 | someone asked for something excellent and you are about to start | *The loop you describe is not the loop* |
 | you are choosing what to measure against | *A bar is a thing, not an adjective* |
-| the work is large and you are deciding how to split it | *Cut where a critic can judge one piece alone* |
-| a critic keeps returning the same grade round after round | *An unreachable bar measures nothing* — read this before touching the work |
-| a round came back with blocking findings | *A round measures; a fix wave closes* |
+| the work is large and you are deciding how to split it | [`CUTTING-THE-WORK.md`](CUTTING-THE-WORK.md) |
+| a critic keeps returning the same grade round after round | [`UNREACHABLE-BAR.md`](UNREACHABLE-BAR.md) — read this before touching the work |
+| a round came back with blocking findings | *A round measures; a fix wave closes*, then [`FIX-WAVES.md`](FIX-WAVES.md) |
 | the findings are not falling, or rise after each fix | *Watch the trend* |
 | the run may outlive the session, the quota or the machine | [`LONG-RUNS.md`](LONG-RUNS.md) |
 | the thing has no obvious reference to be judged against | [`CHOOSING-A-BAR.md`](CHOOSING-A-BAR.md) |
@@ -94,77 +94,20 @@ got was a game far past what one pass produces. The bar's job is to pull, not to
 
 ## An unreachable bar measures nothing
 
-This is the failure that costs the most, because it looks like diligence.
-
-Tell a critic to pass the work "only when you cannot name a concrete improvement" and it will
-never pass anything. In any artifact of real size there is always something nameable — a
-sharper example, a tighter sentence, a better heading. The grade stops carrying information: the
-work improves, the score does not move, and the loop runs until something else stops it.
-
-**Measured.** Eight documents ran four rounds under exactly that instruction. Every round
-returned the same grade with six to ten blocking defects, and nothing in the number said whether
-the work was getting better. The instruction was replaced with a checkable one — *no remaining
-defect changes what someone following this would DO* — and findings were split into two buckets:
-
-```
-blocking   a contradiction, a term that silently becomes a second term, a step whose
-           mechanism appears nowhere, a required item that is missing, a claim the work
-           itself falsifies, ground another piece already owns
-
-polish     wording you would tighten, an example you would sharpen, a heading you would
-           rename — real suggestions that never hold the work below the bar
-```
-
-The next round returned 0–3 blocking per document, with the rest of each critic's findings landing
-in polish, and two documents passed for the first time. Read those two numbers separately, because they say different
-things. **The relabelling is what made the grade carry information** — the same critic, given
-somewhere to put a rename, stopped reporting ten defects where two were load-bearing. **The passes
-came from the round that followed**, which was a real build round: no work was relabelled into
-passing, and a loop that could do that would be the failure this section opens on.
-
-**So write the exit as an observable property, and give the critic somewhere to put the
-rest.** Without the second bucket a conscientious critic files the rename as blocking, because
-filing it nowhere feels like hiding it. A critic that can only reject has been given a rubber
-stamp with one word on it.
-
-**Even a checkable exit leaves one question open: which paths count.** A careful critic of a
-system with state will trace ever rarer states — a crash between two writes, a file edited by
-hand, data left by an earlier version — and each one is a real defect. Where the line sits is the
-**human's** decision, not the loop's: *"blocking only when reachable on the normal path; the rest
-is polish"* is a legitimate bar, and so is its opposite. Ask; then write the answer, word for
-word, into every critic's brief — a critic that was never told the line redraws it.
+A critic told to pass the work "only when you cannot name a concrete improvement"
+never passes anything, and the grade stops carrying information. Write the exit as
+an observable property — *no remaining defect changes what someone following this
+would DO* — give the critic a **polish** bucket beside **blocking**, and let the
+human decide which paths count → [`UNREACHABLE-BAR.md`](UNREACHABLE-BAR.md), with
+the measured before and after.
 
 ## Cut where a critic can judge one piece alone
 
-Split the work into **the smallest pieces that can be improved and judged independently** — and
-that second half is the whole test. A piece a critic cannot evaluate without opening three others
-is not a piece.
-
-**Do not split a coupled thing merely because more agents are available.** Fan out over a set of
-tightly coupled parts and each builder optimises its own against a bar the others are also
-moving; they converge on nothing. Coupled work goes to one owner, in sequence.
-
-**And what no per-piece critic can see, no number of rounds will fix.** A defect that lives
-*between* pieces — two of them claiming the same ground, a term one defines and another redefines,
-an interface each implements differently — is invisible from inside either. Each critic passes its
-own piece honestly, and the collision survives every round.
-
-That needs a pass whose input is **all the pieces at once**, run after the per-piece loops settle.
-It is not a bigger critic; it is a different question:
-
-```
-per-piece   "is this piece right?"
-whole       "do these pieces contradict, duplicate or overlap each other?"
-```
-
-Once, three of these cross-piece defects survived four clean rounds and were closed only by one
-pass holding every piece together. Budget for it from the start.
-
-**When the pieces come back, attribute each one by what its worker was ASKED, never by what its
-output mentions.** Workers read shared briefs that name every piece, and a critic hunting
-cross-piece overlap opens the other pieces on purpose — so matching on content assigns a verdict
-to whichever piece is named most. This fails quietly: the verdict lands on the wrong piece and the
-next round dutifully fixes a defect that was never there. Match on the assignment alone.
+Split into the smallest pieces that can be improved **and judged** independently;
+give coupled work to one owner, in sequence; budget one pass that reads all the
+pieces at once, because a defect between pieces survives every per-piece round;
+and attribute each returned piece by what its worker was asked →
+[`CUTTING-THE-WORK.md`](CUTTING-THE-WORK.md).
 
 ## The builder builds, the critic judges, and they never meet
 
@@ -246,7 +189,7 @@ is recorded as died, never counted.
 Below three blocking findings neither test applies: the loop is finishing, not oscillating. The run
 this rule was drawn from went 6 → 10 → 6 → 14, five of the fourteen self-caused; the rule fires at
 the third round, before the fourteen. If most of the findings that will not fall are nameable
-improvements rather than defects, it is the unreachable bar above — fix the exit first. Otherwise
+improvements rather than defects, it is the unreachable bar ([`UNREACHABLE-BAR.md`](UNREACHABLE-BAR.md)) — fix the exit first. Otherwise
 the choices for the human are: tighten the bar, change how fixes are made, or stop with every open
 finding filed.
 

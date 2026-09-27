@@ -125,7 +125,7 @@ while IFS='|' read -r label conversation message; do
   if [[ -z "$body" ]]; then
     if [[ "$label" == "tool" ]]; then
       # NOT a failure of this script and NOT a failure of the tracing layer. See issue #18:
-      # the Gemini 3.x thoughtSignature is not round-tripped by LangChain4j 1.18.1, so a turn
+      # the Gemini 3.x thoughtSignature is not round-tripped by LangChain4j 1.18.1 (re-check on 1.20.1: #56), so a turn
       # that calls a tool 500s. Measured this session: the five turns above answer normally.
       note "scenario '$label' returned nothing — this is issue #18, and it is not observability"
     else

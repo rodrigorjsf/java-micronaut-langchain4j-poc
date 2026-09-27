@@ -1,4 +1,4 @@
-# Micronaut 5 + LangChain4j 1.18 — traps that cost real time here
+# Micronaut 5 + LangChain4j 1.20 — traps that cost real time here
 
 Framework-specific gotchas hit in this repository. Each one compiled, or ran, or
 passed a test while being wrong. The concepts behind them live in
@@ -93,9 +93,20 @@ enumerated forms the document lists, never the pattern it describes.
 **Model listeners are swallowed.** An exception in a `ChatModelListener` is a
 silent hole in the accounting, not an error. Catch and log inside the listener.
 
-**GA and beta modules move together.** `langchain4j-bom:1.18.1` manages the
-stable modules at `1.18.1` and the beta ones at `1.18.1-beta28`. Never pin one
-half by hand.
+**GA and beta modules move together.** `langchain4j-bom:1.20.1` manages the
+stable modules at `1.20.1` and the beta ones at `1.20.1-beta30`. Never pin one
+half by hand. Skip `1.19.1`: its release page reads "This release was published
+by mistake. Do not use it."
+
+**Async AI Services (1.20.0+) reverse two tool defaults.** A method returning
+`CompletableFuture`/`CompletionStage`/`Flow.Publisher` runs a response's tool
+calls **concurrently**, and a tool **execution** error **fails the invocation**
+instead of reaching the model — a recoverable tool error becomes a 5xx. Keep
+`toolExecutionErrorHandler` and `toolArgumentsErrorHandler` set explicitly (they
+apply in every mode) before adopting async; the table and the concurrency knob are
+in `agentic-tool-boundary` §3. This application is synchronous today. `[sourced]`
+LangChain4j 1.20.0 release notes
+(https://github.com/langchain4j/langchain4j/releases/tag/1.20.0), read 2026-09-27.
 
 ## The tool layer
 
@@ -139,6 +150,13 @@ projecting endpoint it must sit ABOVE the raw body, because projection needs a
 complete document. Set it at the size you want the model to see and the cut lands
 mid-object, projection cannot parse it, and the tool answers "narrow your query"
 for a request that would have worked.
+
+**Micronaut's HTTP client follows redirects by default, and the switch is
+client-wide.** A catalogued host answering `302` to `169.254.169.254` was
+followed before `ToolHttpClient` saw it. The tool door has its own client
+(`@Client(id = "tool-apis")`, `micronaut.http.services.tool-apis.follow-redirects:
+false`) and follows hops itself; turning it off on the shared client would make a
+3xx on a Langfuse score POST "succeed" unwritten.
 
 **Every `base-url` is https.** A tool's arguments are user text.
 `check-tool-catalogue.py` fails on any other scheme; `localhost` is exempt for

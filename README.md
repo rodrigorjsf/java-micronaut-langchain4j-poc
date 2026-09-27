@@ -1,6 +1,6 @@
 # Agentic chat, built to be read
 
-A working agentic chat backend — **Micronaut 5.1.0, Java 25, LangChain4j 1.18.1**
+A working agentic chat backend — **Micronaut 5.1.0, Java 25, LangChain4j 1.20.1**
 — written as a study of how one is actually assembled, with the reasoning kept
 next to the code.
 
@@ -60,9 +60,9 @@ in-process and starting a real Valkey container for the cache.
 ```bash
 ./mvnw test                       # no network, no Docker, no API key
 ./mvnw test -Pit                  # + floci via Testcontainers
-./mvnw test -Pevals               # + the triage golden set against a live model
+./mvnw test -Pevals               # + the triage golden set, the scenario suite (writes eval-report.html) and the grader calibration, against live models
 ./scripts/check-tool-catalogue.py # tool code vs configured endpoints, both ways, https only
-./scripts/check-skill-docs.py     # skill directories vs docs/06-skills.md, both ways
+./scripts/check-skill-docs.py     # skill directories vs docs/06-skills.md, both ways; no skill points into another
 ```
 
 Traces are optional and off by default. Two profiles, one at a time — the two stacks
@@ -113,7 +113,7 @@ question from the two above is
 | Reach for | When |
 |---|---|
 | a triage gate in front of the agent | requests arrive that the agent should not answer, and the agent turn is much more expensive than a classifier |
-| progressive disclosure through skills | more than ~15 tools, or tool selection accuracy dropping as tools are added |
+| progressive disclosure through skills | ten or more tools, or tool selection accuracy dropping as tools are added |
 | a sub-agent workflow | a subtask produces output the main conversation will never reference again |
 | retrieval | there are questions no tool can answer — usually about the assistant itself |
 | a voice document in the prompt, not behind a skill | the rule applies to *every* answer. Routing buys nothing when the answer is always, and it fails silently when the model does not notice the turn qualifies |

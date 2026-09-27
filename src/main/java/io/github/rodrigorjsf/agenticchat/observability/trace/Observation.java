@@ -66,7 +66,7 @@ public interface Observation extends AutoCloseable {
      * The OpenTelemetry GenAI semantic-convention attributes, for the consumers that do
      * not read {@code langfuse.*}.
      */
-    Observation genAi(String system, String operationName, String requestModel);
+    Observation genAi(String providerName, String operationName, String requestModel);
 
     /**
      * The response half of the GenAI conventions: what actually served the call, and why

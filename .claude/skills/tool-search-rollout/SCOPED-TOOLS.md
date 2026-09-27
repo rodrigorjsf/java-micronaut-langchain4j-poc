@@ -344,7 +344,7 @@ is already stale by the tenth tool call inside that same turn, and the execution
 boundary is the only position that sees the tenth call.
 
 How wide that staleness window is comes straight from the disclosure-lifetime
-observation in `SKILL.md`, Step 2. Where a search's result reaches only the next
+observation in `DECIDE.md`. Where a search's result reaches only the next
 model call, the window is short. Where the disclosure survives across turns, it
 is as long as the conversation, and there is a second thing to establish while
 you are measuring: whether the filter re-runs over a disclosure the model already
@@ -359,7 +359,7 @@ serializing the specifications on the turn after.
 conversation** and design against that. It is the assumption that costs nothing
 when it turns out to be wrong: a guardrail written for a long window is still
 correct on a short one, while the reverse fails exactly on the turns where a
-permission was revoked and the conversation kept going. `SKILL.md`, Step 2
+permission was revoked and the conversation kept going. `DECIDE.md`
 carries the same default for `maxResults`, and for the same reason.
 
 **What the guardrail is.** One interceptor around every tool invocation, which

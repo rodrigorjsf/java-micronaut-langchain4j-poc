@@ -13,13 +13,17 @@ a broken tool.
 
 ## Choosing a tool
 
-| The user gives you | Use |
-|---|---|
-| a barcode read off a package, "o que tem nesse produto?" with the number | `get_food_product_by_barcode` |
-| a product or brand name — "nutella", "leite condensado Moça" — and no number | `search_food_products` |
-| a dish to cook, or nothing at all and a wish for a suggestion | `search_recipe` |
-| a drink to mix — "como faz uma caipirinha?" | `search_cocktail` |
-| a city and an interest in beer, brewpubs or a brewery tour | `search_breweries` |
+| The user gives you | Use | Before you quote its result, read once per conversation |
+|---|---|---|
+| a barcode read off a package, "o que tem nesse produto?" with the number | `get_food_product_by_barcode` | `read_skill_resource("health-and-food", "references/packaged-food.md")` |
+| a product or brand name — "nutella", "leite condensado Moça" — and no number | `search_food_products` | `read_skill_resource("health-and-food", "references/packaged-food.md")` |
+| a dish to cook, or nothing at all and a wish for a suggestion | `search_recipe` | `read_skill_resource("health-and-food", "references/recipes-and-drinks.md")` |
+| a drink to mix — "como faz uma caipirinha?" | `search_cocktail` | `read_skill_resource("health-and-food", "references/recipes-and-drinks.md")` |
+| a city and an interest in beer, brewpubs or a brewery tour | `search_breweries` | nothing — its reading rules are below |
+
+The references hold the field-by-field reading rules for one catalogue family
+each. A reference already read in this conversation is still in front of you, so
+do not read it again.
 
 ## Data, not medical advice
 
@@ -62,36 +66,13 @@ the method, not an opinion about whether the dish suits the person asking.
   where a city is, or what the weather there will be, hand the city name to
   `geo-and-weather`; this skill has no coordinates.
 
-## Reading the results
+## Reading brewery results
 
-- **Nutrition numbers are per 100 grams**, not per pack and not per serving.
-  Always say "per 100 g" when you quote one. `energy-kcal_100g` is kilocalories;
-  `salt_100g` is salt, which is roughly 2.5× the sodium figure people expect.
-  `quantity` is the pack size, so a per-pack figure needs the multiplication
-  done and stated.
-- **A found product may still carry no nutrition.** A record can come back with a
-  name and a brand, `nutriscore_grade` set to `unknown`, and none of the per-100 g
-  fields present at all. That is a real product whose data nobody filled in — say
-  the values are not recorded rather than treating the product as missing, and
-  never fill the gap from memory.
-- **`allergens_tags` is language-prefixed**, e.g. `en:milk`, `en:nuts`. Strip the
-  prefix before showing it, and see the boundary section above before saying
-  anything about safety.
-- **Recipes use numbered parallel fields.** `strIngredient1` pairs with
-  `strMeasure1`, `strIngredient2` with `strMeasure2`, and so on to 20. Read them
-  in pairs and stop at the first empty one — that is the end of the list, not a
-  gap. `strInstructions` is one long block of prose; summarise it into steps.
-  `strArea` is the cuisine and `strCategory` the course.
-- **Several variants can come back at once.** A common name — margarita, mojito —
-  returns every catalogued variant in `drinks`, and a broad word returns many
-  `meals`. Both lists arrive capped at three, ending with an entry like
-  `{"_more": 11}` when more matched. Present one recipe properly, say how many
-  others exist, and do not dump the list.
-- **Brewery results are not marked as partial.** You asked for a number and you
-  got that number; the directory may hold many more. Say "three of the breweries
-  listed in X", never "the breweries in X". `brewery_type` values are terms of art:
-  `micro`, `brewpub` (brews and serves food), `large`, `contract`, `planning`
-  (not open yet), `closed`.
+**Brewery results are not marked as partial.** You asked for a number and you
+got that number; the directory may hold many more. Say "three of the breweries
+listed in X", never "the breweries in X". `brewery_type` values are terms of art:
+`micro`, `brewpub` (brews and serves food), `large`, `contract`, `planning`
+(not open yet), `closed`.
 
 ## What this skill does not cover
 

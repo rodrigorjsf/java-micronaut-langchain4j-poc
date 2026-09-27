@@ -1,7 +1,8 @@
 package io.github.rodrigorjsf.agenticchat.rag;
 
 import dev.langchain4j.rag.content.retriever.ContentRetriever;
-import dev.langchain4j.rag.query.Query;
+import io.github.rodrigorjsf.agenticchat.rag.RetrievalReport.Chunk;
+import io.github.rodrigorjsf.agenticchat.rag.RetrievalReport.Result;
 import io.micronaut.context.ApplicationContext;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -9,9 +10,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
-import java.util.Map;
+import java.util.List;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -20,7 +23,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * <p>The embedding model runs in-process and costs nothing per call, so these are
  * ordinary unit tests with no network and no fixtures — which is the point of
- * choosing an in-process model in the first place.
+ * choosing an in-process model in the first place. They assert only; the report a person
+ * reads is written by {@code RetrievalReportEval} in the evals profile, so the default build
+ * leaves the working tree alone.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class KnowledgeBaseTest {
@@ -28,14 +33,15 @@ class KnowledgeBaseTest {
     private ApplicationContext ctx;
     private KnowledgeBase knowledge;
     private ContentRetriever retriever;
+    private List<Result> results;
 
     @BeforeAll
-    void setUp() {
-        ctx = ApplicationContext.run(Map.of(
-                "agentic.llm.credentials.google-api-key", "fake",
-                "agentic.llm.credentials.openai-api-key", "fake"));
+    void setUp() throws Exception {
+        ctx = RetrievalRun.startContext();
         knowledge = ctx.getBean(KnowledgeBase.class);
         retriever = ctx.getBean(ContentRetriever.class);
+
+        results = RetrievalRun.retrieveEveryRow(retriever);
     }
 
     @AfterAll
@@ -57,39 +63,46 @@ class KnowledgeBaseTest {
         assertThat(knowledge.embeddingModel().embed("teste").content().dimension()).isEqualTo(384);
     }
 
-    @ParameterizedTest(name = "\"{0}\" retrieves {1}")
-    @CsvSource({
-            "o que voce consegue fazer?,                          sobre-o-assistente.md",
-            "quais sao suas limitacoes?,                          sobre-o-assistente.md",
-            "o que significa o codigo IBGE de um municipio?,      dados-publicos-brasileiros.md",
-            "por que o CEP veio sem rua e sem bairro?,            dados-publicos-brasileiros.md",
-            "o que quer dizer o codigo 95 na previsao?,           como-ler-a-previsao.md",
-            "a previsao esta em qual fuso horario?,               como-ler-a-previsao.md",
-    })
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("positiveRows")
     @DisplayName("a real question retrieves the document that answers it")
-    void retrievesTheRightDocument(String question, String expectedSource) {
-        var contents = retriever.retrieve(Query.from(question));
-
-        assertThat(contents)
-                .as("nothing retrieved for: %s", question)
-                .isNotEmpty();
-
-        var sources = contents.stream()
-                .map(content -> content.textSegment().metadata().getString("source"))
-                .toList();
-        assertThat(sources)
-                .as("question: %s", question)
-                .contains(expectedSource);
+    void retrievesTheRightDocument(String id, Result result) {
+        var sources = result.chunks().stream().map(Chunk::source).toList();
+        assertThat(result.passed())
+                .as("%s: \"%s\" should retrieve %s, retrieved %s",
+                        id, result.query().question(), result.query().expectedSource(), sources)
+                .isTrue();
     }
 
-    @ParameterizedTest(name = "no match: {0}")
-    @org.junit.jupiter.params.provider.ValueSource(strings = {
-            "qual e a receita de bolo de cenoura com cobertura de chocolate",
-            "escreva um script em python para ler um csv",
-    })
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("negativeRows")
     @DisplayName("a clearly unrelated question retrieves nothing")
-    void anUnrelatedQuestionRetrievesNothing(String question) {
-        assertThat(retriever.retrieve(Query.from(question))).isEmpty();
+    void anUnrelatedQuestionRetrievesNothing(String id, Result result) {
+        assertThat(result.chunks())
+                .as("%s: \"%s\" should retrieve nothing", id, result.query().question())
+                .isEmpty();
+    }
+
+    @Test
+    @DisplayName("every corpus document is some positive row's expected source, and every expected source exists")
+    void queriesCoverTheCorpusBothWays() throws Exception {
+        var expected = results.stream().map(r -> r.query().expectedSource())
+                .filter(java.util.Objects::nonNull).distinct().toList();
+
+        assertThat(expected)
+                .as("a document no positive row names ships untested; see Uncovered documents in RetrievalReportEval's report")
+                .containsAll(RetrievalRun.corpusDocuments());
+        assertThat(RetrievalRun.corpusDocuments())
+                .as("an expected_source naming a document that no longer exists can never pass")
+                .containsAll(expected);
+    }
+
+    Stream<Arguments> positiveRows() {
+        return results.stream().filter(r -> r.query().positive()).map(r -> Arguments.of(r.query().id(), r));
+    }
+
+    Stream<Arguments> negativeRows() {
+        return results.stream().filter(r -> !r.query().positive()).map(r -> Arguments.of(r.query().id(), r));
     }
 
     @Test
@@ -116,7 +129,7 @@ class KnowledgeBaseTest {
 
     private static double topScore(dev.langchain4j.rag.content.retriever.ContentRetriever retriever,
                                    String question) {
-        var contents = retriever.retrieve(Query.from(question));
+        var contents = retriever.retrieve(dev.langchain4j.rag.query.Query.from(question));
         assertThat(contents).isNotEmpty();
         return (Double) contents.getFirst().metadata()
                 .get(dev.langchain4j.rag.content.ContentMetadata.SCORE);
@@ -124,7 +137,7 @@ class KnowledgeBaseTest {
 
     @Test
     void everySegmentCarriesItsSourceAndTitle() {
-        var contents = retriever.retrieve(Query.from("o que voce consegue fazer"));
+        var contents = retriever.retrieve(dev.langchain4j.rag.query.Query.from("o que voce consegue fazer"));
 
         assertThat(contents).allSatisfy(content -> {
             var metadata = content.textSegment().metadata();
@@ -136,7 +149,7 @@ class KnowledgeBaseTest {
     @Test
     @DisplayName("retrieval carries a relevance score, so citations can be ranked")
     void contentsCarryAScore() {
-        var contents = retriever.retrieve(Query.from("quais feriados voce conhece"));
+        var contents = retriever.retrieve(dev.langchain4j.rag.query.Query.from("quais feriados voce conhece"));
 
         assertThat(contents).isNotEmpty();
         assertThat(contents.getFirst().metadata()).isNotEmpty();
