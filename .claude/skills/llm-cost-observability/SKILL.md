@@ -77,7 +77,9 @@ cached token read **plus storage per million tokens per hour** [sourced — Goog
 *Gemini Developer API pricing*, https://ai.google.dev/gemini-api/docs/pricing,
 read 2026-09-27].
 
-So price input in three parts, each at its configured rate:
+So price input in three parts, each at its configured rate. Here `input` is the
+span's total (`gen_ai.usage.input_tokens`); a store that already keeps fresh input
+in its own bucket skips the subtraction:
 
 ```
 fresh       = max(0, input - cache_read - cache_write)

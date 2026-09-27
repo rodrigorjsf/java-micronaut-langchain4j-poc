@@ -649,10 +649,15 @@ fi
 # starts mapping the provider — or typing on it — is noticed rather than inferred.
 PROVIDER=$(jq -r '.data[] | select(.name=="agent") | .metadata["attributes.gen_ai.provider.name"] // empty' <<<"$SHAPE_OBS" 2>/dev/null | head -1)
 PROVIDER_GEN_TYPE=$(jq -r '.data[] | select(.name=="agent") | .type // empty' <<<"$SHAPE_OBS" 2>/dev/null | head -1)
-if [[ "$PROVIDER" == "google_ai_gemini" && "$PROVIDER_GEN_TYPE" == "GENERATION" ]]; then
-  ok "gen_ai.provider.name arrives unmapped under metadata.attributes; the generation stays GENERATION"
+if [[ "$PROVIDER" == "google_ai_gemini" ]]; then
+  ok "gen_ai.provider.name arrives unmapped, under metadata.attributes"
 else
-  fail "gen_ai.provider.name read back as '$PROVIDER' on a '$PROVIDER_GEN_TYPE', expected google_ai_gemini on a GENERATION"
+  fail "gen_ai.provider.name read back as '$PROVIDER', expected google_ai_gemini in the catch-all"
+fi
+if [[ "$PROVIDER_GEN_TYPE" == "GENERATION" ]]; then
+  ok "a generation carrying gen_ai.provider.name stays GENERATION"
+else
+  fail "the generation carrying gen_ai.provider.name is typed '$PROVIDER_GEN_TYPE'"
 fi
 
 REFUSED_OBS=""

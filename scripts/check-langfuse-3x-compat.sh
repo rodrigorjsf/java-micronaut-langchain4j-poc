@@ -246,7 +246,9 @@ check '.data[] | select(.name=="voice-compliance") | .statusMessage // ""' 'repr
 check '.data[] | select(.name=="chat-turn") | .environment' 'compat' "langfuse.environment survives"
 check '.data[] | select(.name=="agent") | .model // ""' 'gemini-3.1-flash-lite' "model name survives"
 # 3.80.0's OtelIngestionProcessor reads neither gen_ai.system nor gen_ai.provider.name, so
-# the provider should arrive only as unmapped metadata — the same place 4.x files it.
+# the provider should arrive only as unmapped metadata — the same place 4.x files it. Both
+# metadata shapes are accepted because the legacy read path may nest the attributes object
+# rather than flatten it; the claim tested is "unmapped", not the key's spelling.
 check '.data[] | select(.name=="agent") | .metadata.attributes["gen_ai.provider.name"] // .metadata["attributes.gen_ai.provider.name"] // ""' 'google_ai_gemini' "gen_ai.provider.name survives as unmapped metadata"
 
 USAGE=$(jq -r '.data[] | select(.name=="agent") | .usageDetails | tostring' <<<"$OBS" 2>/dev/null)

@@ -298,8 +298,9 @@ public class LangfuseAiServiceListener {
     }
 
     /**
-     * {@code gen_ai.provider.name} in the spelling the GenAI conventions use — lower snake case,
-     * matching the {@code google_genai} this project already writes on generations.
+     * {@code gen_ai.provider.name} from LangChain4j's own provider enum, lower-cased — the same
+     * spelling the model listeners write on generations ({@code google_ai_gemini}), and
+     * deliberately not the registry value; see {@code GenAiMetrics} for why one vocabulary.
      */
     private static String providerOf(InvocationContext invocation) {
         var provider = invocation.modelProvider();
