@@ -260,6 +260,68 @@ class ToolHttpClientTest {
     }
 
     @Test
+    @DisplayName("a 302 from a catalogued host to the cloud metadata address is not followed")
+    void aRedirectToTheMetadataAddressIsNotFollowed() {
+        // The catalogue stops a tool from NAMING 169.254.169.254; it says nothing about
+        // a catalogued host that answers 302 to it. An HTTP client that follows
+        // redirects by default re-opens the door the catalogue closed.
+        long start = System.nanoTime();
+        var response = tools.get("stub", "/redirect",
+                Map.of("to", "http://169.254.169.254/latest/meta-data/iam/security-credentials/"));
+        long elapsedMs = (System.nanoTime() - start) / 1_000_000;
+
+        assertThat(response.outcome()).isEqualTo(ToolResponse.Outcome.UPSTREAM_ERROR);
+        assertThat(response.toModelText())
+                .as("refused as a redirect, not a connection to the metadata address that failed")
+                .contains("redirected outside the tool catalogue")
+                .doesNotContain("169.254");
+        assertThat(elapsedMs)
+                .as("a refused hop costs no connection attempt, so it cannot wait on the 2 s timeout")
+                .isLessThan(1_500);
+    }
+
+    @Test
+    @DisplayName("a redirect to a host outside the catalogue is never requested")
+    void aRedirectOffTheCatalogueIsNeverRequested() {
+        // 169.254.169.254 cannot be observed from a test; 127.0.0.1 can. It is the same
+        // server under a host the catalogue does not hold ("localhost" is), so a request
+        // that lands there proves the client followed a hop it should have refused.
+        StubApiController.LANDED_CALLS.set(0);
+
+        var response = tools.get("stub", "/redirect",
+                Map.of("to", "http://127.0.0.1:" + server.getPort() + "/stub/landed"));
+
+        assertThat(response.isOk()).isFalse();
+        assertThat(StubApiController.LANDED_CALLS.get()).isZero();
+    }
+
+    @Test
+    @DisplayName("a redirect to another port on a catalogued host is refused")
+    void aRedirectToAnotherPortIsRefused() {
+        // The catalogue names an origin, not a hostname: "localhost" with the stub's port
+        // is reviewed, localhost:6379 is somebody's Redis. The port is unbound here, so a
+        // client that followed would fail as a connection error, not as a refusal.
+        var response = tools.get("stub", "/redirect", Map.of("to", "http://localhost:1/stub/landed"));
+
+        assertThat(response.toModelText()).contains("redirected outside the tool catalogue");
+    }
+
+    @Test
+    @DisplayName("a redirect that stays on the catalogued host is still followed")
+    void aRedirectWithinTheCatalogueIsFollowed() {
+        // Refusing every 3xx would be the easy fix and a silent regression: an upstream
+        // that moves a route and answers 301 is ordinary, and the answer is still there.
+        var relative = tools.get("stub", "/redirect", Map.of("to", "/stub/ok"));
+        var absolute = tools.get("stub", "/redirect",
+                Map.of("to", "http://localhost:" + server.getPort() + "/stub/ok"));
+
+        assertThat(relative.isOk()).isTrue();
+        assertThat(relative.body()).contains("Sao Paulo");
+        assertThat(absolute.isOk()).isTrue();
+        assertThat(absolute.body()).contains("Sao Paulo");
+    }
+
+    @Test
     void exposesTheCatalogueForStartupValidation() {
         assertThat(tools.knownApis()).contains("stub", "slowapi");
     }

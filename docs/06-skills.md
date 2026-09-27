@@ -175,6 +175,11 @@ parameters would let the model name a destination.
 - An upstream call throws, and the exception's message — carrying the upstream URL,
   the response body, possibly a credential — is on its way into the prompt, the
   history and the provider's logs.
+- A catalogued host answers `302` to `169.254.169.254`, and the HTTP client
+  follows it before any code sees the redirect — the catalogue decided the first
+  request and nothing decided the second.
+- The first tool that writes, sends or deletes is proposed, and nothing stops the
+  loop between the model choosing that call and the call running.
 
 | Neighbour | Way | The discriminator |
 |---|---|---|

@@ -151,6 +151,13 @@ complete document. Set it at the size you want the model to see and the cut land
 mid-object, projection cannot parse it, and the tool answers "narrow your query"
 for a request that would have worked.
 
+**Micronaut's HTTP client follows redirects by default, and the switch is
+client-wide.** A catalogued host answering `302` to `169.254.169.254` was
+followed before `ToolHttpClient` saw it. The tool door has its own client
+(`@Client(id = "tool-apis")`, `micronaut.http.services.tool-apis.follow-redirects:
+false`) and follows hops itself; turning it off on the shared client would make a
+3xx on a Langfuse score POST "succeed" unwritten.
+
 **Every `base-url` is https.** A tool's arguments are user text.
 `check-tool-catalogue.py` fails on any other scheme; `localhost` is exempt for
 test fixtures. `ip-api.com` was rejected over exactly this — see

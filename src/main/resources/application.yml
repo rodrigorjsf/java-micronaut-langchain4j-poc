@@ -22,6 +22,17 @@ micronaut:
       # Per-endpoint transport limits are the version that would make this derived
       # rather than chosen; see docs/03-security.md.
       max-content-length: 3145728
+    services:
+      # ToolHttpClient's own client (@Client(id = "tool-apis")); every request it makes
+      # is an absolute catalogue URL, so it needs no url here.
+      tool-apis:
+        # Redirects are followed by ToolHttpClient, hop by hop, and only to a host and
+        # port the tool catalogue names. Left at Micronaut's default (true), a catalogued
+        # host answering 302 to http://169.254.169.254 is followed before any code here
+        # sees it. Scoped to this client on purpose: on the shared default client it
+        # would also make a Langfuse score POST answered with a 3xx "succeed" unwritten.
+        # ToolHttpClientTest#aRedirectToTheMetadataAddressIsNotFollowed pins it.
+        follow-redirects: false
   server:
     port: 8080
 
